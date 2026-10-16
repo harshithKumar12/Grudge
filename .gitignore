@@ -1,0 +1,14 @@
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
+
+# Local environments and generated Python artifacts.
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.grudge/
+build/
+dist/

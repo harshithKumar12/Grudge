@@ -1,0 +1,10 @@
+name: Grudge Gate (roadmap)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  phase-zero-placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "CI integration is a Phase 13 roadmap item."

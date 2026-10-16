@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 220" role="img" aria-labelledby="title desc">
+  <title id="title">Grudge eight-stage pipeline</title>
+  <desc id="desc">Placeholder diagram showing the eight Grudge pipeline stages from recording to the CI gate.</desc>
+  <style>
+    .stage { fill: #202938; stroke: #8fb3ff; stroke-width: 2; }
+    .label { fill: #f5f7fb; font: 16px sans-serif; text-anchor: middle; }
+    .arrow { fill: none; marker-end: url(#arrowhead); stroke: #8fb3ff; stroke-width: 2; }
+  </style>
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#8fb3ff" />
+    </marker>
+  </defs>
+  <rect width="1200" height="220" fill="#10151f" />
+  <g>
+    <rect class="stage" x="20" y="85" width="125" height="50" rx="8" />
+    <rect class="stage" x="165" y="85" width="125" height="50" rx="8" />
+    <rect class="stage" x="310" y="85" width="125" height="50" rx="8" />
+    <rect class="stage" x="455" y="85" width="125" height="50" rx="8" />
+    <rect class="stage" x="600" y="85" width="125" height="50" rx="8" />
+    <rect class="stage" x="745" y="85" width="125" height="50" rx="8" />
+    <rect class="stage" x="890" y="85" width="125" height="50" rx="8" />
+    <rect class="stage" x="1035" y="85" width="145" height="50" rx="8" />
+  </g>
+  <g>
+    <path class="arrow" d="M145 110 H165" /><path class="arrow" d="M290 110 H310" />
+    <path class="arrow" d="M435 110 H455" /><path class="arrow" d="M580 110 H600" />
+    <path class="arrow" d="M725 110 H745" /><path class="arrow" d="M870 110 H890" />
+    <path class="arrow" d="M1015 110 H1035" />
+  </g>
+  <g class="label">
+    <text x="82" y="115">1 Recorder</text>
+    <text x="227" y="115">2 Locator</text>
+    <text x="372" y="115">3 Shrinker</text>
+    <text x="517" y="115">4 Predicate</text>
+    <text x="662" y="115">5 Admission</text>
+    <text x="807" y="115">6 Fuzzer</text>
+    <text x="952" y="115">7 Registry</text>
+    <text x="1107" y="115">8 CI Gate</text>
+  </g>
+</svg>
