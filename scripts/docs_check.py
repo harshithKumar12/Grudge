@@ -51,7 +51,7 @@ def check_docs(repo_root: Path) -> list[str]:
             errors.append(f"unindexed docs file: docs/{relative}")
         if not path.read_bytes():
             errors.append(f"empty docs file: docs/{relative}")
-        if path.suffix.lower() == ".md":
+        if path.suffix.lower() == ".md" and relative != "PROGRESS.md":
             text = path.read_text(encoding="utf-8")
             for field in REQUIRED_METADATA:
                 if field not in text:

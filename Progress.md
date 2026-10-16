@@ -1,19 +1,19 @@
 # Progress.md: Grudge build tracker
 
-_Last updated: 2026-10-15 by omnirush.ai_
+_Last updated: 2026-10-16 by omnirush.ai_
 
 ## Snapshot
-- **Current phase:** 0: Bootstrap & Governance
-- **Overall:** 0/14 phases complete
-- **Test suite:** 20 passing in the project-local environment
+- **Current phase:** 1: Schemas complete; awaiting owner commit
+- **Overall:** 2/14 phases complete
+- **Test suite:** 30 passing in WSL Python 3.11.17
 - **Demo status:** works offline? n/a (demo is a Phase 10 deliverable)
-- **Next action:** Re-run the exit protocol and commit Phase 0 on a machine with Python 3.11, make, git, and Docker available.
+- **Next action:** Owner runs the Phase 1 commit commands, then the next session re-runs pre-flight before Phase 2.
 
 ## Phase Board
 | # | Phase | Status | Exit gate passed | Docs done |
 |---|-------|--------|------------------|-----------|
-| 0 | Bootstrap & Governance | [!] | no | [x] |
-| 1 | Schemas | [ ] | no | no |
+| 0 | Bootstrap & Governance | [x] | yes | [x] |
+| 1 | Schemas | [x] | yes | [x] |
 | 2 | Leaky Agent & Scripted LLM | [ ] | no | no |
 | 3 | Recorder | [ ] | no | no |
 | 4 | Replay Engine | [ ] | no | no |
@@ -35,10 +35,16 @@ _Last updated: 2026-10-15 by omnirush.ai_
 - [x] Implement configuration, error hierarchy, CLI help surface, and honest stretch stubs.
 - [x] Create the docs system, docs checker, architecture skeleton, roadmap, and ADRs.
 - [x] Add Phase 0 tests for configuration, errors, CLI help, stubs, and docs checking.
-- [!] Run the Phase Exit Protocol and commit `phase-0: complete bootstrap & governance`.
+- [x] Run the Phase Exit Protocol and commit `phase-0: complete bootstrap & governance`.
 
 ### Phase 1
-- [ ] Schemas and schema tests.
+- [x] Implement `Trace` and its discriminated step models with JSONL round-trip helpers.
+- [x] Implement `Cassette` and argument matcher contracts with stable hashing and size reporting.
+- [x] Implement predicate AST models, combinators, and plain-English descriptions.
+- [x] Implement `Scar` metadata, admission record, fingerprint, and JSON file I/O.
+- [x] Add model round-trip, invalid payload, Hypothesis, and description snapshot tests.
+- [x] Write and index `trace-format.md`, `cassette-format.md`, and `glossary.md`.
+- [x] Run the Phase 1 Exit Protocol; owner commit command is supplied in the handoff report.
 
 ### Phase 2
 - [ ] Leaky agent, scripted LLM, example world, and tests.
@@ -82,23 +88,28 @@ _Last updated: 2026-10-15 by omnirush.ai_
 | 2026-10-15 | `docs/PROGRESS.md` existed but was empty; use root `Progress.md` as the canonical tracker required by PROMPT.md, and retain the docs file as a pointer. | The specification's final layout and all phase rules name root `Progress.md`; the user's note identified the empty docs file as the intended existing tracker. | Progress tracking and docs-check |
 | 2026-10-15 | Choose the standard-library `http.server` path for Phase 0 rather than adding FastAPI/Uvicorn. | Phase 0 needs only a buildable skeleton; this minimizes dependencies and keeps the bootstrap offline-friendly. | pyproject.toml, ADR 0001 |
 | 2026-10-15 | Keep the required Python 3.11.11 pin instead of widening it to accommodate the host's Python 3.14. | The specification requires Python 3.11+ and the lock's pinned Pydantic version has no usable host-Python wheel here; the project must remain reproducible on its declared runtime. | .python-version, requirements.lock |
+| 2026-10-16 | Phase 0 exit gate is passed by owner commit `aa965bc` (`phase-0: complete bootstrap & governance`). | Owner-provided WSL Ubuntu/Python 3.11.17 evidence shows `make test` (20 passed), lint, typecheck, docs-check, `make all`, and CLI help all green. | Phase Board, Snapshot, Phase 1 start |
+| 2026-10-16 | Docker is optional and is not part of any exit gate. | Owner clarified that PROMPT.md does not require Docker for phase exits. Keep the Dockerfile as an optional reproducibility artifact. | Progress blockers and exit protocol |
+| 2026-10-16 | Supported Python range is `>=3.11,<3.14`; `.python-version` uses `3.11`. | Owner decision broadens the prior exact patch pin while excluding the unsupported Python 3.14 environment. | pyproject.toml, .python-version |
+| 2026-10-16 | The schema import failure was a Phase 1 acceptance failure, not a Phase 0 failure. | `Trace`, `Cassette`, and `Scar` are Phase 1 deliverables. | Phase 1 implementation and acceptance |
+| 2026-10-16 | All commands run in WSL with the activated `.venv`; failed git commands do not block implementation. | Owner will perform commits in their terminal when needed. | Command execution and handoff |
+| 2026-10-16 | Root `Progress.md` is canonical; `docs/PROGRESS.md` is a one-line pointer. | Prevent duplicate progress trackers from drifting. | docs/PROGRESS.md, docs-check |
 
 ## Blockers
 | Date | Blocker | Tried | Needs |
 |------|---------|-------|-------|
-| 2026-10-15 | The repository has no existing lockfile or project metadata. | Confirmed the workspace contains only owner/spec files and an empty docs progress file. | Phase 0 must create the pinned metadata and lockfile without installing globally. |
-| 2026-10-15 | Host cannot run the complete exit protocol: Python is 3.14.0 (not pinned 3.11.11), and `make`, `git`, and Docker are unavailable. | Project-local checks were run with a Python 3.14 venv; the exact missing tools were probed and not found. | Run the documented commands on a clean Linux environment with the declared toolchain, then commit. |
-| 2026-10-15 | Exact dependency install from `requirements.lock` cannot build `pydantic-core` on host Python 3.14 without Rust/Cargo. | A project-local install was attempted; the lock remains correct for the declared Python 3.11.11 runtime. | Use Python 3.11.11 or the Docker build environment. |
-| 2026-10-15 | Session 2 re-confirmed the Phase 0 exit blocker: host reports Python 3.14.0 and cannot resolve `make`, `git`, or `docker`. | Ran `python --version; make --version; git --version; docker --version` from the repository. | Provide a clean Linux environment with Python 3.11.11, make, Git, and Docker, or explicitly authorize a process exception. |
-| 2026-10-15 | WSL2 is available, but its Ubuntu distribution has Python 3.14.4, no Python 3.11, and no Docker CLI; only make and Git are available. | Ran the toolchain probe from `/mnt/c/Users/kotes/Desktop/Grudge` inside the running Ubuntu WSL2 distribution. | Install/use project-approved Python 3.11.11 and provide Docker access in WSL, without starting Phase 1 before Phase 0 passes. |
-| 2026-10-15 | Owner decision: all work runs in WSL Ubuntu with Python 3.11 and an activated `.venv`; Makefile commands must use the active environment or detect both POSIX and Windows venv layouts. | The owner supplied a successful WSL Python 3.11.17 setup and requested portability without starting Phase 1. | Makefile, README setup instructions, and Phase 0 verification. |
-| 2026-10-15 | The WSL service stopped starting after the Phase 0 checks completed, so the exact `python -m pip install -e .` retry and commit could not be performed by this session. | `wsl --status` returned Ubuntu as the default WSL2 distribution, but `wsl -e bash` then returned `Wsl/Service/CreateInstance/E_FAIL`. | Restart WSL, rerun the exact install/commit steps, and keep Phase 1 unopened. |
+| 2026-10-15 | The repository has no existing lockfile or project metadata. | Resolved by Phase 0 bootstrap and owner commit `aa965bc`. | Closed |
+| 2026-10-15 | Host cannot run the complete exit protocol under the original Windows environment. | Superseded by owner’s WSL evidence and Phase 0 commit. | Closed; Docker is not required |
+| 2026-10-15 | Exact dependency install from `requirements.lock` cannot build `pydantic-core` on host Python 3.14 without Rust/Cargo. | Superseded by owner’s Python 3.11.17 WSL environment. | Closed |
+| 2026-10-15 | Session 2 re-confirmed the Phase 0 blocker in the original host environment. | Superseded by owner’s WSL evidence and commit. | Closed |
+| 2026-10-15 | WSL2 initially lacked Python 3.11 and Docker CLI. | Owner supplied a working Python 3.11.17 WSL environment; Docker removed from the gate. | Closed |
+| 2026-10-15 | Owner’s WSL service temporarily returned `Wsl/Service/CreateInstance/E_FAIL`. | Owner later supplied successful WSL checks and commit evidence. | Closed |
 
 ## Known Issues & Tech Debt
 - Phase 0 intentionally leaves all stretch modules as documented `NotImplementedError` stubs.
 
 ## Doc Debt
-- Required phase-specific docs for later phases are indexed as planned stubs; they will be written in their owning phases.
+- Required docs for Phases 2-12 remain indexed as planned work; no Phase 1 doc debt remains.
 
 ## Session Log (append-only, newest at bottom)
 ### 2026-10-15 Session 1
@@ -154,3 +165,24 @@ _Last updated: 2026-10-15 by omnirush.ai_
 - **Tests:** `python -m grudge --help` printed the CLI; `make test` → `20 passed`; `make lint` → `All checks passed!`; `make typecheck` → `Success: no issues found in 75 source files`; `make docs-check` → `docs-check: 7 indexed, non-empty, linked documentation files`; `make all` → all four checks passed; import sweep → `56 modules imported`; `uv pip install -e .` succeeded. The separately attempted `from grudge.schema import Trace, Cassette, Scar` remains intentionally unavailable because it is a Phase 1 acceptance check.
 - **Docs updated:** Progress.md decision/session log and README portability instructions.
 - **Handoff note:** WSL then failed to start with `Wsl/Service/CreateInstance/E_FAIL`, so this session did not run the exact pip retry or commit. Restart WSL, rerun the Phase 0 exit/commit steps, and do not begin Phase 1.
+
+### 2026-10-16 Session 6
+- **Pre-flight:** read AGENTS.md y, read PROMPT.md y, read Progress.md y, read docs/INDEX.md y, read Phase 1 requirements in PROMPT.md.
+- **Plan:**
+  - Record the owner’s Phase 0 pass, commit `aa965bc`, Python range, optional Docker, WSL execution, Phase 1 import interpretation, and canonical progress-file decisions.
+  - Update the Phase 0 tracker state and make the progress pointer one line.
+  - Implement only Phase 1 schemas in `grudge/schema/` with tests for round trips, invalid payloads, Hypothesis JSONL properties, and descriptions.
+  - Write and index `docs/trace-format.md`, `docs/cassette-format.md`, and `docs/glossary.md`, then update architecture links/status.
+  - Run the Phase 1 acceptance import and the full Phase Exit Protocol; do not begin Phase 2.
+- **Done:** Phase 0 decisions recorded; Phase 1 work in progress.
+- **Tests:** Phase 1 checks not yet run.
+- **Docs updated:** Progress.md, docs/PROGRESS.md, docs/INDEX.md, and Phase 1 docs pending.
+- **Handoff note:** At phase end, provide exact owner-run git commands for `phase-1: complete schemas`; if git is unavailable to this session, do not treat that as a phase blocker.
+
+### 2026-10-16 Session 7
+- **Pre-flight:** read AGENTS.md y, read PROMPT.md y, read Progress.md y, read docs/INDEX.md y; Phase 1 requirements re-read before implementation.
+- **Plan:** Implement only Phase 1 schemas, tests, and required docs; expose schema imports; run the acceptance import and full Phase Exit Protocol; do not begin Phase 2.
+- **Done:** Implemented Trace/Step discriminated models and JSONL, Cassette/ArgMatcher contracts and hashes, predicate AST/combinators, Scar/AdmissionRecord persistence, package exports, Hypothesis round-trip coverage, and Phase 1 documentation. Fixed JSONL parsing to preserve Unicode line-separator characters and made docs progress a one-line canonical pointer.
+- **Tests:** `python -m pytest` → `30 passed`; `python -m ruff check grudge tests scripts` → `All checks passed!`; `python -m ruff format --check grudge tests scripts` → `85 files already formatted`; `python -m mypy grudge scripts` → `Success: no issues found in 75 source files`; `python -m scripts.docs_check` → `docs-check: 10 indexed, non-empty, linked documentation files`; `make all` → all four checks passed; acceptance import → `schema imports ok`; `git diff --check` passed.
+- **Docs updated:** `docs/trace-format.md`, `docs/cassette-format.md`, `docs/glossary.md`, `docs/INDEX.md`, `docs/architecture.md`, and one-line `docs/PROGRESS.md`.
+- **Handoff note:** Phase 1 exit gate is complete. Owner should run the exact git commands in the final report to create `phase-1: complete schemas`. Phase 2 has not started.

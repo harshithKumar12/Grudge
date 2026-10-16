@@ -1,13 +1,13 @@
 # Architecture
 
-**Purpose:** Describe the Phase 0 architecture skeleton that later implementation phases will fill in.
+**Purpose:** Describe the Phase 1 architecture and typed contract boundaries that later stages consume.
 **Audience:** Contributors designing or implementing a pipeline stage, and reviewers checking stage boundaries.
 **Status:** draft
-**Last updated (phase):** 0
+**Last updated (phase):** 1
 
 ## System boundary
 
-Grudge turns an agent failure trace into a durable regression artifact called a **Scar**. A Scar combines a minimal frozen world (a cassette), a behavioral predicate, and evidence that the predicate distinguishes a failing agent from a fixed agent. The Phase 0 repository has the documentation and planned boundaries only; runtime modules are delivered in later phases.
+Grudge turns an agent failure trace into a durable regression artifact called a **Scar**. Phase 1 now implements the shared Pydantic contracts for traces, cassettes, predicates, and Scars; execution stages consume these contracts without owning their shape.
 
 ## Eight-stage pipeline
 
@@ -53,7 +53,7 @@ The deterministic core is the shrinker, predicate checker, admission court, and 
 
 | Boundary | Planned package | Phase | Contract |
 |---|---|---:|---|
-| Shared data | `grudge.schema` | 1 | Typed trace, cassette, predicate, and Scar models. |
+| Shared data | `grudge.schema` | 1 | Typed trace, cassette, predicate, and Scar models with JSON persistence helpers. |
 | Capture | `grudge.recorder` | 3 | Append-only trace recording with redaction hooks. |
 | Replay | `grudge.replay` | 4 | Cassette-backed tools and a deterministic sandbox. |
 | Reduction | `grudge.shrinker` | 5 | Delta debugging plus content reducers. |
@@ -71,4 +71,6 @@ The deterministic core is the shrinker, predicate checker, admission court, and 
 - **Gate selectors and registries** can remain optional so the offline CLI path stays small and reproducible.
 - **Viewer events** are emitted by the demo boundary; the viewer does not own pipeline state or decision logic.
 
-Phase-specific documents will deepen this skeleton as each contract is implemented. Deferred work is tracked in [`roadmap.md`](roadmap.md).
+The Phase 1 schema details are in [`trace-format.md`](trace-format.md),
+[`cassette-format.md`](cassette-format.md), and [`glossary.md`](glossary.md).
+Deferred work is tracked in [`roadmap.md`](roadmap.md).
