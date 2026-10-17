@@ -3,11 +3,11 @@
 _Last updated: 2026-10-17 by omnirush.ai_
 
 ## Snapshot
-- **Current phase:** 4: Replay Engine complete; awaiting owner commit
-- **Overall:** 5/14 phases complete
-- **Test suite:** 61 passing in WSL Python 3.11.17
+- **Current phase:** 5: Shrinker complete; awaiting owner commit
+- **Overall:** 6/14 phases complete
+- **Test suite:** 82 passing in WSL Python 3.11.17
 - **Demo status:** works offline? n/a (demo is a Phase 10 deliverable)
-- **Next action:** Owner runs the Phase 4 commit commands, then the next session re-runs pre-flight before Phase 5.
+- **Next action:** Owner runs the Phase 5 commit commands, then the next session re-runs pre-flight before Phase 6.
 
 ## Phase Board
 | # | Phase | Status | Exit gate passed | Docs done |
@@ -17,7 +17,7 @@ _Last updated: 2026-10-17 by omnirush.ai_
 | 2 | Leaky Agent & Scripted LLM | [x] | yes | [x] |
 | 3 | Recorder | [x] | yes | [x] |
 | 4 | Replay Engine | [x] | yes | [x] |
-| 5 | Shrinker | [ ] | no | no |
+| 5 | Shrinker | [x] | yes | [x] |
 | 6 | Predicates | [ ] | no | no |
 | 7 | Admission Court | [ ] | no | no |
 | 8 | Gate & Statistics | [ ] | no | no |
@@ -73,7 +73,13 @@ _Last updated: 2026-10-17 by omnirush.ai_
 - [x] Run the Phase 4 Exit Protocol; owner commit command is supplied in the handoff report.
 
 ### Phase 5
-- [ ] Shrinker, reducers, cassette builder, and tests.
+- [x] Implement memoized `PredicateOracle` with repeats and `max_oracle_calls` budget handling.
+- [x] Implement pure Zeller ddmin with ordered progress callbacks, stats, and 1-minimality coverage.
+- [x] Implement `TrimDocument`, `BlankField`, and `NormalizeIds` content reducers.
+- [x] Implement `build_minimal_cassette` with entry reduction before content reduction and ordered history.
+- [x] Add synthetic, property-based, oracle, reducer, and real leaky-agent shrink tests.
+- [x] Write and index `shrinking.md` and ADR 0002; update architecture documentation.
+- [x] Run the Phase 5 Exit Protocol; owner commit command is supplied in the handoff report.
 
 ### Phase 6
 - [ ] Predicate DSL, compiler, synthesizer, and tests.
@@ -111,6 +117,7 @@ _Last updated: 2026-10-17 by omnirush.ai_
 | 2026-10-16 | The schema import failure was a Phase 1 acceptance failure, not a Phase 0 failure. | `Trace`, `Cassette`, and `Scar` are Phase 1 deliverables. | Phase 1 implementation and acceptance |
 | 2026-10-16 | All commands run in WSL with the activated `.venv`; failed git commands do not block implementation. | Owner will perform commits in their terminal when needed. | Command execution and handoff |
 | 2026-10-16 | Root `Progress.md` is canonical; `docs/PROGRESS.md` is a one-line pointer. | Prevent duplicate progress trackers from drifting. | docs/PROGRESS.md, docs-check |
+| 2026-10-17 | Shrink cassettes in two levels: entry ddmin first, then deterministic content reducers. | Whole-entry reduction exposes the causal set before spending oracle calls on response detail; memoization and a call budget control the remaining search cost. | `grudge/shrinker/`, ADR 0002, `docs/shrinking.md` |
 
 ## Blockers
 | Date | Blocker | Tried | Needs |
@@ -127,7 +134,7 @@ _Last updated: 2026-10-17 by omnirush.ai_
 - Phase 2’s fixed agent uses a simple substring taint check and explicit confirmation heuristic; generalized taint semantics belong to Phase 6.
 
 ## Doc Debt
-- Required docs for Phases 2-12 remain indexed as planned work; no Phase 1 doc debt remains.
+- Required docs for Phases 6-12 remain indexed as planned work; Phase 5 shrinker documentation is complete.
 
 ## Session Log (append-only, newest at bottom)
 ### 2026-10-15 Session 1
@@ -246,6 +253,19 @@ _Last updated: 2026-10-17 by omnirush.ai_
 - **Tests:** `python -m pytest` → `61 passed`; focused replay tests → `14 passed`; `python -m ruff check grudge tests scripts` → `All checks passed!`; `python -m ruff format --check grudge tests scripts` → all files formatted; `python -m mypy grudge scripts` → `Success: no issues found in 75 source files`; `python -m scripts.docs_check` → `docs-check: 12 indexed, non-empty, linked documentation files`; `make all` → all four checks passed; `git diff --check` passed.
 - **Docs updated:** `docs/why-not-replay.md`, `docs/cassette-format.md`, `docs/architecture.md`, `docs/INDEX.md`, and this tracker.
 - **Handoff note:** Phase 4 exit gate is complete. Owner should run the exact git commands in the final report to create `phase-4: complete replay engine`. Phase 5 has not started.
+
+### 2026-10-17 Session 12
+- **Pre-flight:** read `AGENTS.md`, `PROMPT.md`, `Progress.md`, `docs/INDEX.md`, `docs/cassette-format.md`, `docs/architecture.md`, and the Phase 5 requirements; verified Phase 4 commit `a88b0c3` exists; preserved unrelated untracked files.
+- **Plan:**
+  - Implement only Phase 5 oracle, pure ddmin, content reducers, cassette-builder orchestration, focused tests, and required documentation.
+  - Keep oracle evaluation deterministic, memoized by cassette hash, bounded by `max_oracle_calls`, and repeat-safe for configured flakiness checks.
+  - Implement classic entry-level ddmin with ordered progress history and prove 1-minimality, soundness, interaction cases, and determinism.
+  - Apply content reducers after entry reduction and preserve cassette validity and reproducibility.
+  - Run the real leaky-agent shrink acceptance: at most three entries, under 1 KB, reproducing the failure; then run the full Phase Exit Protocol and stop before Phase 6.
+- **Done:** Added memoized `PredicateOracle` with repeats and call budgets; pure Zeller ddmin with ordered progress events and deterministic stats; `TrimDocument`, `BlankField`, and `NormalizeIds`; two-level cassette builder and public shrinker exports; synthetic, property-based, reducer, oracle, builder, and real-agent tests.
+- **Tests:** `python -m pytest` → `82 passed`; focused Phase 5 tests → `21 passed`; `python -m ruff check grudge tests scripts` → `All checks passed!`; `python -m ruff format --check grudge tests scripts` → `9 files already formatted`; `python -m mypy grudge scripts` → `Success: no issues found in 75 source files`; `python -m scripts.docs_check` → `docs-check: 14 indexed, non-empty, linked documentation files`; `make all` → all four checks passed; real shrink acceptance → `21` original entries to `3` minimal entries, `375` bytes, `196` ordered history events; `git diff --check` passed.
+- **Docs updated:** `docs/shrinking.md`, `docs/adr/0002-ddmin-over-entries-then-content.md`, `docs/architecture.md`, `docs/INDEX.md`, and this tracker.
+- **Handoff note:** Phase 5 exit gate is complete. Owner should run the exact git commands in the final report to create `phase-5: complete shrinker`. Phase 6 has not started.
 
 ### 2026-10-17 Session 8
 - **Pre-flight:** read AGENTS.md y, read PROMPT.md y, read Progress.md y, read docs/INDEX.md y; Phase 2 requirements re-read; `docs/scripted-llm.md` is absent and will be created as required by this phase.

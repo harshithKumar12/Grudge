@@ -3,7 +3,7 @@
 **Purpose:** Describe the Phase 1 architecture and typed contract boundaries that later stages consume.
 **Audience:** Contributors designing or implementing a pipeline stage, and reviewers checking stage boundaries.
 **Status:** draft
-**Last updated (phase):** 4
+**Last updated (phase):** 5
 
 ## System boundary
 
@@ -40,7 +40,7 @@ The exported placeholder is [`assets/pipeline.svg`](assets/pipeline.svg). Stage 
 
 1. **Recorder** captures model, tool, and result steps as an ordered trace.
 2. **Fault Locator** is an optional analysis boundary for finding a point of no return.
-3. **World Shrinker** evaluates candidate cassettes with a deterministic oracle and keeps a minimal reproducer.
+3. **World Shrinker** first applies entry-level ddmin, then content reducers, evaluating candidate cassettes with a deterministic memoized oracle and keeping a minimal reproducer.
 4. **Predicate Synthesizer** may draft a rule with an LLM, but the resulting rule must compile into deterministic checking code.
 5. **Admission Court** proves the rule is red on the bad agent and green on the fixed agent before it becomes a Scar.
 6. **Variant Fuzzer** can produce input variants while preserving the failure fingerprint.
@@ -78,4 +78,7 @@ The Phase 1 schema details are in [`trace-format.md`](trace-format.md),
 [`cassette-format.md`](cassette-format.md), and [`glossary.md`](glossary.md).
 The Phase 2 policy contract is described in [`scripted-llm.md`](scripted-llm.md).
 The Phase 4 replay boundary is described in [`why-not-replay.md`](why-not-replay.md).
+The Phase 5 shrink workflow is described in [`shrinking.md`](shrinking.md),
+with the ordering decision recorded in
+[`adr/0002-ddmin-over-entries-then-content.md`](adr/0002-ddmin-over-entries-then-content.md).
 Deferred work is tracked in [`roadmap.md`](roadmap.md).
