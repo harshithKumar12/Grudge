@@ -33,6 +33,9 @@ grudge = "grudge.cli.main:app"
 [tool.setuptools.packages.find]
 include = ["grudge*"]
 
+[tool.setuptools.package-data]
+"grudge.predicates" = ["prompts/*.md"]
+
 [tool.ruff]
 target-version = "py311"
 line-length = 88

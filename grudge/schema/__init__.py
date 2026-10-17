@@ -3,6 +3,7 @@
 from grudge.schema.cassette import ArgMatcher, Cassette, CassetteEntry
 from grudge.schema.predicate import (
     CallShape,
+    FilteredTaintFlow,
     Ordering,
     Outcome,
     Predicate,
@@ -26,6 +27,7 @@ __all__ = [
     "CallShape",
     "Cassette",
     "CassetteEntry",
+    "FilteredTaintFlow",
     "FinalAnswer",
     "ModelCall",
     "Ordering",

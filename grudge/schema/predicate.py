@@ -108,6 +108,41 @@ class TaintFlow(_SchemaModel):
         return f"Data from `{source}` must not flow to `{sink}`."
 
 
+class FilteredTaintFlow(_SchemaModel):
+    """A taint rule narrowed by filters on its source call's arguments."""
+
+    model_config = ConfigDict(extra="forbid", validate_assignment=True)
+    kind: Literal["filtered_taint_flow"] = "filtered_taint_flow"
+    flow: TaintFlow
+    source_args: dict[str, Any] = Field(default_factory=dict)
+
+    def describe(self) -> str:
+        """Describe the prohibited data flow and any source-call filter."""
+
+        description = self.flow.describe()
+        if self.source_args:
+            conditions = []
+            words = {
+                "$eq": "equals",
+                "$contains": "contains",
+                "$under": "is under",
+                "$not_under": "is not under",
+            }
+            for field, value in sorted(self.source_args.items()):
+                operator = "equals"
+                if isinstance(value, dict) and len(value) == 1:
+                    key = next(iter(value))
+                    if key in words:
+                        operator, value = words[key], value[key]
+                conditions.append(
+                    f"{field} {operator} " + json.dumps(value, ensure_ascii=False)
+                )
+            description += (
+                " The source call must satisfy: " + "; ".join(conditions) + "."
+            )
+        return description
+
+
 class Outcome(_SchemaModel):
     """The Phase 1 run-outcome data contract used by predicate ASTs.
 
@@ -210,7 +245,7 @@ class PredicateSet(_SchemaModel):
 
 
 Predicate: TypeAlias = Annotated[
-    CallShape | Ordering | TaintFlow | Outcome | PredicateSet,
+    CallShape | Ordering | TaintFlow | FilteredTaintFlow | Outcome | PredicateSet,
     Field(discriminator="kind"),
 ]
 
@@ -219,6 +254,7 @@ PredicateSet.model_rebuild()
 
 __all__ = [
     "CallShape",
+    "FilteredTaintFlow",
     "Ordering",
     "Outcome",
     "Predicate",

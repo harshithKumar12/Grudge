@@ -1,10 +1,10 @@
-"""Offline fallback predicate boundary; implementation is planned for Phase 6."""
+"""Hand-verified behavioral rule for the file-exfiltration demo."""
 
-from typing import NoReturn
+from grudge.llm.client import DEMO_DSL
+from grudge.predicates.dsl import PredicateAST, parse
 
-from grudge._stubs import roadmap
 
+def demo_rule() -> PredicateAST:
+    """Detect data from a ``read_file`` result reaching ``send_http.body``."""
 
-def demo_rule() -> NoReturn:
-    """Load the demo fallback rule after predicate work begins."""
-    roadmap("predicates.fallback_rules")
+    return parse(DEMO_DSL)

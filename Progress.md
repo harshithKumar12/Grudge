@@ -3,11 +3,11 @@
 _Last updated: 2026-10-17 by omnirush.ai_
 
 ## Snapshot
-- **Current phase:** 5: Shrinker complete; awaiting owner commit
-- **Overall:** 6/14 phases complete
-- **Test suite:** 82 passing in WSL Python 3.11.17
+- **Current phase:** 6: Predicates complete
+- **Overall:** 7/14 phases complete
+- **Test suite:** 178 passing in WSL Python 3.11.17
 - **Demo status:** works offline? n/a (demo is a Phase 10 deliverable)
-- **Next action:** Owner runs the Phase 5 commit commands, then the next session re-runs pre-flight before Phase 6.
+- **Next action:** Wait for owner approval before starting Phase 7 pre-flight.
 
 ## Phase Board
 | # | Phase | Status | Exit gate passed | Docs done |
@@ -18,7 +18,7 @@ _Last updated: 2026-10-17 by omnirush.ai_
 | 3 | Recorder | [x] | yes | [x] |
 | 4 | Replay Engine | [x] | yes | [x] |
 | 5 | Shrinker | [x] | yes | [x] |
-| 6 | Predicates | [ ] | no | no |
+| 6 | Predicates | [x] | yes | [x] |
 | 7 | Admission Court | [ ] | no | no |
 | 8 | Gate & Statistics | [ ] | no | no |
 | 9 | CLI | [ ] | no | no |
@@ -82,7 +82,14 @@ _Last updated: 2026-10-17 by omnirush.ai_
 - [x] Run the Phase 5 Exit Protocol; owner commit command is supplied in the handoff report.
 
 ### Phase 6
-- [ ] Predicate DSL, compiler, synthesizer, and tests.
+- [x] Implement readable DSL parsing, canonical printing, and located parse errors.
+- [x] Implement deterministic call-shape, ordering, and MVP-lite taint checkers with exact trace evidence.
+- [x] Reject ill-typed rules and retain outcome checking as an explicit Phase 13 stub.
+- [x] Persist source-filtered taint rules and groups through the shared predicate/Scar contracts.
+- [x] Implement hand-verified demo fallback, packaged prompt, optional provider client, prompt-hash disk cache, and bounded synthesis retries.
+- [x] Add DSL, checker, schema-persistence, offline, retry/fallback, and cache tests; prove red-on-vulnerable and green-on-fixed acceptance.
+- [x] Write and index `predicate-dsl.md` and ADR 0003; update architecture and provider environment examples.
+- [x] Run Phase 6 exit checks; commit this phase and stop before Phase 7.
 
 ### Phase 7
 - [ ] Admission court, verdicts, sample scar, and tests.
@@ -118,6 +125,7 @@ _Last updated: 2026-10-17 by omnirush.ai_
 | 2026-10-16 | All commands run in WSL with the activated `.venv`; failed git commands do not block implementation. | Owner will perform commits in their terminal when needed. | Command execution and handoff |
 | 2026-10-16 | Root `Progress.md` is canonical; `docs/PROGRESS.md` is a one-line pointer. | Prevent duplicate progress trackers from drifting. | docs/PROGRESS.md, docs-check |
 | 2026-10-17 | Shrink cassettes in two levels: entry ddmin first, then deterministic content reducers. | Whole-entry reduction exposes the causal set before spending oracle calls on response detail; memoization and a call budget control the remaining search cost. | `grudge/shrinker/`, ADR 0002, `docs/shrinking.md` |
+| 2026-10-17 | Keep model drafting outside deterministic checking; add persisted `FilteredTaintFlow` for source argument filters and package the synthesis template. | DSL rules must retain their filters through Scar JSON. Drafts must parse and compile before use; outcome checking stays a stretch stub. Offline mode and cached drafts require no credentials or network. No dependencies were added. | Phase 6 predicates, schema union, provider cache, ADR 0003 |
 
 ## Blockers
 | Date | Blocker | Tried | Needs |
@@ -132,9 +140,11 @@ _Last updated: 2026-10-17 by omnirush.ai_
 ## Known Issues & Tech Debt
 - Phase 0 intentionally leaves all stretch modules as documented `NotImplementedError` stubs.
 - Phase 2’s fixed agent uses a simple substring taint check and explicit confirmation heuristic; generalized taint semantics belong to Phase 6.
+- Phase 6 taint checking is substring/typed-identity matching, not complete provenance tracking; transformation/implicit-flow limits are documented in `docs/predicate-dsl.md`.
+- One Phase 6 full-suite run intermittently failed the existing Phase 5 cassette-builder reproduction assertion. The focused rerun and two subsequent full-suite runs passed without shrinker changes; the underlying intermittent replay/shrinker behavior remains unisolated.
 
 ## Doc Debt
-- Required docs for Phases 6-12 remain indexed as planned work; Phase 5 shrinker documentation is complete.
+- Phase 6 documentation is complete; documents required in Phases 7-12 remain future work.
 
 ## Session Log (append-only, newest at bottom)
 ### 2026-10-15 Session 1
@@ -266,6 +276,21 @@ _Last updated: 2026-10-17 by omnirush.ai_
 - **Tests:** `python -m pytest` → `82 passed`; focused Phase 5 tests → `21 passed`; `python -m ruff check grudge tests scripts` → `All checks passed!`; `python -m ruff format --check grudge tests scripts` → `9 files already formatted`; `python -m mypy grudge scripts` → `Success: no issues found in 75 source files`; `python -m scripts.docs_check` → `docs-check: 14 indexed, non-empty, linked documentation files`; `make all` → all four checks passed; real shrink acceptance → `21` original entries to `3` minimal entries, `375` bytes, `196` ordered history events; `git diff --check` passed.
 - **Docs updated:** `docs/shrinking.md`, `docs/adr/0002-ddmin-over-entries-then-content.md`, `docs/architecture.md`, `docs/INDEX.md`, and this tracker.
 - **Handoff note:** Phase 5 exit gate is complete. Owner should run the exact git commands in the final report to create `phase-5: complete shrinker`. Phase 6 has not started.
+
+### 2026-10-17 Session 13
+- **Pre-flight:** read `AGENTS.md`, `PROMPT.md`, `Progress.md`, `docs/INDEX.md`, Phase 6 requirements, and the existing predicate/LLM stubs; verified Phase 5 commit `bc3bd43` exists; preserved unrelated untracked files.
+- **Plan:**
+  - Implement only the Phase 6 predicate DSL, deterministic compiler/checkers, demo fallback rule, provider-neutral offline LLM boundary, disk cache, synthesizer, focused tests, and required documentation.
+  - Parse the four readable predicate forms with precise `PredicateParseError` line/column diagnostics and canonical pretty-print round trips.
+  - Compile call-shape, ordering, and taint-flow predicates into evidence-bearing checkers; keep outcome explicitly as the documented stretch stub.
+  - Ensure the demo predicate flags the vulnerable trace and passes the fixed trace, with plain-English explanations.
+  - Keep synthesis deterministic and offline-safe: validate generated DSL, retry malformed drafts up to two times, then use the hand-verified fallback; cache by prompt hash.
+  - Run the Phase 6 Exit Protocol, commit `phase-6: complete predicates`, and stop before Phase 7.
+- **Done:** Implemented typed readable DSL and canonical printer, located parse errors, deterministic evidence-bearing call-shape/ordering/MVP-lite taint checkers, persistent filtered taint rules, demo fallback, packaged synthesis prompt, optional OpenAI-compatible client, disk cache, and validated synthesis with at most two retries. Outcome checking remains the required Phase 13 stub.
+- **Tests:** In WSL with activated `.venv`, `make all` → `178 passed`, Ruff clean, mypy `Success: no issues found in 75 source files`, docs-check `16 indexed, non-empty, linked documentation files`; `python -m ruff format --check grudge tests scripts` → `98 files already formatted`; `python -m pytest tests/test_predicates_dsl.py tests/test_predicate_compiler.py tests/test_predicate_synthesizer.py` → `96 passed`. An initial `make all` timed out during mypy and one later run hit the existing intermittent Phase 5 assertion; subsequent complete checks passed as recorded above.
+- **Acceptance:** `python -m pytest tests/test_predicate_compiler.py::test_generalized_rule_is_red_on_vulnerable_and_green_on_fixed_leaky_agent -v` verifies the actual example traces and exact evidence. Direct `python -c` smoke check of the same parsed rule produced `phase6 acceptance: vulnerable=True, fixed=False, evidence=[43, 44, 46]`. The rule describes the prohibited read-file-to-send-body flow in plain English. Schema and Scar persistence, invalid-draft retries, and offline cache/fallback paths are covered by the focused suite.
+- **Docs updated:** `docs/predicate-dsl.md`, `docs/adr/0003-llm-drafts-deterministic-code-decides.md`, `docs/architecture.md`, `docs/INDEX.md`, `.env.example`, and this tracker. `pyproject.toml` includes the prompt as package data.
+- **Handoff note:** Commit this verified phase as `phase-6: complete predicates` and report the actual commit hash. Phase 7 has not started. Live external-provider and Docker builds were not exercised; provider behavior was tested with fakes and offline network guards. Preserve unrelated untracked files.
 
 ### 2026-10-17 Session 8
 - **Pre-flight:** read AGENTS.md y, read PROMPT.md y, read Progress.md y, read docs/INDEX.md y; Phase 2 requirements re-read; `docs/scripted-llm.md` is absent and will be created as required by this phase.
