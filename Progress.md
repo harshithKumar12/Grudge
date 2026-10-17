@@ -3,11 +3,11 @@
 _Last updated: 2026-10-17 by omnirush.ai_
 
 ## Snapshot
-- **Current phase:** 2: Leaky Agent & Scripted LLM complete; awaiting owner commit
-- **Overall:** 3/14 phases complete
-- **Test suite:** 39 passing in WSL Python 3.11.17
+- **Current phase:** 3: Recorder complete; awaiting owner commit
+- **Overall:** 4/14 phases complete
+- **Test suite:** 47 passing in WSL Python 3.11.17
 - **Demo status:** works offline? n/a (demo is a Phase 10 deliverable)
-- **Next action:** Owner runs the Phase 2 commit commands, then the next session re-runs pre-flight before Phase 3.
+- **Next action:** Owner runs the Phase 3 commit commands, then the next session re-runs pre-flight before Phase 4.
 
 ## Phase Board
 | # | Phase | Status | Exit gate passed | Docs done |
@@ -15,7 +15,7 @@ _Last updated: 2026-10-17 by omnirush.ai_
 | 0 | Bootstrap & Governance | [x] | yes | [x] |
 | 1 | Schemas | [x] | yes | [x] |
 | 2 | Leaky Agent & Scripted LLM | [x] | yes | [x] |
-| 3 | Recorder | [ ] | no | no |
+| 3 | Recorder | [x] | yes | [x] |
 | 4 | Replay Engine | [ ] | no | no |
 | 5 | Shrinker | [ ] | no | no |
 | 6 | Predicates | [ ] | no | no |
@@ -56,7 +56,13 @@ _Last updated: 2026-10-17 by omnirush.ai_
 - [x] Run the Phase 2 Exit Protocol; owner commit command is supplied in the handoff report.
 
 ### Phase 3
-- [ ] Recorder, redaction, adapters, and tests.
+- [x] Implement `Recorder` context manager and `@record` decorator with append-only JSONL output.
+- [x] Record model calls, tool calls, tool results, state diffs, final answers, and failed outcomes with monotonic indexes.
+- [x] Implement the raw SDK adapter boundary used by the example agent.
+- [x] Implement regex-based redaction with pluggable rules and reversible-off test behavior.
+- [x] Keep MCP proxy and LangGraph adapters as documented roadmap stubs.
+- [x] Add recorder schema/order/exception/redaction tests and update trace/architecture docs.
+- [x] Run the Phase 3 Exit Protocol; owner commit command is supplied in the handoff report.
 
 ### Phase 4
 - [ ] Replay engine, sandbox, and tests.
@@ -201,6 +207,27 @@ _Last updated: 2026-10-17 by omnirush.ai_
 - **Tests:** `python -m pytest` → `39 passed`; `python -m ruff check grudge tests scripts` → `All checks passed!`; `python -m ruff format --check grudge tests scripts` → `87 files already formatted`; `python -m mypy grudge scripts` → `Success: no issues found in 75 source files`; `python -m scripts.docs_check` → `docs-check: 11 indexed, non-empty, linked documentation files`; `make all` → all four checks passed; vulnerable example → `71` steps and `1` `send_http` call; fixed example → `65` steps and `0` `send_http` calls; `git diff --check` passed.
 - **Docs updated:** `docs/scripted-llm.md`, `docs/INDEX.md`, `docs/architecture.md`, and `examples/leaky_agent/README.md`.
 - **Handoff note:** Phase 2 exit gate is complete. Owner should run the exact git commands in the final report to create `phase-2: complete leaky agent & scripted llm`. Phase 3 has not started.
+
+### 2026-10-17 Session 9
+- **Pre-flight:** read AGENTS.md y, read PROMPT.md y, read Progress.md y, read docs/INDEX.md y, read Phase 3 requirements; Phase 2 is marked complete and its implementation is present.
+- **Plan:**
+  - Implement only Phase 3 recorder, redaction, raw adapter, tests, and required documentation.
+  - Touch `grudge/recorder/`, recorder tests, `docs/trace-format.md`, `docs/architecture.md`, `docs/INDEX.md`, and this tracker.
+  - Ensure recorder output validates with Phase 1 `Trace`, preserves event order, records exceptions as failed outcomes, and can redact the fake key.
+  - Keep MCP proxy and LangGraph adapters as honest stubs; do not begin Phase 4 replay work.
+  - Run the Phase 3 acceptance and complete exit protocol, then provide owner-run commit commands.
+- **Done:** Phase 3 plan recorded; implementation pending.
+- **Tests:** not yet run in this session.
+- **Docs updated:** Progress.md session log only so far.
+- **Handoff note:** Phase 3 must stop after its exit protocol; Phase 4 remains unopened.
+
+### 2026-10-17 Session 10
+- **Pre-flight:** read AGENTS.md y, read PROMPT.md y, read Progress.md y, read docs/INDEX.md y, read Phase 3 requirements; Phase 2 remains complete.
+- **Plan:** Implement only Phase 3 recorder, redaction, raw adapter, tests, and trace/architecture documentation; keep MCP/LangGraph stubs; run the full exit protocol and stop before Phase 4.
+- **Done:** Added exported `Recorder`, `JsonlWriter`, `@record`, raw SDK event adapter, recursive configurable redaction with disabled mode, and honest MCP/LangGraph stubs. Recorder tests cover JSONL validity/order, failure persistence, adapter translation, decorator behavior, package exports, and fake-key redaction.
+- **Tests:** `python -m pytest` → `47 passed`; `python -m ruff check grudge tests scripts` → `All checks passed!`; `python -m ruff format --check grudge tests scripts` → `89 files already formatted`; `python -m mypy grudge scripts` → `Success: no issues found in 75 source files`; `python -m scripts.docs_check` → `docs-check: 11 indexed, non-empty, linked documentation files`; `make all` → all four checks passed; recorder acceptance → `71 steps, valid Trace JSONL`; `git diff --check` passed.
+- **Docs updated:** `docs/trace-format.md` recording semantics, `docs/architecture.md`, `docs/INDEX.md`, and recorder package docstring.
+- **Handoff note:** Phase 3 exit gate is complete. Owner should run the exact git commands in the final report to create `phase-3: complete recorder`. Phase 4 has not started.
 
 ### 2026-10-17 Session 8
 - **Pre-flight:** read AGENTS.md y, read PROMPT.md y, read Progress.md y, read docs/INDEX.md y; Phase 2 requirements re-read; `docs/scripted-llm.md` is absent and will be created as required by this phase.

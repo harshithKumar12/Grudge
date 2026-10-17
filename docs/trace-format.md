@@ -3,7 +3,7 @@
 **Purpose:** Specify the Phase 1 ordered trace contract and its JSONL encoding.
 **Audience:** Recorder, replay, shrinker, and integration implementers.
 **Status:** final
-**Last updated (phase):** 1
+**Last updated (phase):** 3
 
 ## Trace envelope
 
@@ -52,6 +52,24 @@ and a final newline is included:
 
 `Trace.from_jsonl()` validates the header, reconstructs the discriminated union,
 preserves list order, and converts malformed payloads to `SchemaError`.
+
+## Recording semantics
+
+Phase 3's `Recorder` assigns indexes as events arrive and accepts model calls,
+tool calls, tool results, state diffs, and final answers. On context exit it
+writes one canonical header followed by the ordered steps to an append-only
+JSONL sink. If the wrapped agent raises, the recorder writes the accumulated
+trace with `outcome: "failed"` and then re-raises the original exception.
+
+`record_raw_sdk()` translates mapping-shaped SDK events into the same typed
+steps without importing a provider SDK. The `@record` decorator supplies a
+recorder keyword when the wrapped function accepts it and still records the
+success or failure boundary for functions that do not.
+
+Redaction is separate from the trace contract. `redact_trace()` recursively
+copies mappings, lists, and tuples and masks key-like strings with pluggable
+regular-expression rules. It can be disabled for tests that need the original
+values.
 
 ## Helpers and validation
 

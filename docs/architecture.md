@@ -3,11 +3,11 @@
 **Purpose:** Describe the Phase 1 architecture and typed contract boundaries that later stages consume.
 **Audience:** Contributors designing or implementing a pipeline stage, and reviewers checking stage boundaries.
 **Status:** draft
-**Last updated (phase):** 2
+**Last updated (phase):** 3
 
 ## System boundary
 
-Grudge turns an agent failure trace into a durable regression artifact called a **Scar**. Phase 1 implements the shared Pydantic contracts for traces, cassettes, predicates, and Scars; Phase 2 adds a deterministic fake-world agent whose behavior responds to tool results and exposes a prompt-injection leak.
+Grudge turns an agent failure trace into a durable regression artifact called a **Scar**. Phase 1 implements the shared Pydantic contracts for traces, cassettes, predicates, and Scars; Phase 2 adds a deterministic fake-world agent whose behavior responds to tool results and exposes a prompt-injection leak; Phase 3 captures those events with an append-only recorder and optional redaction.
 
 ## Eight-stage pipeline
 
@@ -56,6 +56,7 @@ The deterministic core is the shrinker, predicate checker, admission court, and 
 | Shared data | `grudge.schema` | 1 | Typed trace, cassette, predicate, and Scar models with JSON persistence helpers. |
 | Example policy | `grudge.replay.scripted_llm` | 2 | Deterministic message-driven gullible policy with defended mode. |
 | Demo world | `examples.leaky_agent` | 2 | Pure fake email/file tools plus vulnerable and fixed agent loops. |
+| Recording | `grudge.recorder` | 3 | Context manager, decorator, raw SDK adapter, and recursive redaction. |
 | Capture | `grudge.recorder` | 3 | Append-only trace recording with redaction hooks. |
 | Replay | `grudge.replay` | 4 | Cassette-backed tools and a deterministic sandbox. |
 | Reduction | `grudge.shrinker` | 5 | Delta debugging plus content reducers. |
