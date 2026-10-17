@@ -3,11 +3,11 @@
 _Last updated: 2026-10-17 by omnirush.ai_
 
 ## Snapshot
-- **Current phase:** 3: Recorder complete; awaiting owner commit
-- **Overall:** 4/14 phases complete
-- **Test suite:** 47 passing in WSL Python 3.11.17
+- **Current phase:** 4: Replay Engine complete; awaiting owner commit
+- **Overall:** 5/14 phases complete
+- **Test suite:** 61 passing in WSL Python 3.11.17
 - **Demo status:** works offline? n/a (demo is a Phase 10 deliverable)
-- **Next action:** Owner runs the Phase 3 commit commands, then the next session re-runs pre-flight before Phase 4.
+- **Next action:** Owner runs the Phase 4 commit commands, then the next session re-runs pre-flight before Phase 5.
 
 ## Phase Board
 | # | Phase | Status | Exit gate passed | Docs done |
@@ -16,7 +16,7 @@ _Last updated: 2026-10-17 by omnirush.ai_
 | 1 | Schemas | [x] | yes | [x] |
 | 2 | Leaky Agent & Scripted LLM | [x] | yes | [x] |
 | 3 | Recorder | [x] | yes | [x] |
-| 4 | Replay Engine | [ ] | no | no |
+| 4 | Replay Engine | [x] | yes | [x] |
 | 5 | Shrinker | [ ] | no | no |
 | 6 | Predicates | [ ] | no | no |
 | 7 | Admission Court | [ ] | no | no |
@@ -65,7 +65,12 @@ _Last updated: 2026-10-17 by omnirush.ai_
 - [x] Run the Phase 3 Exit Protocol; owner commit command is supplied in the handoff report.
 
 ### Phase 4
-- [ ] Replay engine, sandbox, and tests.
+- [x] Implement cassette playback with exact/subset/any precedence, consumption tracking, strict misses, and lenient misses.
+- [x] Implement the hermetic sandbox with cassette-backed tool methods, filesystem/network guards, time and step limits, and failed Trace results.
+- [x] Implement `world_from_trace(trace)` for full unshrunk cassette conversion.
+- [x] Add replay tests for failure reproduction, missing-poison causality, strict mismatch, hermetic guards, limits, determinism, and cassette conversion.
+- [x] Write and index `why-not-replay.md`; update cassette and architecture docs.
+- [x] Run the Phase 4 Exit Protocol; owner commit command is supplied in the handoff report.
 
 ### Phase 5
 - [ ] Shrinker, reducers, cassette builder, and tests.
@@ -228,6 +233,19 @@ _Last updated: 2026-10-17 by omnirush.ai_
 - **Tests:** `python -m pytest` → `47 passed`; `python -m ruff check grudge tests scripts` → `All checks passed!`; `python -m ruff format --check grudge tests scripts` → `89 files already formatted`; `python -m mypy grudge scripts` → `Success: no issues found in 75 source files`; `python -m scripts.docs_check` → `docs-check: 11 indexed, non-empty, linked documentation files`; `make all` → all four checks passed; recorder acceptance → `71 steps, valid Trace JSONL`; `git diff --check` passed.
 - **Docs updated:** `docs/trace-format.md` recording semantics, `docs/architecture.md`, `docs/INDEX.md`, and recorder package docstring.
 - **Handoff note:** Phase 3 exit gate is complete. Owner should run the exact git commands in the final report to create `phase-3: complete recorder`. Phase 4 has not started.
+
+### 2026-10-17 Session 11
+- **Pre-flight:** read `AGENTS.md`, `PROMPT.md`, `Progress.md`, `docs/INDEX.md`, `docs/cassette-format.md`, `docs/trace-format.md`, and `docs/architecture.md`; verified Phase 3 is complete and Phase 4 is next; preserved unrelated untracked files.
+- **Plan:**
+  - Implement only Phase 4 cassette playback, hermetic sandbox execution, full-trace cassette conversion, focused tests, and required documentation.
+  - Match cassette entries in exact, then subset, then wildcard order; support strict and lenient misses with consumption tracking.
+  - Run the existing leaky agent against cassette-backed tools without loading the example world or permitting real file/network access; enforce step/time limits and return failed traces.
+  - Prove failure reproduction, missing-poison safety, strict mismatch behavior, determinism, and filesystem/network guards.
+  - Run the Phase 4 acceptance and full exit protocol; do not begin Phase 5.
+- **Done:** Added `CassettePlayer` with exact/subset/any precedence, single-use entries, strict `ReplayMismatch`, lenient neutral results, and miss tracking; added `CassetteWorld`, `CassetteToolAdapter`, `world_from_trace`, hermetic filesystem/network guards, timeout and step-limit failure traces, and replay API exports; added focused cassette and sandbox tests.
+- **Tests:** `python -m pytest` → `61 passed`; focused replay tests → `14 passed`; `python -m ruff check grudge tests scripts` → `All checks passed!`; `python -m ruff format --check grudge tests scripts` → all files formatted; `python -m mypy grudge scripts` → `Success: no issues found in 75 source files`; `python -m scripts.docs_check` → `docs-check: 12 indexed, non-empty, linked documentation files`; `make all` → all four checks passed; `git diff --check` passed.
+- **Docs updated:** `docs/why-not-replay.md`, `docs/cassette-format.md`, `docs/architecture.md`, `docs/INDEX.md`, and this tracker.
+- **Handoff note:** Phase 4 exit gate is complete. Owner should run the exact git commands in the final report to create `phase-4: complete replay engine`. Phase 5 has not started.
 
 ### 2026-10-17 Session 8
 - **Pre-flight:** read AGENTS.md y, read PROMPT.md y, read Progress.md y, read docs/INDEX.md y; Phase 2 requirements re-read; `docs/scripted-llm.md` is absent and will be created as required by this phase.

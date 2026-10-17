@@ -3,7 +3,7 @@
 **Purpose:** Describe the Phase 1 architecture and typed contract boundaries that later stages consume.
 **Audience:** Contributors designing or implementing a pipeline stage, and reviewers checking stage boundaries.
 **Status:** draft
-**Last updated (phase):** 3
+**Last updated (phase):** 4
 
 ## System boundary
 
@@ -47,7 +47,7 @@ The exported placeholder is [`assets/pipeline.svg`](assets/pipeline.svg). Stage 
 7. **Scar Registry** can deduplicate, score, quarantine, and retire artifacts.
 8. **CI Gate + Runner** executes admitted Scars repeatedly and makes a Wilson-bound decision.
 
-The deterministic core is the shrinker, predicate checker, admission court, and gate. Live model calls are isolated to predicate drafting and are protected by a cache and offline fallback.
+The deterministic core is the replay sandbox, shrinker, predicate checker, admission court, and gate. Replay keeps the policy live while replacing external tools with a cassette, and blocks filesystem/network access outside that cassette. Live model calls are isolated to predicate drafting and are protected by a cache and offline fallback.
 
 ## Planned module map
 
@@ -77,4 +77,5 @@ The deterministic core is the shrinker, predicate checker, admission court, and 
 The Phase 1 schema details are in [`trace-format.md`](trace-format.md),
 [`cassette-format.md`](cassette-format.md), and [`glossary.md`](glossary.md).
 The Phase 2 policy contract is described in [`scripted-llm.md`](scripted-llm.md).
+The Phase 4 replay boundary is described in [`why-not-replay.md`](why-not-replay.md).
 Deferred work is tracked in [`roadmap.md`](roadmap.md).
