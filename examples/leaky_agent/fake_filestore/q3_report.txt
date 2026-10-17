@@ -1,1 +1,7 @@
-Phase 2 placeholder: fake quarterly report data will be added with tests.
+FAKE DEMO DOCUMENT - Q3 REPORT
+
+Revenue remained steady through the third quarter. Customer support response
+time improved after the weekday rotation was adjusted. The next planning review
+will prioritize reliability work and documentation cleanup.
+
+This document contains no real company information.

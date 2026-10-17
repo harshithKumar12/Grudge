@@ -1,20 +1,20 @@
 # Progress.md: Grudge build tracker
 
-_Last updated: 2026-10-16 by omnirush.ai_
+_Last updated: 2026-10-17 by omnirush.ai_
 
 ## Snapshot
-- **Current phase:** 1: Schemas complete; awaiting owner commit
-- **Overall:** 2/14 phases complete
-- **Test suite:** 30 passing in WSL Python 3.11.17
+- **Current phase:** 2: Leaky Agent & Scripted LLM complete; awaiting owner commit
+- **Overall:** 3/14 phases complete
+- **Test suite:** 39 passing in WSL Python 3.11.17
 - **Demo status:** works offline? n/a (demo is a Phase 10 deliverable)
-- **Next action:** Owner runs the Phase 1 commit commands, then the next session re-runs pre-flight before Phase 2.
+- **Next action:** Owner runs the Phase 2 commit commands, then the next session re-runs pre-flight before Phase 3.
 
 ## Phase Board
 | # | Phase | Status | Exit gate passed | Docs done |
 |---|-------|--------|------------------|-----------|
 | 0 | Bootstrap & Governance | [x] | yes | [x] |
 | 1 | Schemas | [x] | yes | [x] |
-| 2 | Leaky Agent & Scripted LLM | [ ] | no | no |
+| 2 | Leaky Agent & Scripted LLM | [x] | yes | [x] |
 | 3 | Recorder | [ ] | no | no |
 | 4 | Replay Engine | [ ] | no | no |
 | 5 | Shrinker | [ ] | no | no |
@@ -47,7 +47,13 @@ _Last updated: 2026-10-16 by omnirush.ai_
 - [x] Run the Phase 1 Exit Protocol; owner commit command is supplied in the handoff report.
 
 ### Phase 2
-- [ ] Leaky agent, scripted LLM, example world, and tests.
+- [x] Implement the fake email/file world and pure tool functions.
+- [x] Implement the deterministic gullible `ScriptedLLM` policy with defended mode.
+- [x] Implement vulnerable and fixed agents with trace output.
+- [x] Add the poisoned inbox, fake secret, scripted policy configuration, and example README.
+- [x] Add leak, fixed-agent, causality, and byte-identical determinism tests.
+- [x] Write and index `docs/scripted-llm.md`; update architecture.
+- [x] Run the Phase 2 Exit Protocol; owner commit command is supplied in the handoff report.
 
 ### Phase 3
 - [ ] Recorder, redaction, adapters, and tests.
@@ -107,6 +113,7 @@ _Last updated: 2026-10-16 by omnirush.ai_
 
 ## Known Issues & Tech Debt
 - Phase 0 intentionally leaves all stretch modules as documented `NotImplementedError` stubs.
+- Phase 2’s fixed agent uses a simple substring taint check and explicit confirmation heuristic; generalized taint semantics belong to Phase 6.
 
 ## Doc Debt
 - Required docs for Phases 2-12 remain indexed as planned work; no Phase 1 doc debt remains.
@@ -186,3 +193,24 @@ _Last updated: 2026-10-16 by omnirush.ai_
 - **Tests:** `python -m pytest` → `30 passed`; `python -m ruff check grudge tests scripts` → `All checks passed!`; `python -m ruff format --check grudge tests scripts` → `85 files already formatted`; `python -m mypy grudge scripts` → `Success: no issues found in 75 source files`; `python -m scripts.docs_check` → `docs-check: 10 indexed, non-empty, linked documentation files`; `make all` → all four checks passed; acceptance import → `schema imports ok`; `git diff --check` passed.
 - **Docs updated:** `docs/trace-format.md`, `docs/cassette-format.md`, `docs/glossary.md`, `docs/INDEX.md`, `docs/architecture.md`, and one-line `docs/PROGRESS.md`.
 - **Handoff note:** Phase 1 exit gate is complete. Owner should run the exact git commands in the final report to create `phase-1: complete schemas`. Phase 2 has not started.
+
+### 2026-10-17 Session 8
+- **Pre-flight:** read AGENTS.md y, read PROMPT.md y, read Progress.md y, read docs/INDEX.md y, read Phase 2 requirements; verified Phase 1 commit `ebde38e` exists.
+- **Plan:** Implement only Phase 2 fake world, scripted policy, vulnerable/fixed agents, tests, and required docs; run the Phase 2 acceptance commands and full exit protocol; do not start Phase 3.
+- **Done:** Added the immutable JSON-backed fake world with 20 ordered emails and one poisoned message; deterministic `ScriptedLLM` with configurable injection patterns and defended mode; vulnerable and fixed agents using Phase 1 traces; causality/determinism tests; `scripted-llm.md`; and architecture/index updates.
+- **Tests:** `python -m pytest` → `39 passed`; `python -m ruff check grudge tests scripts` → `All checks passed!`; `python -m ruff format --check grudge tests scripts` → `87 files already formatted`; `python -m mypy grudge scripts` → `Success: no issues found in 75 source files`; `python -m scripts.docs_check` → `docs-check: 11 indexed, non-empty, linked documentation files`; `make all` → all four checks passed; vulnerable example → `71` steps and `1` `send_http` call; fixed example → `65` steps and `0` `send_http` calls; `git diff --check` passed.
+- **Docs updated:** `docs/scripted-llm.md`, `docs/INDEX.md`, `docs/architecture.md`, and `examples/leaky_agent/README.md`.
+- **Handoff note:** Phase 2 exit gate is complete. Owner should run the exact git commands in the final report to create `phase-2: complete leaky agent & scripted llm`. Phase 3 has not started.
+
+### 2026-10-17 Session 8
+- **Pre-flight:** read AGENTS.md y, read PROMPT.md y, read Progress.md y, read docs/INDEX.md y; Phase 2 requirements re-read; `docs/scripted-llm.md` is absent and will be created as required by this phase.
+- **Plan:**
+  - Confirm the owner’s Phase 1 commit state without changing history; proceed because Progress.md marks Phase 1’s exit gate passed and the user authorized the next phase.
+  - Touch only Phase 2 example/world files, `grudge/replay/scripted_llm.py`, agent tests, `docs/scripted-llm.md`, `docs/INDEX.md`, architecture, and this tracker.
+  - Implement a deterministic policy that reacts to tool-result content rather than replaying a fixed transcript.
+  - Write tests for vulnerable leakage, fixed-agent safety, poisoned-email causality, and byte-identical traces with at least 35 steps.
+  - Run the Phase 2 acceptance commands and full exit protocol; do not start Phase 3.
+- **Done:** Phase 2 plan recorded; implementation pending.
+- **Tests:** not yet run in this session.
+- **Docs updated:** Progress.md session log only so far.
+- **Handoff note:** Phase 2 must stop after its exit protocol and provide owner-run git commands for `phase-2: complete leaky agent & scripted llm`.

@@ -3,11 +3,11 @@
 **Purpose:** Describe the Phase 1 architecture and typed contract boundaries that later stages consume.
 **Audience:** Contributors designing or implementing a pipeline stage, and reviewers checking stage boundaries.
 **Status:** draft
-**Last updated (phase):** 1
+**Last updated (phase):** 2
 
 ## System boundary
 
-Grudge turns an agent failure trace into a durable regression artifact called a **Scar**. Phase 1 now implements the shared Pydantic contracts for traces, cassettes, predicates, and Scars; execution stages consume these contracts without owning their shape.
+Grudge turns an agent failure trace into a durable regression artifact called a **Scar**. Phase 1 implements the shared Pydantic contracts for traces, cassettes, predicates, and Scars; Phase 2 adds a deterministic fake-world agent whose behavior responds to tool results and exposes a prompt-injection leak.
 
 ## Eight-stage pipeline
 
@@ -54,6 +54,8 @@ The deterministic core is the shrinker, predicate checker, admission court, and 
 | Boundary | Planned package | Phase | Contract |
 |---|---|---:|---|
 | Shared data | `grudge.schema` | 1 | Typed trace, cassette, predicate, and Scar models with JSON persistence helpers. |
+| Example policy | `grudge.replay.scripted_llm` | 2 | Deterministic message-driven gullible policy with defended mode. |
+| Demo world | `examples.leaky_agent` | 2 | Pure fake email/file tools plus vulnerable and fixed agent loops. |
 | Capture | `grudge.recorder` | 3 | Append-only trace recording with redaction hooks. |
 | Replay | `grudge.replay` | 4 | Cassette-backed tools and a deterministic sandbox. |
 | Reduction | `grudge.shrinker` | 5 | Delta debugging plus content reducers. |
@@ -73,4 +75,5 @@ The deterministic core is the shrinker, predicate checker, admission court, and 
 
 The Phase 1 schema details are in [`trace-format.md`](trace-format.md),
 [`cassette-format.md`](cassette-format.md), and [`glossary.md`](glossary.md).
+The Phase 2 policy contract is described in [`scripted-llm.md`](scripted-llm.md).
 Deferred work is tracked in [`roadmap.md`](roadmap.md).
