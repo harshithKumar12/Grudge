@@ -3,11 +3,11 @@
 _Last updated: 2026-10-18 by omnirush.ai_
 
 ## Snapshot
-- **Current phase:** 8: Gate & Statistics complete
-- **Overall:** 9/14 phases complete
-- **Test suite:** 266 passing in WSL Python 3.11.17
+- **Current phase:** 9: CLI implementation complete; exit protocol pending
+- **Overall:** 9/14 phases complete; Phase 9 exit verification underway
+- **Test suite:** 275 passing in WSL Ubuntu-D Python 3.11.17
 - **Demo status:** works offline? n/a (demo is a Phase 10 deliverable)
-- **Next action:** Wait for owner approval before starting Phase 9 pre-flight.
+- **Next action:** Complete the CLI pipeline and Phase 9 exit protocol; stop before Phase 10.
 
 ## Phase Board
 | # | Phase | Status | Exit gate passed | Docs done |
@@ -110,7 +110,10 @@ _Last updated: 2026-10-18 by omnirush.ai_
 - [x] Pass Phase 8 Exit Protocol and commit this phase; stop before Phase 9.
 
 ### Phase 9
-- [ ] Scriptable CLI commands and tests.
+- [x] Scriptable CLI commands and tests.
+- [x] Capture, shrink, admit, run, demo, and Scar browsing commands expose consistent JSON/error behavior.
+- [x] Verify the shell pipeline end to end on the vulnerable and fixed example agents.
+- [ ] Update CLI and demo documentation, then run the complete Phase Exit Protocol.
 
 ### Phase 10
 - [ ] Demo orchestrator, event stream, server, and tests.
@@ -349,3 +352,16 @@ _Last updated: 2026-10-18 by omnirush.ai_
 - **Acceptance:** gate smoke command → `fixed_exit=0 vulnerable_exit=1 fixed_passes=20/20 lower=0.8389`; Markdown header → `## Grudge gate: **PASS**`. Offline mode is reported explicitly and the vulnerable agent is blocked by predicate violations.
 - **Docs updated:** `docs/statistics.md`, `docs/architecture.md`, `docs/INDEX.md`, and this tracker.
 - **Handoff note:** Commit this verified phase as `phase-8: complete gate and statistics` and report the actual hash. Phase 9 has not started. The two unrelated untracked files remain untouched.
+
+### 2026-10-18 Session 16
+- **Pre-flight:** Read `AGENTS.md`, Phase 9 requirements and Exit Protocol in `PROMPT.md`, `Progress.md`, `docs/INDEX.md`, the CLI stubs, and the capture/shrink/admission/gate APIs. Verified commit `7366746`; unrelated untracked files remain untouched.
+- **Plan:**
+  - Implement the scriptable Typer commands with `--json`, `--debug`, friendly `GrudgeError` handling, and the required exit-code contract.
+  - Add CliRunner coverage for every Phase 9 command, machine-readable output, missing-file errors, and the fixed/vulnerable gate outcomes.
+  - Repair only the shrinker boundary needed for the required pipeline so empty source values cannot falsely reproduce taint failures.
+  - Update the CLI reference and demo guide, then run the manual capture → shrink → admit → run pipeline.
+  - Run `make test`, `make lint`, `make typecheck`, `make docs-check`, `make all`, formatting, and diff checks; commit Phase 9 and stop before Phase 10.
+- **Done:** Implemented the Phase 9 CLI, shared JSON/debug/error handling, real Scar browsing commands, offline demo, and CLI tests. Added a CLI shrink boundary that requires complete replay and the seed checker to reproduce, preventing cassettes that pass the shrink oracle but fail admission. Updated README, architecture, docs index, and demo guide.
+- **Tests:** Focused CLI/shrinker/cassette tests → `20 passed`; WSL `make VENV=.venv-wsl all` → `275 passed`, Ruff clean, `Success: no issues found in 77 source files`, and docs-check `19 indexed, non-empty, linked documentation files`; WSL Ruff format → `105 files already formatted`; WSL `git diff --check` passed. The Windows rerun had one environment-only symlink privilege failure (`WinError 1314`); the clean WSL run passed it.
+- **Acceptance:** Manual shell pipeline completed: capture wrote a 71-step trace; shrink wrote a 23-entry cassette; admit proved 3 bad red / 3 good green / 2 controls and persisted a Scar; fixed-agent run returned exit `0` with `20/20`; vulnerable-agent run returned exit `1` with `0/20`. Offline demo returned fixed pass and vulnerable blocked in JSON mode.
+- **Handoff note:** Phase 9 implementation, acceptance, and the clean WSL exit checks are complete. The only remaining repository action is the phase commit; do not start Phase 10 until it is recorded. Preserve unrelated `GrudgeBrief.pdf` and `PROMPT-2-PARALLEL.md`.

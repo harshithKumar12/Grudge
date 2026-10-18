@@ -4,10 +4,11 @@
 
 Grudge will compile an agent failure into three reviewable artifacts: a minimal
 cassette, a never-again behavioral predicate, and a statistical verdict. The
-Phase 0 bootstrap establishes the reproducible project and CLI surface; later
-phases implement the runtime pipeline described in [the architecture](docs/architecture.md).
+Phase 9 CLI exposes the runtime pipeline described in
+[the architecture](docs/architecture.md); later phases add event streaming and
+the supporting viewer.
 
-## Phase 0 quickstart
+## Quickstart
 
 The supported runtime is Python 3.11.11, recorded in `.python-version`.
 Commands below create and use a project-local environment; they do not install
@@ -19,9 +20,30 @@ make install
 python -m grudge --help
 ```
 
-The command surface is intentionally scaffolded in Phase 0. Runtime commands
-that belong to later phases report an explicit roadmap error instead of
-pretending to work.
+The Phase 9 CLI wraps the recorder, shrinker, admission court, and statistical
+gate. The offline demo uses only checked-in fake data and the scripted policy:
+
+```bash
+python -m grudge demo --no-browser
+```
+
+For the complete command reference and a manual capture → shrink → admit → run
+pipeline, see [`docs/demo-guide.md`](docs/demo-guide.md).
+
+### CLI reference
+
+```text
+grudge capture <agent_module> --out trace.jsonl [--json] [--debug]
+grudge shrink <trace.jsonl> --failure <seed-rule> --out cassette.json [--agent <module>] [--json] [--debug]
+grudge admit <cassette.json> --bad <module> --good <module> --out <scars-dir> [--json] [--debug]
+grudge run --scars <file-or-dir> --agent <module> [--runs N] [--threshold T] [--json] [--debug]
+grudge demo [--live] [--port 8765] [--no-browser] [--json] [--debug]
+grudge scars list|show|retire [--json] [--debug]
+```
+
+Every command supports `--json` for machine-readable output and `--debug` for
+a traceback on stderr. Missing files, schema failures, and other expected
+engine failures exit 2. A gate passes with exit 0 and is blocked with exit 1.
 
 ## Checks
 
@@ -46,15 +68,15 @@ The Dockerfile pins the Python base image and installs the lockfile into the
 image:
 
 ```bash
-docker build -t grudge:phase-0 .
-docker run --rm grudge:phase-0
+docker build -t grudge:phase-9 .
+docker run --rm grudge:phase-9
 ```
 
 To deploy, push the same image to the registry used by your target platform:
 
 ```bash
-docker tag grudge:phase-0 REGISTRY/PROJECT/grudge:phase-0
-docker push REGISTRY/PROJECT/grudge:phase-0
+docker tag grudge:phase-9 REGISTRY/PROJECT/grudge:phase-9
+docker push REGISTRY/PROJECT/grudge:phase-9
 ```
 
 No API keys or real personal data are needed for the offline path. Copy
@@ -82,7 +104,8 @@ python -m scripts.build_sample_scar --runs 3
 This replaces the sample only on successful admission. No API key or real
 network is used. See [Admission rules](docs/architecture.md#admission-rules)
 for rejection behavior, evidence, and the empty-trace interpretation. The
-`grudge` CLI admission command remains scheduled for Phase 9.
+`grudge admit` command is available for the manual pipeline; see the demo
+guide for its required options.
 
 - [Architecture](docs/architecture.md) — pipeline stages and contracts.
 - [Roadmap](docs/roadmap.md) — honest stubs and deferred work.

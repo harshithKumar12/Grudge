@@ -158,8 +158,9 @@ then is revalidated before the compiled predicate is checked. A clean,
 successful replay is a gate success; violations and all replay/checker errors
 are failed runs. The result keeps per-run traces, predicate results, exact
 evidence, reasons, counts, pass rate, lower bound, threshold, and offline mode
-metadata. `grudge.gate.gate` maps the result to CI codes 0/1/2 without adding
-the Phase 9 CLI.
+metadata. `grudge.gate.gate` maps the result to CI codes 0/1/2. The Phase 9
+CLI exposes these engine contracts through scriptable capture, shrink, admit,
+run, demo, and Scar browsing commands.
 
 `wilson_lower_bound` uses the lower Wilson score formula, validates counts and
 confidence parameters, and returns zero for an empty sample. The runner's

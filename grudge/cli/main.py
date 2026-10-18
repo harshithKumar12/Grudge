@@ -1,10 +1,18 @@
-"""Typer command surface for Grudge; command implementations arrive by phase."""
+"""Typer command surface for Grudge's deterministic pipeline."""
 
-from typing import NoReturn
+from typing import Any, NoReturn
 
 import typer
 
 from grudge._stubs import roadmap
+from grudge.cli._common import command
+from grudge.cli.admit import admit_cassette
+from grudge.cli.capture import capture_agent
+from grudge.cli.demo import run_demo
+from grudge.cli.run import run_scars
+from grudge.cli.scars import scars_app
+from grudge.cli.shrink import shrink_trace
+from grudge.errors import GrudgeError
 
 app = typer.Typer(
     name="grudge",
@@ -17,43 +25,28 @@ def _future(command: str) -> NoReturn:
     roadmap(f"cli.{command}")
 
 
-@app.command()
-def capture() -> NoReturn:
-    """Capture an agent run into a trace."""
-    _future("capture")
+app.command("capture")(capture_agent)
+app.command("shrink")(shrink_trace)
+app.command("admit")(admit_cassette)
+app.command("run")(run_scars)
+app.command("demo")(run_demo)
 
 
 @app.command()
-def shrink() -> NoReturn:
-    """Shrink a failing trace into a minimal cassette."""
-    _future("shrink")
-
-
-@app.command()
-def admit() -> NoReturn:
-    """Prove a candidate scar against bad and fixed agents."""
-    _future("admit")
-
-
-@app.command("run")
-def run_gate() -> NoReturn:
-    """Run the regression gate against admitted scars."""
-    _future("run")
-
-
-@app.command()
-def demo() -> NoReturn:
-    """Play the offline five-beat demo."""
-    _future("demo")
-
-
-@app.command()
-def viewer() -> NoReturn:
+def viewer(
+    json_output: bool = typer.Option(False, "--json", help="Emit JSON output."),
+    debug: bool = typer.Option(False, "--debug", help="Show a traceback on errors."),
+) -> None:
     """Start the local viewer server."""
-    _future("viewer")
+
+    def run() -> dict[str, Any]:
+        try:
+            _future("viewer")
+        except NotImplementedError as exc:
+            raise GrudgeError(str(exc)) from exc
+        raise AssertionError("unreachable")
+
+    command(run, json_output=json_output, debug=debug)
 
 
-@app.command()
-def scars() -> NoReturn:
-    """List, show, or retire saved scars."""
-    _future("scars")
+app.add_typer(scars_app, name="scars")
