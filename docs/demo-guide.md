@@ -1,28 +1,52 @@
-# Phase 9 CLI and offline demo
+# Phase 10 CLI and offline demo
 
 **Purpose:** Explain the scriptable CLI pipeline and the deterministic demo.
 **Audience:** Contributors, CI authors, and demo operators.
 **Status:** final
-**Last updated (phase):** 9
+**Last updated (phase):** 10
 
 ## Offline demo
 
-The demo uses the checked-in `scars/sample_leak.scar.json` and the scripted
-agents. It does not call a provider or open a browser:
+The demo captures the real vulnerable example, shrinks its replay world,
+synthesizes the fallback predicate, proves admission, and runs the Wilson gate
+against the fixed and vulnerable agents. The offline path uses the checked-in
+`scars/sample_leak.scar.json`, controls, and scripted agents; it does not call a
+provider or require a network connection:
 
 ```bash
 python -m grudge demo --no-browser
 ```
 
-The fixed agent must pass and the vulnerable agent must be blocked. Machine
-consumers can request one JSON document instead of Rich output:
+For tests and CI, `--fast` disables presenter pacing and uses one deterministic
+gate repetition per agent so the complete story stays under ten seconds. It
+prints the complete event log before exiting:
 
 ```bash
-python -m grudge demo --no-browser --runs 2 --json
+python -m grudge demo --no-browser --fast
 ```
 
-`--live` and the viewer `--port` are accepted as forward-compatible options;
-live providers and the event-stream viewer are implemented in later phases.
+The fixed agent must pass and the vulnerable agent must be blocked. Machine
+consumers can request one JSON document containing the event list and
+compatibility gate summaries:
+
+```bash
+python -m grudge demo --no-browser --runs 2 --fast --json
+```
+
+`--live` remains reserved for a future provider integration. The local server
+is available from `grudge.demo.server` and serves the checked-in `viewer/`
+directory, `/events` as SSE, `/state` as a replay snapshot, and `/restart` as a
+fresh run trigger. The default presenter pacing is approximately 75–95 seconds;
+`--fast` removes those delays for tests and CI. The complete event contract is in
+[`viewer-events.md`](viewer-events.md).
+
+## Fallback video procedure
+
+The buildathon fallback recording can be made without a provider: run
+`python -m grudge demo --no-browser --fast --json > phase10-events.json`, then
+record the terminal output while replaying the JSON event list in a viewer or
+slide deck. The event log is deterministic apart from its process-local
+sequence numbers and is safe to regenerate offline.
 
 ## Manual pipeline
 

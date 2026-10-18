@@ -1,16 +1,16 @@
-"""Run the deterministic, offline Phase 9 command-line demonstration."""
+"""Run the deterministic, offline five-beat demonstration."""
 
 # Typer's declarative Option defaults are intentional here.
 # ruff: noqa: B008
 
+import json
 from typing import Any
 
 import typer
 
-from grudge.cli._common import command, finish, load_callable
+from grudge.cli._common import command, finish
 from grudge.config import DEFAULTS, SCARS_DIR
-from grudge.gate.runner import run_gate
-from grudge.schema.scar import Scar
+from grudge.demo.orchestrator import run_demo as orchestrate_demo
 
 
 def run_demo(
@@ -20,6 +20,7 @@ def run_demo(
         False, "--no-browser", help="Do not open a browser."
     ),
     runs: int = typer.Option(DEFAULTS.n_runs, "--runs", min=1),
+    fast: bool = typer.Option(False, "--fast", help="Disable presenter pacing."),
     json_output: bool = typer.Option(False, "--json", help="Emit JSON output."),
     debug: bool = typer.Option(False, "--debug", help="Show a traceback on errors."),
 ) -> None:
@@ -31,37 +32,31 @@ def run_demo(
                 "live demo mode is reserved for a future provider integration"
             )
         _ = (port, no_browser)
-        path = SCARS_DIR / "sample_leak.scar.json"
-        if not path.is_file():
-            raise FileNotFoundError(f"offline demo Scar does not exist: {path}")
-        scar = Scar.load(path)
-        fixed = run_gate(
-            scar,
-            load_callable("examples.leaky_agent.agent_fixed"),
-            runs=runs,
-            threshold=DEFAULTS.gate_threshold,
+        events = orchestrate_demo(fast=fast, runs=runs)
+        event_payloads = [event.model_dump(mode="json") for event in events]
+        gates = [event for event in event_payloads if event["type"] == "gate.result"]
+        vulnerable = next(
+            event
+            for event in gates
+            if event["agent"] == "vulnerable" and not event["passed"]
         )
-        vulnerable = run_gate(
-            scar,
-            load_callable("examples.leaky_agent.agent"),
-            runs=runs,
-            threshold=DEFAULTS.gate_threshold,
-        )
+        fixed = next(event for event in gates if event["agent"] == "fixed")
         return {
             "command": "demo",
             "mode": "offline/deterministic",
-            "scar": str(path),
+            "scar": str(SCARS_DIR / "sample_leak.scar.json"),
+            "events": event_payloads,
             "fixed": {
-                "passed": fixed.passed,
-                "successes": fixed.successes,
-                "runs": fixed.runs,
-                "lower_bound": fixed.lower_bound,
+                "passed": fixed["passed"],
+                "successes": fixed["passes"],
+                "runs": fixed["n"],
+                "lower_bound": fixed["wilson"],
             },
             "vulnerable": {
-                "passed": vulnerable.passed,
-                "successes": vulnerable.successes,
-                "runs": vulnerable.runs,
-                "lower_bound": vulnerable.lower_bound,
+                "passed": vulnerable["passed"],
+                "successes": vulnerable["passes"],
+                "runs": vulnerable["n"],
+                "lower_bound": vulnerable["wilson"],
             },
         }
 
@@ -69,14 +64,8 @@ def run_demo(
     if json_output:
         finish(result, json_output=True)
     else:
-        typer.echo("Grudge offline demo")
-        typer.echo(
-            "fixed agent: PASS" if result["fixed"]["passed"] else "fixed agent: BLOCKED"
-        )
-        typer.echo(
-            "vulnerable agent: PASS"
-            if result["vulnerable"]["passed"]
-            else "vulnerable agent: BLOCKED (old mistake detected)"
-        )
-    if not result["fixed"]["passed"] or result["vulnerable"]["passed"]:
-        raise typer.Exit(code=1)
+        for event in result["events"]:
+            typer.echo(
+                f"{event['type']} "
+                f"{json.dumps(event, ensure_ascii=False, sort_keys=True)}"
+            )

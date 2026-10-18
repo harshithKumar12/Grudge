@@ -3,11 +3,11 @@
 _Last updated: 2026-10-18 by omnirush.ai_
 
 ## Snapshot
-- **Current phase:** 9: CLI complete
-- **Overall:** 10/14 phases complete
-- **Test suite:** 275 passing in WSL Ubuntu-D Python 3.11.17
-- **Demo status:** works offline? n/a (demo is a Phase 10 deliverable)
-- **Next action:** Begin Phase 10 only after owner approval.
+- **Current phase:** 10: Demo Orchestrator & Event Stream complete
+- **Overall:** 11/14 phases complete
+- **Test suite:** 281 passing in WSL Ubuntu-D Python 3.11.17
+- **Demo status:** works offline? yes
+- **Next action:** Begin Phase 11 only after owner approval.
 
 ## Phase Board
 | # | Phase | Status | Exit gate passed | Docs done |
@@ -22,7 +22,7 @@ _Last updated: 2026-10-18 by omnirush.ai_
 | 7 | Admission Court | [x] | yes | [x] |
 | 8 | Gate & Statistics | [x] | yes | [x] |
 | 9 | CLI | [x] | yes | [x] |
-| 10 | Demo Orchestrator & Event Stream | [ ] | no | no |
+| 10 | Demo Orchestrator & Event Stream | [x] | yes | [x] |
 | 11 | Viewer | [ ] | no | no |
 | 12 | Polish, Docs, Pitch | [ ] | no | no |
 | 13 | Stretch Implementations | [ ] | no | no |
@@ -116,7 +116,10 @@ _Last updated: 2026-10-18 by omnirush.ai_
 - [x] Update CLI and demo documentation, then run the complete Phase Exit Protocol.
 
 ### Phase 10
-- [ ] Demo orchestrator, event stream, server, and tests.
+- [x] Demo orchestrator, event stream, server, and tests.
+- [x] Real five-beat offline flow emits typed, ordered events and blocks the reintroduced regression.
+- [x] SSE server serves static viewer assets, event replay, state, and restart.
+- [x] Document the event contract, server endpoints, pacing, and fallback video procedure.
 
 ### Phase 11
 - [ ] Static viewer and viewer tests.
@@ -365,3 +368,16 @@ _Last updated: 2026-10-18 by omnirush.ai_
 - **Tests:** Focused CLI/shrinker/cassette tests → `20 passed`; WSL `make VENV=.venv-wsl all` → `275 passed`, Ruff clean, `Success: no issues found in 77 source files`, and docs-check `19 indexed, non-empty, linked documentation files`; WSL Ruff format → `105 files already formatted`; WSL `git diff --check` passed. The Windows rerun had one environment-only symlink privilege failure (`WinError 1314`); the clean WSL run passed it.
 - **Acceptance:** Manual shell pipeline completed: capture wrote a 71-step trace; shrink wrote a 23-entry cassette; admit proved 3 bad red / 3 good green / 2 controls and persisted a Scar; fixed-agent run returned exit `0` with `20/20`; vulnerable-agent run returned exit `1` with `0/20`. Offline demo returned fixed pass and vulnerable blocked in JSON mode.
 - **Handoff note:** Phase 9 implementation, acceptance, clean WSL exit checks, and commit `1b50a10` are complete. Do not start Phase 10 without owner approval. Preserve unrelated `GrudgeBrief.pdf` and `PROMPT-2-PARALLEL.md`.
+
+### 2026-10-18 Session 17
+- **Pre-flight:** Read `AGENTS.md`, Phase 10 requirements and Exit Protocol in `PROMPT.md`, `Progress.md`, `docs/INDEX.md`, the Phase 9 CLI, viewer stubs, and demo boundaries. Verified commit `bad9769`; unrelated untracked files remain untouched.
+- **Plan:**
+  - Implement typed Pydantic events and a synchronous replayable in-process bus for the complete five-beat story.
+  - Orchestrate the real capture/replay/shrink/synthesis/admission/gate engines offline, including the fixed-to-vulnerable regression beat and fast test mode.
+  - Implement a dependency-free local HTTP server with static viewer files, SSE `/events`, JSON `/state`, and `POST /restart`; add focused flow and server tests with network guards.
+  - Integrate the CLI demo, document the event protocol and fallback procedure, and update architecture/index documentation.
+  - Run the Phase 10 Exit Protocol, commit this phase, and stop before Phase 11.
+- **Done:** Implemented typed event models and replayable bus, real five-beat orchestrator, SSE/static demo server, `--fast` CLI flow, server/ordering/network tests, event documentation, and architecture updates. Default presenter pacing is `0.4s` per event; fast mode uses one deterministic gate repetition to keep the test/demo path under ten seconds while preserving real engine execution.
+- **Tests:** Focused Phase 10/CLI tests → `16 passed`; clean WSL `make VENV=.venv-wsl all` → `281 passed`, Ruff clean, `Success: no issues found in 77 source files`, docs-check `20 indexed, non-empty, linked documentation files`; Ruff format → `106 files already formatted`; `git diff --check` passed. The unlazy G1-G5 ledger gates all passed, including the full Linux check bundle.
+- **Acceptance:** `grudge demo --no-browser --fast` emits all required event types and exits successfully; event order is demo start → beats 1-5 → finished; beat 4 emits vulnerable blocked and fixed passing gate results; beat 5 emits a blocked vulnerable gate and PR regression comment. The server replays completed events over SSE, returns state, restarts runs, and serves `viewer/` assets without network use by the orchestrator.
+- **Handoff note:** Phase 10 implementation, acceptance, Exit Protocol, and commit are pending only the owner commit action. Do not start Phase 11 until the phase commit is recorded. Preserve unrelated `GrudgeBrief.pdf` and `PROMPT-2-PARALLEL.md`.

@@ -3,7 +3,7 @@
 **Purpose:** Describe the Phase 1 architecture and typed contract boundaries that later stages consume.
 **Audience:** Contributors designing or implementing a pipeline stage, and reviewers checking stage boundaries.
 **Status:** draft
-**Last updated (phase):** 8
+**Last updated (phase):** 10
 
 ## System boundary
 
@@ -46,6 +46,7 @@ The exported placeholder is [`assets/pipeline.svg`](assets/pipeline.svg). Stage 
 6. **Variant Fuzzer** can produce input variants while preserving the failure fingerprint.
 7. **Scar Registry** can deduplicate, score, quarantine, and retire artifacts.
 8. **CI Gate + Runner** executes admitted Scars repeatedly, treats successful nonviolating replays as passes, computes the Wilson lower bound, and emits Rich/PR-style reports. Offline runs are intentionally deterministic and labeled as such.
+9. **Demo Orchestrator + Event Stream** runs the real engines as one five-beat offline story. Typed events are retained by an in-process bus, streamed to the viewer over standard-library SSE, and replayed through `/state`; the viewer remains a pure consumer of those events.
 
 The deterministic core is the replay sandbox, shrinker, predicate checker, admission court, and gate. Replay keeps the policy live while replacing external tools with a cassette, and blocks filesystem/network access outside that cassette. Live model calls are isolated to predicate drafting and are protected by a cache and offline fallback.
 
@@ -64,6 +65,7 @@ The deterministic core is the replay sandbox, shrinker, predicate checker, admis
 | Proof | `grudge.admission` | 7 | Reject predicates that do not discriminate. |
 | Statistics | `grudge.gate` | 8 | Repeated runs, Wilson lower bound, and reporting. |
 | User surface | `grudge.cli` | 9 | Scriptable capture, shrink, admit, run, and demo commands. |
+| Demo stream | `grudge.demo` | 10 | Typed event bus, real five-beat orchestration, and local SSE/static server. |
 | Presentation | `viewer/` | 11 | Static event-driven visualization of the CLI pipeline. |
 
 ## Admission rules
@@ -149,6 +151,20 @@ decision is recorded in
 - **Predicate types** can add taint-flow and outcome checks behind the same compiled checker interface.
 - **Gate selectors and registries** can remain optional so the offline CLI path stays small and reproducible.
 - **Viewer events** are emitted by the demo boundary; the viewer does not own pipeline state or decision logic.
+- **Demo events** are Pydantic models with a `type` discriminator and a
+  monotonic stream sequence. Beat 4 emits the admission proof and red/green
+  gate results; beat 5 reruns the vulnerable agent and emits a blocked gate plus
+  the deterministic PR comment. See [`viewer-events.md`](viewer-events.md).
+
+## Offline demo boundary
+
+`grudge.demo.orchestrator.run_demo` calls the existing vulnerable example,
+`world_from_trace`, `build_minimal_cassette`, `synthesize`, `admit`, and
+`run_gate`; it does not fake pipeline results. In `OFFLINE` mode synthesis uses
+the cache/fallback path and admission/gate use the checked-in Scar and benign
+controls. `grudge.demo.server` is deliberately stdlib-only: it serves
+`viewer/`, replays the in-memory event history from `/state`, streams `/events`
+with Server-Sent Events, and starts a fresh run on `POST /restart`.
 
 ## Gate and statistics
 
