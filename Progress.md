@@ -3,11 +3,11 @@
 _Last updated: 2026-10-18 by omnirush.ai_
 
 ## Snapshot
-- **Current phase:** 9: CLI implementation complete; exit protocol pending
-- **Overall:** 9/14 phases complete; Phase 9 exit verification underway
+- **Current phase:** 9: CLI complete
+- **Overall:** 10/14 phases complete
 - **Test suite:** 275 passing in WSL Ubuntu-D Python 3.11.17
 - **Demo status:** works offline? n/a (demo is a Phase 10 deliverable)
-- **Next action:** Complete the CLI pipeline and Phase 9 exit protocol; stop before Phase 10.
+- **Next action:** Begin Phase 10 only after owner approval.
 
 ## Phase Board
 | # | Phase | Status | Exit gate passed | Docs done |
@@ -21,7 +21,7 @@ _Last updated: 2026-10-18 by omnirush.ai_
 | 6 | Predicates | [x] | yes | [x] |
 | 7 | Admission Court | [x] | yes | [x] |
 | 8 | Gate & Statistics | [x] | yes | [x] |
-| 9 | CLI | [ ] | no | no |
+| 9 | CLI | [x] | yes | [x] |
 | 10 | Demo Orchestrator & Event Stream | [ ] | no | no |
 | 11 | Viewer | [ ] | no | no |
 | 12 | Polish, Docs, Pitch | [ ] | no | no |
@@ -113,7 +113,7 @@ _Last updated: 2026-10-18 by omnirush.ai_
 - [x] Scriptable CLI commands and tests.
 - [x] Capture, shrink, admit, run, demo, and Scar browsing commands expose consistent JSON/error behavior.
 - [x] Verify the shell pipeline end to end on the vulnerable and fixed example agents.
-- [ ] Update CLI and demo documentation, then run the complete Phase Exit Protocol.
+- [x] Update CLI and demo documentation, then run the complete Phase Exit Protocol.
 
 ### Phase 10
 - [ ] Demo orchestrator, event stream, server, and tests.
@@ -364,4 +364,4 @@ _Last updated: 2026-10-18 by omnirush.ai_
 - **Done:** Implemented the Phase 9 CLI, shared JSON/debug/error handling, real Scar browsing commands, offline demo, and CLI tests. Added a CLI shrink boundary that requires complete replay and the seed checker to reproduce, preventing cassettes that pass the shrink oracle but fail admission. Updated README, architecture, docs index, and demo guide.
 - **Tests:** Focused CLI/shrinker/cassette tests → `20 passed`; WSL `make VENV=.venv-wsl all` → `275 passed`, Ruff clean, `Success: no issues found in 77 source files`, and docs-check `19 indexed, non-empty, linked documentation files`; WSL Ruff format → `105 files already formatted`; WSL `git diff --check` passed. The Windows rerun had one environment-only symlink privilege failure (`WinError 1314`); the clean WSL run passed it.
 - **Acceptance:** Manual shell pipeline completed: capture wrote a 71-step trace; shrink wrote a 23-entry cassette; admit proved 3 bad red / 3 good green / 2 controls and persisted a Scar; fixed-agent run returned exit `0` with `20/20`; vulnerable-agent run returned exit `1` with `0/20`. Offline demo returned fixed pass and vulnerable blocked in JSON mode.
-- **Handoff note:** Phase 9 implementation, acceptance, and the clean WSL exit checks are complete. The only remaining repository action is the phase commit; do not start Phase 10 until it is recorded. Preserve unrelated `GrudgeBrief.pdf` and `PROMPT-2-PARALLEL.md`.
+- **Handoff note:** Phase 9 implementation, acceptance, clean WSL exit checks, and commit `1b50a10` are complete. Do not start Phase 10 without owner approval. Preserve unrelated `GrudgeBrief.pdf` and `PROMPT-2-PARALLEL.md`.
