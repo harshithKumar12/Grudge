@@ -1,10 +1,26 @@
-"""Admission verdict boundary; implementation is planned for Phase 7."""
+"""Structured proof and diagnostics returned by the admission court."""
 
-from typing import NoReturn
+from pathlib import Path
 
-from grudge._stubs import roadmap
+from pydantic import BaseModel, ConfigDict, Field
+
+from grudge.predicates.compiler import PredicateResult
+from grudge.schema.trace import Step
 
 
-def verdict() -> NoReturn:
-    """Produce an admission verdict after the court is implemented."""
-    roadmap("admission.verdict")
+class AdmissionVerdict(BaseModel):
+    """Admission succeeds only after every proof gate and persistence succeed."""
+
+    model_config = ConfigDict(extra="forbid", validate_assignment=True)
+
+    admitted: bool
+    reasons: list[str] = Field(default_factory=list)
+    evidence: list[Step] = Field(default_factory=list)
+    bad_results: list[PredicateResult] = Field(default_factory=list)
+    good_results: list[PredicateResult] = Field(default_factory=list)
+    control_results: list[PredicateResult] = Field(default_factory=list)
+    empty_result: PredicateResult | None = None
+    saved_path: Path | None = None
+
+
+__all__ = ["AdmissionVerdict"]

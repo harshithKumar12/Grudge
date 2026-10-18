@@ -62,6 +62,28 @@ No API keys or real personal data are needed for the offline path. Copy
 
 ## Repository guide
 
+### Phase 7 admission proof (offline)
+
+The prebuilt example is `scars/sample_leak.scar.json`. From the project root,
+activate the project environment and verify its repeated bad/red, fixed/green,
+and benign-control proof:
+
+```bash
+source .venv/bin/activate
+python -m pytest tests/test_admission_court.py tests/test_sample_scar.py
+```
+
+To explicitly regenerate the fixture after a new successful proof:
+
+```bash
+python -m scripts.build_sample_scar --runs 3
+```
+
+This replaces the sample only on successful admission. No API key or real
+network is used. See [Admission rules](docs/architecture.md#admission-rules)
+for rejection behavior, evidence, and the empty-trace interpretation. The
+`grudge` CLI admission command remains scheduled for Phase 9.
+
 - [Architecture](docs/architecture.md) — pipeline stages and contracts.
 - [Roadmap](docs/roadmap.md) — honest stubs and deferred work.
 - [Documentation index](docs/INDEX.md) — every documentation file and owner phase.

@@ -1,13 +1,13 @@
 # Progress.md: Grudge build tracker
 
-_Last updated: 2026-10-17 by omnirush.ai_
+_Last updated: 2026-10-18 by omnirush.ai_
 
 ## Snapshot
-- **Current phase:** 6: Predicates complete
-- **Overall:** 7/14 phases complete
-- **Test suite:** 178 passing in WSL Python 3.11.17
+- **Current phase:** 7: Admission Court complete
+- **Overall:** 8/14 phases complete
+- **Test suite:** 234 passing in WSL Python 3.11.17
 - **Demo status:** works offline? n/a (demo is a Phase 10 deliverable)
-- **Next action:** Wait for owner approval before starting Phase 7 pre-flight.
+- **Next action:** Wait for owner approval before starting Phase 8 pre-flight.
 
 ## Phase Board
 | # | Phase | Status | Exit gate passed | Docs done |
@@ -19,7 +19,7 @@ _Last updated: 2026-10-17 by omnirush.ai_
 | 4 | Replay Engine | [x] | yes | [x] |
 | 5 | Shrinker | [x] | yes | [x] |
 | 6 | Predicates | [x] | yes | [x] |
-| 7 | Admission Court | [ ] | no | no |
+| 7 | Admission Court | [x] | yes | [x] |
 | 8 | Gate & Statistics | [ ] | no | no |
 | 9 | CLI | [ ] | no | no |
 | 10 | Demo Orchestrator & Event Stream | [ ] | no | no |
@@ -92,7 +92,14 @@ _Last updated: 2026-10-17 by omnirush.ai_
 - [x] Run Phase 6 exit checks; commit this phase and stop before Phase 7.
 
 ### Phase 7
-- [ ] Admission court, verdicts, sample scar, and tests.
+- [x] Implement repeated red-on-bad/green-on-fixed admission with fresh policies and isolated cassettes.
+- [x] Implement typed verdicts, exact evidence, empty sanity, benign controls, and readable rejection reasons.
+- [x] Fail closed on vacuous/non-discriminating predicates, replay/checker failures, tool errors, and invalid controls.
+- [x] Persist only admitted copies with embedded proof records and safe exclusive filenames.
+- [x] Add actual benign control traces, the sample generation command, and prebuilt `scars/sample_leak.scar.json`.
+- [x] Verify repeated demo admission, predicate tampering rejection, persistence round trips, and all negative boundaries.
+- [x] Document architecture admission rules, ADR 0004, README steps, and container fixture copies.
+- [x] Pass Phase 7 exit checks and include this tracker in `phase-7: complete admission court`; stop before Phase 8.
 
 ### Phase 8
 - [ ] Gate runner, Wilson statistics, reports, and tests.
@@ -126,6 +133,9 @@ _Last updated: 2026-10-17 by omnirush.ai_
 | 2026-10-16 | Root `Progress.md` is canonical; `docs/PROGRESS.md` is a one-line pointer. | Prevent duplicate progress trackers from drifting. | docs/PROGRESS.md, docs-check |
 | 2026-10-17 | Shrink cassettes in two levels: entry ddmin first, then deterministic content reducers. | Whole-entry reduction exposes the causal set before spending oracle calls on response detail; memoization and a call budget control the remaining search cost. | `grudge/shrinker/`, ADR 0002, `docs/shrinking.md` |
 | 2026-10-17 | Keep model drafting outside deterministic checking; add persisted `FilteredTaintFlow` for source argument filters and package the synthesis template. | DSL rules must retain their filters through Scar JSON. Drafts must parse and compile before use; outcome checking stays a stretch stub. Offline mode and cached drafts require no credentials or network. No dependencies were added. | Phase 6 predicates, schema union, provider cache, ADR 0003 |
+| 2026-10-18 | Interpret empty-trace sanity as no failure evidence on an empty trace, not rejection of every safety rule satisfied by an empty trace. | The demo's forbidden-flow safety rule necessarily holds on empty input. Admission still requires witnessed violations on bad runs, clean good runs, and nonempty benign controls; empty replay alone is never proof. | Phase 7 court, architecture admission rules |
+| 2026-10-18 | Keep four complete response entries in the admitted demo cassette, including the successful sink response. | Phase 7 rejects tool replay errors; a missing sink response is not a successful complete proof even when the Phase 5 attempted-call predicate still fires. | `scars/sample_leak.scar.json`, sample generator |
+| 2026-10-18 | Make narrow example typing fixes now reached by the sample script, and copy example/control/Scar/docs inputs into Docker. | The new script makes the normal typecheck traverse both example agents, exposing three older typing errors. Shared `Step` annotations and dataclass-instance narrowing fix these without changing trace output. Container copies keep the new offline fixtures available; no dependencies added. | Examples, Dockerfile, Phase 7 reproducibility |
 
 ## Blockers
 | Date | Blocker | Tried | Needs |
@@ -144,7 +154,7 @@ _Last updated: 2026-10-17 by omnirush.ai_
 - One Phase 6 full-suite run intermittently failed the existing Phase 5 cassette-builder reproduction assertion. The focused rerun and two subsequent full-suite runs passed without shrinker changes; the underlying intermittent replay/shrinker behavior remains unisolated.
 
 ## Doc Debt
-- Phase 6 documentation is complete; documents required in Phases 7-12 remain future work.
+- Phase 7 documentation is complete; documents required in Phases 8-12 remain future work.
 
 ## Session Log (append-only, newest at bottom)
 ### 2026-10-15 Session 1
@@ -304,3 +314,18 @@ _Last updated: 2026-10-17 by omnirush.ai_
 - **Tests:** not yet run in this session.
 - **Docs updated:** Progress.md session log only so far.
 - **Handoff note:** Phase 2 must stop after its exit protocol and provide owner-run git commands for `phase-2: complete leaky agent & scripted llm`.
+
+### 2026-10-18 Session 14
+- **Pre-flight:** Read `AGENTS.md`, full `Progress.md`, Phase 7 requirements and Phase Exit Protocol in `PROMPT.md`, `docs/INDEX.md`, architecture, predicate compiler, replay, and Scar contracts. Verified Phase 6 commit `aa4d046`; unrelated untracked files are preserved.
+- **Plan:**
+  - Implement only Phase 7 court/verdict APIs, controls, sample Scar generation/persistence, tests, and documentation.
+  - Replay both agents on independent copies of the same cassette and require repeated witnessed bad violations and clean successful good runs.
+  - Reject vacuous, over-broad, both-agent-failing, invalid, and failed-replay candidates with actionable reasons; check empty trace and supplied benign controls.
+  - Save only admitted Scars with embedded admission records; verify disk round trips and the demo predicate-tampering rejection.
+  - Update architecture admission rules and write/index ADR 0004; run acceptance and `make all`, then commit `phase-7: complete admission court` and stop before Phase 8.
+- **Done:** Implemented `admit` and Pydantic `AdmissionVerdict`, strict trace/evidence validation, repeated isolated proof, empty and control checks, safe exclusive proof persistence, two real-loop benign controls, sample generation and the admitted demo artifact. Added 56 focused tests. Fixed three existing example typing issues exposed by the new script and added container fixture copies. No dependency or runtime changes.
+- **Tests:** WSL Ubuntu-D, activated `.venv` Python 3.11.17: `make all` → `234 passed`, Ruff clean, mypy `Success: no issues found in 76 source files`, docs-check `17 indexed, non-empty, linked documentation files`; `python -m ruff format --check grudge tests scripts` → `101 files already formatted`; `python -m pytest tests/test_admission_court.py tests/test_sample_scar.py` → `56 passed`; `git diff --check` passed. First combined check exposed the example typing errors; final combined check passed after narrow fixes.
+- **Acceptance:** `python -m scripts.build_sample_scar --runs 3` → `admitted: true`, all 3 bad runs violated with evidence, all 3 fixed runs and 2 controls successful/clean, empty sanity passed. Artifact: four cassette entries, successful fake sink response, embedded proof. `python -m pytest tests/test_sample_scar.py::test_checked_in_sample_re_admits_with_repeated_real_runs tests/test_sample_scar.py::test_overbroad_never_read_file_rejects_without_artifact -v` → `2 passed`; tampered predicate rejected on benign controls and wrote no artifact.
+- **Docs updated:** `docs/architecture.md` admission rules, `docs/adr/0004-prove-tests-before-admitting.md`, `docs/INDEX.md`, README offline proof/regeneration steps, and this tracker.
+- **Final rerun limitation:** After the successful combined code checks and regenerated-sample acceptance tests, a final redundant `make all` rerun was terminated by the host; retry failed before Python started with `Wsl/Service/E_UNEXPECTED`. No code changed after the successful checks. WSL was not restarted; the latest successful suite remains `234 passed` above.
+- **Handoff note:** Include this verified phase in `phase-7: complete admission court` and report its actual commit hash. Phase 8 has not started. Docker build was not executed; offline replay and persistence were verified in WSL. The previously recorded intermittent Phase 5 issue was not changed or observed in the successful suite. Before Phase 8, restore WSL and rerun `source .venv/bin/activate && make all`. Unrelated `GrudgeBrief.pdf` and `PROMPT-2-PARALLEL.md` remain untouched.

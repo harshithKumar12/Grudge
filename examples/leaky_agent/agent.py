@@ -13,6 +13,7 @@ from grudge.replay.scripted_llm import Action, ScriptedLLM
 from grudge.schema.trace import (
     FinalAnswer,
     ModelCall,
+    Step,
     ToolCall,
     ToolResult,
     Trace,
@@ -46,7 +47,11 @@ def _message_content(value: Any) -> Any:
         return json.loads(
             json.dumps(
                 value,
-                default=lambda item: asdict(item) if is_dataclass(item) else str(item),
+                default=lambda item: (
+                    asdict(item)
+                    if is_dataclass(item) and not isinstance(item, type)
+                    else str(item)
+                ),
             )
         )
     except (TypeError, ValueError):
@@ -102,7 +107,7 @@ def _load_world() -> WorldLike:
 
 
 def _append_model_call(
-    trace_steps: list[ModelCall | ToolCall | ToolResult | FinalAnswer],
+    trace_steps: list[Step],
     run_id: str,
     messages: Sequence[Mapping[str, Any]],
     action: Action,
@@ -140,7 +145,7 @@ def run_agent(
         {"role": "system", "content": "Use the available tools to complete the task."},
         {"role": "user", "content": TASK},
     ]
-    steps: list[ModelCall | ToolCall | ToolResult | FinalAnswer] = []
+    steps: list[Step] = []
 
     for _ in range(max_actions):
         action = policy.next_action(messages, TOOL_DEFINITIONS)
