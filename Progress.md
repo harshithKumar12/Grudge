@@ -3,11 +3,11 @@
 _Last updated: 2026-10-18 by omnirush.ai_
 
 ## Snapshot
-- **Current phase:** 7: Admission Court complete
-- **Overall:** 8/14 phases complete
-- **Test suite:** 234 passing in WSL Python 3.11.17
+- **Current phase:** 8: Gate & Statistics complete
+- **Overall:** 9/14 phases complete
+- **Test suite:** 266 passing in WSL Python 3.11.17
 - **Demo status:** works offline? n/a (demo is a Phase 10 deliverable)
-- **Next action:** Wait for owner approval before starting Phase 8 pre-flight.
+- **Next action:** Wait for owner approval before starting Phase 9 pre-flight.
 
 ## Phase Board
 | # | Phase | Status | Exit gate passed | Docs done |
@@ -20,7 +20,7 @@ _Last updated: 2026-10-18 by omnirush.ai_
 | 5 | Shrinker | [x] | yes | [x] |
 | 6 | Predicates | [x] | yes | [x] |
 | 7 | Admission Court | [x] | yes | [x] |
-| 8 | Gate & Statistics | [ ] | no | no |
+| 8 | Gate & Statistics | [x] | yes | [x] |
 | 9 | CLI | [ ] | no | no |
 | 10 | Demo Orchestrator & Event Stream | [ ] | no | no |
 | 11 | Viewer | [ ] | no | no |
@@ -102,7 +102,12 @@ _Last updated: 2026-10-18 by omnirush.ai_
 - [x] Pass Phase 7 exit checks and include this tracker in `phase-7: complete admission court`; stop before Phase 8.
 
 ### Phase 8
-- [ ] Gate runner, Wilson statistics, reports, and tests.
+- [x] Implement validated Wilson lower-bound calculation with empty-sample handling and known-value/property tests.
+- [x] Implement admitted-Scar gate runner with fresh policies, deep cassette copies, per-run traces/evidence, offline metadata, and fail-closed replay/checker handling.
+- [x] Implement CI status mapping (`0` pass, `1` blocked, `2` configuration/error), Rich terminal output, and deterministic PR Markdown reporting.
+- [x] Add fixed-agent pass and vulnerable-agent block acceptance tests plus report snapshots and invalid-input tests.
+- [x] Write and index `statistics.md`; update architecture with gate semantics and limitations.
+- [x] Pass Phase 8 Exit Protocol and commit this phase; stop before Phase 9.
 
 ### Phase 9
 - [ ] Scriptable CLI commands and tests.
@@ -136,6 +141,7 @@ _Last updated: 2026-10-18 by omnirush.ai_
 | 2026-10-18 | Interpret empty-trace sanity as no failure evidence on an empty trace, not rejection of every safety rule satisfied by an empty trace. | The demo's forbidden-flow safety rule necessarily holds on empty input. Admission still requires witnessed violations on bad runs, clean good runs, and nonempty benign controls; empty replay alone is never proof. | Phase 7 court, architecture admission rules |
 | 2026-10-18 | Keep four complete response entries in the admitted demo cassette, including the successful sink response. | Phase 7 rejects tool replay errors; a missing sink response is not a successful complete proof even when the Phase 5 attempted-call predicate still fires. | `scars/sample_leak.scar.json`, sample generator |
 | 2026-10-18 | Make narrow example typing fixes now reached by the sample script, and copy example/control/Scar/docs inputs into Docker. | The new script makes the normal typecheck traverse both example agents, exposing three older typing errors. Shared `Step` annotations and dataclass-instance narrowing fix these without changing trace output. Container copies keep the new offline fixtures available; no dependencies added. | Examples, Dockerfile, Phase 7 reproducibility |
+| 2026-10-18 | Count a gate pass only when replay succeeds and the compiled predicate is clean; use the lower Wilson bound, not observed pass rate, for the threshold decision. | A replay/checker error must not look like a safe run. Small-N pass rates are optimistic, so the lower bound is the conservative CI decision. Offline repeated runs are deterministic and explicitly labeled rather than presented as independent samples. | Phase 8 gate runner, `statistics.md`, reports |
 
 ## Blockers
 | Date | Blocker | Tried | Needs |
@@ -154,7 +160,7 @@ _Last updated: 2026-10-18 by omnirush.ai_
 - One Phase 6 full-suite run intermittently failed the existing Phase 5 cassette-builder reproduction assertion. The focused rerun and two subsequent full-suite runs passed without shrinker changes; the underlying intermittent replay/shrinker behavior remains unisolated.
 
 ## Doc Debt
-- Phase 7 documentation is complete; documents required in Phases 8-12 remain future work.
+- Phase 8 documentation is complete; documents required in Phases 9-12 remain future work.
 
 ## Session Log (append-only, newest at bottom)
 ### 2026-10-15 Session 1
@@ -329,3 +335,17 @@ _Last updated: 2026-10-18 by omnirush.ai_
 - **Docs updated:** `docs/architecture.md` admission rules, `docs/adr/0004-prove-tests-before-admitting.md`, `docs/INDEX.md`, README offline proof/regeneration steps, and this tracker.
 - **Final rerun limitation:** After the successful combined code checks and regenerated-sample acceptance tests, a final redundant `make all` rerun was terminated by the host; retry failed before Python started with `Wsl/Service/E_UNEXPECTED`. No code changed after the successful checks. WSL was not restarted; the latest successful suite remains `234 passed` above.
 - **Handoff note:** Include this verified phase in `phase-7: complete admission court` and report its actual commit hash. Phase 8 has not started. Docker build was not executed; offline replay and persistence were verified in WSL. The previously recorded intermittent Phase 5 issue was not changed or observed in the successful suite. Before Phase 8, restore WSL and rerun `source .venv/bin/activate && make all`. Unrelated `GrudgeBrief.pdf` and `PROMPT-2-PARALLEL.md` remain untouched.
+
+### 2026-10-18 Session 15
+- **Pre-flight:** Read `AGENTS.md`, full `Progress.md`, Phase 8 requirements and Exit Protocol in `PROMPT.md`, `docs/INDEX.md`, architecture, config, Scar, admission, replay, and predicate contracts. Verified Phase 7 commit `17932d6`; unrelated untracked files remain untouched.
+- **Plan:**
+  - Implement only Wilson lower-bound math, admitted-Scar gate execution, report renderers, focused tests, and Phase 8 documentation.
+  - Require admitted Scars, run the selected agent repeatedly against isolated cassette copies, evaluate deterministic predicate results, and count gate passes as nonviolations.
+  - Support offline repeated runs with an explicit deterministic/offline note; reject invalid inputs and fail closed on replay/checker failures.
+  - Provide machine-readable result objects plus Rich terminal and PR-style Markdown reports; keep selector as the Phase 13-style stub.
+  - Verify fixed agent exits 0 and vulnerable agent exits 1 through a reusable gate command path, run `make all`, commit `phase-8: complete gate and statistics`, and stop before Phase 9.
+- **Done:** Implemented Wilson lower-bound statistics, admitted-Scar gate execution with isolated deterministic replays, typed run/gate results, CI exit status mapping, Rich terminal and PR Markdown reports, and Phase 8 tests. Selector remains an honest stub and Phase 9 CLI was not touched.
+- **Tests:** WSL Ubuntu-D `.venv`: focused gate tests → `32 passed`; full `python -m pytest` → `266 passed`; Ruff check → `All checks passed!`; Ruff format → `104 files already formatted`; mypy → `Success: no issues found in 76 source files`; docs-check → `18 indexed, non-empty, linked documentation files`; `git diff --check` passed.
+- **Acceptance:** gate smoke command → `fixed_exit=0 vulnerable_exit=1 fixed_passes=20/20 lower=0.8389`; Markdown header → `## Grudge gate: **PASS**`. Offline mode is reported explicitly and the vulnerable agent is blocked by predicate violations.
+- **Docs updated:** `docs/statistics.md`, `docs/architecture.md`, `docs/INDEX.md`, and this tracker.
+- **Handoff note:** Commit this verified phase as `phase-8: complete gate and statistics` and report the actual hash. Phase 9 has not started. The two unrelated untracked files remain untouched.

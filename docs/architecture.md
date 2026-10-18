@@ -3,7 +3,7 @@
 **Purpose:** Describe the Phase 1 architecture and typed contract boundaries that later stages consume.
 **Audience:** Contributors designing or implementing a pipeline stage, and reviewers checking stage boundaries.
 **Status:** draft
-**Last updated (phase):** 7
+**Last updated (phase):** 8
 
 ## System boundary
 
@@ -45,7 +45,7 @@ The exported placeholder is [`assets/pipeline.svg`](assets/pipeline.svg). Stage 
 5. **Admission Court** repeats hermetic bad/fixed replays, checks witnessed red-on-bad and clean green-on-fixed behavior, and checks empty and benign control traces. Only a successful proof is persisted as a Scar with its embedded admission record.
 6. **Variant Fuzzer** can produce input variants while preserving the failure fingerprint.
 7. **Scar Registry** can deduplicate, score, quarantine, and retire artifacts.
-8. **CI Gate + Runner** executes admitted Scars repeatedly and makes a Wilson-bound decision.
+8. **CI Gate + Runner** executes admitted Scars repeatedly, treats successful nonviolating replays as passes, computes the Wilson lower bound, and emits Rich/PR-style reports. Offline runs are intentionally deterministic and labeled as such.
 
 The deterministic core is the replay sandbox, shrinker, predicate checker, admission court, and gate. Replay keeps the policy live while replacing external tools with a cassette, and blocks filesystem/network access outside that cassette. Live model calls are isolated to predicate drafting and are protected by a cache and offline fallback.
 
@@ -149,6 +149,24 @@ decision is recorded in
 - **Predicate types** can add taint-flow and outcome checks behind the same compiled checker interface.
 - **Gate selectors and registries** can remain optional so the offline CLI path stays small and reproducible.
 - **Viewer events** are emitted by the demo boundary; the viewer does not own pipeline state or decision logic.
+
+## Gate and statistics
+
+Phase 8's `grudge.gate.run_gate` accepts an admitted `Scar` and an agent
+callable. Each run receives a fresh `ScriptedLLM` and a deep cassette copy,
+then is revalidated before the compiled predicate is checked. A clean,
+successful replay is a gate success; violations and all replay/checker errors
+are failed runs. The result keeps per-run traces, predicate results, exact
+evidence, reasons, counts, pass rate, lower bound, threshold, and offline mode
+metadata. `grudge.gate.gate` maps the result to CI codes 0/1/2 without adding
+the Phase 9 CLI.
+
+`wilson_lower_bound` uses the lower Wilson score formula, validates counts and
+confidence parameters, and returns zero for an empty sample. The runner's
+default threshold and run count come from `grudge.config` (`0.80` and `20`).
+`render_terminal` produces a Rich local report; `render_markdown` produces a
+deterministic PR comment with no network side effects. The full derivation,
+worked table, offline note, and limitations are in [`statistics.md`](statistics.md).
 
 The Phase 1 schema details are in [`trace-format.md`](trace-format.md),
 [`cassette-format.md`](cassette-format.md), and [`glossary.md`](glossary.md).

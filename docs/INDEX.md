@@ -3,7 +3,7 @@
 **Purpose:** Map every file currently under `docs/` and show its purpose, owner phase, and status.
 **Audience:** Contributors, reviewers, and future implementation agents.
 **Status:** final
-**Last updated (phase):** 7
+**Last updated (phase):** 8
 
 ## Documents
 
@@ -22,6 +22,7 @@
 | [`docs/predicate-dsl.md`](predicate-dsl.md) | Predicate grammar, rule semantics/evidence, limits, and offline-safe synthesis. | 6 | final |
 | [`docs/adr/0003-llm-drafts-deterministic-code-decides.md`](adr/0003-llm-drafts-deterministic-code-decides.md) | Separates optional model drafting from deterministic checking and admission. | 6 | final |
 | [`docs/adr/0004-prove-tests-before-admitting.md`](adr/0004-prove-tests-before-admitting.md) | Records red/green, controls, empty sanity, and proof-bearing admission. | 7 | final |
+| [`docs/statistics.md`](statistics.md) | Wilson lower bound, gate semantics, reports, offline mode, and limitations. | 8 | final |
 | [`docs/adr/0002-ddmin-over-entries-then-content.md`](adr/0002-ddmin-over-entries-then-content.md) | Records the Phase 5 two-level shrink ordering. | 5 | final |
 | [`docs/adr/0000-template.md`](adr/0000-template.md) | Reusable template for future architecture decision records. | 0 | final |
 | [`docs/adr/0001-cli-first-with-viewer.md`](adr/0001-cli-first-with-viewer.md) | Records the CLI-first product shape and the viewer's supporting role. | 0 | final |
