@@ -28,3 +28,12 @@ Branch: lane-a   Worktree: C:/Users/kotes/Desktop/grudge-lane-a   Phases: 15, 17
 - Docs written: `docs/hooks.md` with official Claude Code JSON deny mechanism verified 2026-10-19 and timing evidence.
 - Requests filed: none.
 - Handoff note: Commit `phase-17(lane-a)`; ready for S2 merge. Do not start Phase 20 until integrator notification.
+
+### 2026-10-19 Phase 20
+- Plan: Implement exact output budgets, corruption-safe stats, estimated savings, statusline, tests, and docs.
+- Done: `budget.js`, `stats.js`, stats/statusline commands, cap and estimate enforcement tests.
+- Tests (command, result): `npm test` — 28 passing; `npm run build` and `node --check dist/grudge.mjs` — pass.
+- Measurements: statusline 20-call p50 1.20ms, p95 4.83ms, max 4.83ms; all output caps asserted.
+- Docs written: `docs/token-budgets.md` with caps, estimate labeling, comparison, and measurements.
+- Requests filed: `coordination/requests/lane-a-to-integrator-1.md` for doctor cap measurements.
+- Handoff note: Ready for S3 merge; commit `phase-20(lane-a)`; lane stopped.
