@@ -2,7 +2,7 @@
 Branch: lane-c   Worktree: C:/Users/kotes/Desktop/grudge-lane-c   Phases: 19, Phase 21 release
 
 ## Status
-- Current: waiting for S0   Waiting on: Phase 14 contract freeze
+- Current: S2 verification complete   Waiting on: Phase 17 hook/CLI implementation and integrator S2 merge
 
 ## Log (newest at bottom)
 ### 2026-10-19 Phase 14
@@ -12,3 +12,11 @@ Branch: lane-c   Worktree: C:/Users/kotes/Desktop/grudge-lane-c   Phases: 19, Ph
 - Docs written: none.
 - Requests filed: none.
 - Handoff note: Start against the documented stub command after the integrator announces S0.
+
+### 2026-10-19 S2
+- Plan: Reconcile installer command strings and package build against the merged Phase 17 interfaces without editing lane-A or shared files.
+- Done: Reviewed `docs/interfaces.md`, Claude adapter commands, `packages/grudge/src/commands/hook.js`, `src/cli.js`, and `scripts/build.mjs`. Installer strings already match the frozen contract: `node .grudge/bin/grudge.mjs hook <event>`.
+- Tests: `npm test` — 14 passing. `npm run build` and `node --check dist/grudge.mjs` — passed. `npm pack --dry-run` — passed; package contains README, package metadata, and dist runtime.
+- Docs written: none; existing `docs/integrations.md` remains accurate and Cursor stays unverified/no-write.
+- Requests filed: Phase 17 hook and CLI dispatcher are still `NotImplemented("lane-a")`; integrator must land real interfaces before release claims or end-to-end installer proof.
+- Handoff note: No implementation changes in this S2 pass; no focused commit required. Stop for integrator merge.
