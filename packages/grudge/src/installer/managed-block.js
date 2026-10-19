@@ -1,2 +1,48 @@
 // OWNER: lane-c
-export function managedBlock() { throw new Error('NotImplemented("lane-c")'); }
+
+export const MANAGED_BEGIN = "<!-- grudge:begin v1 -->";
+export const MANAGED_END = "<!-- grudge:end -->";
+
+export const INSTRUCTION_BLOCK = `${MANAGED_BEGIN}
+## Grudge (mistake guard)
+- A hook may block a tool call and cite a "scar". Do not retry the same call or work around it. Change approach, or ask the user if you think it is a false positive.
+- When the user corrects a repeatable mistake, or something failed because of an action you should never repeat in this repo, record it once:
+  \`node .grudge/bin/grudge.mjs propose --rule '<rule>' --why '<one sentence>'\`
+- Rule forms: \`never call <tool> where <field> ~ "<text>"\`, \`must call <tool> before <tool>\`, \`never call <tool> where <field> tainted_by <tool>\`. Tools: read_file, write_file, shell, http. Run \`... propose --help\` for examples.
+- One rule per correction. Never propose rules that block reading files or running tests. Do not edit \`.grudge/\`.
+${MANAGED_END}`;
+
+/** Return the versioned block, including its stable markers. */
+export function managedBlock() {
+  return INSTRUCTION_BLOCK;
+}
+
+/** Replace the existing Grudge block or append it without disturbing other text. */
+export function upsertManagedBlock(text = "", block = INSTRUCTION_BLOCK) {
+  const source = String(text);
+  const start = source.indexOf(MANAGED_BEGIN);
+  const end = source.indexOf(MANAGED_END, start + MANAGED_BEGIN.length);
+  if (start >= 0 && end >= 0) {
+    const replaced = `${source.slice(0, start)}${block.trim()}${source.slice(end + MANAGED_END.length)}`;
+    return ensureTrailingNewline(replaced);
+  }
+  const prefix = source.length === 0 || /(?:\r?\n)$/.test(source) ? source : `${source}\n`;
+  return `${prefix}${block.trim()}\n`;
+}
+
+/** Remove only the managed block and its adjacent blank line. */
+export function removeManagedBlock(text = "") {
+  const source = String(text);
+  const start = source.indexOf(MANAGED_BEGIN);
+  const end = source.indexOf(MANAGED_END, start + MANAGED_BEGIN.length);
+  if (start < 0 || end < 0) return ensureTrailingNewline(source.trimEnd());
+  return ensureTrailingNewline(`${source.slice(0, start)}${source.slice(end + MANAGED_END.length)}`.replace(/\n{3,}/g, "\n\n").trimEnd());
+}
+
+export function hasManagedBlock(text = "") {
+  return String(text).includes(MANAGED_BEGIN) && String(text).includes(MANAGED_END);
+}
+
+function ensureTrailingNewline(text) {
+  return text.endsWith("\n") ? text : `${text}\n`;
+}
