@@ -69,6 +69,19 @@ test("doctor reports a healthy installed runtime", async () => {
   await setup({ cwd, home: cwd, agents: ["claude-code"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
   const result = await doctor({ cwd, print: false });
   assert.equal(result.ok, true);
+  assert.deepEqual(result.budgetMeasurements.map(({ name }) => name), ["SessionStart injection", "Block reason", "Prompt nudge", "AGENTS.md block"]);
+  assert.ok(result.budgetMeasurements.every(({ chars, cap }) => chars <= cap));
+});
+
+test("doctor fails when a measured budget exceeds its cap", async () => {
+  const cwd = await scratch();
+  const result = await doctor({
+    cwd,
+    print: false,
+    measureOutputs: () => [{ name: "Block reason", chars: 401, cap: 400, withinCap: false }],
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.checks.find(({ name }) => name === "budget Block reason").ok, false);
 });
 
 test("uninstall removes managed files and installed runtime", async () => {

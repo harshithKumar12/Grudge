@@ -2,7 +2,7 @@
 Branch: lane-c   Worktree: C:/Users/kotes/Desktop/grudge-lane-c   Phases: 19, Phase 21 release
 
 ## Status
-- Current: S2 verification complete   Waiting on: Phase 17 hook/CLI implementation and integrator S2 merge
+- Current: S3 Phase 20 doctor budget measurements complete   Waiting on: integrator merge
 
 ## Log (newest at bottom)
 ### 2026-10-19 Phase 14
@@ -20,3 +20,11 @@ Branch: lane-c   Worktree: C:/Users/kotes/Desktop/grudge-lane-c   Phases: 19, Ph
 - Docs written: none; existing `docs/integrations.md` remains accurate and Cursor stays unverified/no-write.
 - Requests filed: Phase 17 hook and CLI dispatcher are still `NotImplemented("lane-a")`; integrator must land real interfaces before release claims or end-to-end installer proof.
 - Handoff note: No implementation changes in this S2 pass; no focused commit required. Stop for integrator merge.
+
+### 2026-10-19 S3
+- Plan: Implement Lane A's doctor request using `measureOutputs`, add a cap-failure test, and verify package checks.
+- Done: `doctor` now measures SessionStart injection, block reason, prompt nudge, and AGENTS.md block; prints chars/cap and fails when caps or line caps are exceeded. Uses the Phase 20 API when available and a pre-merge compatibility fallback.
+- Tests: `npm test` — 24 passing. `npm run build` plus `node --check dist/grudge.mjs` — passed. `npm pack --dry-run` — passed.
+- Docs written: none.
+- Requests filed: none. The request file was absent in lane-c; read from lane-a's worktree because it was present there.
+- Handoff note: Commit requested as `phase-20(lane-c): report doctor budget measurements`.
