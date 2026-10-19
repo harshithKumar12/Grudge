@@ -2,17 +2,9 @@
 Branch: lane-a   Worktree: C:/Users/kotes/Desktop/grudge-lane-a   Phases: 15, 17, 20
 
 ## Status
-- Current: Phase 17 complete   Waiting on: S2 integrator merge
+- Current: Phase 21 CLI runtime wiring complete   Waiting on: integrator merge
 
 ## Log (newest at bottom)
-### 2026-10-19 Phase 14
-- Plan: Read interfaces and implement core checker, hooks, and budgets in owned files only.
-- Done: Lane scaffold created; no implementation started before S0.
-- Tests (command, result): Integrator package smoke test passed; lane tests pending.
-- Docs written: none.
-- Requests filed: none.
-- Handoff note: Start with Phase 15 after the integrator announces S0.
-
 ### 2026-10-19 Phase 15
 - Plan: Implement the Node checker and core utilities against the frozen interfaces.
 - Done: Parser, checker, normalization, atomic store, config, conformance tests.
@@ -37,3 +29,10 @@ Branch: lane-a   Worktree: C:/Users/kotes/Desktop/grudge-lane-a   Phases: 15, 17
 - Docs written: `docs/token-budgets.md` with caps, estimate labeling, comparison, and measurements.
 - Requests filed: `coordination/requests/lane-a-to-integrator-1.md` for doctor cap measurements.
 - Handoff note: Ready for S3 merge; commit `phase-20(lane-a)`; lane stopped.
+
+### 2026-10-20 Phase 21
+- Plan: Wire the runtime CLI to the existing command registry and preserve fail-open hook behavior.
+- Done: `src/cli.js` now dispatches hook, propose, accept, scars, stats, statusline, setup, doctor, and uninstall; built dist resolves runtime modules.
+- Tests: `npm test` — 29 passing; `npm run build`, `node --check dist/grudge.mjs`, and `node dist/grudge.mjs stats` — pass.
+- Files: `packages/grudge/src/cli.js`, `packages/grudge/test/phase21-cli.test.js`.
+- Handoff: Commit `phase-21(lane-a): wire runtime cli`; ready for integrator merge.
