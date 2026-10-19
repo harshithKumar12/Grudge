@@ -3,11 +3,11 @@
 _Last updated: 2026-10-19 by omnirush.ai_
 
 ## Snapshot
-- **Current phase:** S2: Phases 15-19 merged; Phase 20 in progress
-- **Overall:** 19/22 phases complete
+- **Current phase:** S3: Phases 15-20 merged; Phase 21 in progress
+- **Overall:** 20/22 phases complete
 - **Test suite:** 295 passing in WSL Ubuntu-D Python 3.11.17
 - **Demo status:** works offline? yes
-- **Next action:** Complete Lane A Phase 20 budgets/stats, then run S3 after Phase 20 and Phase 21 preparation.
+- **Next action:** Implement the Phase 21 two-session end-to-end guard proof and run the final reproducibility audit.
 
 ## Phase Board
 | # | Phase | Status | Exit gate passed | Docs done |
@@ -32,8 +32,8 @@ _Last updated: 2026-10-19 by omnirush.ai_
 | 17 | Guard Hooks | [x] | yes | [x] |
 | 18 | Propose, Accept, and Instruction Block | [x] | yes | [x] |
 | 19 | Installer | [x] | yes | [x] |
-| 20 | Token Budgets, Stats, and Status Line | [~] | no | [~] |
-| 21 | End-to-End Proof, Demo, and Release Prep | [ ] | no | no |
+| 20 | Token Budgets, Stats, and Status Line | [x] | yes | [x] |
+| 21 | End-to-End Proof, Demo, and Release Prep | [~] | no | [~] |
 
 ## Task Checklist
 ### Phase 0
@@ -222,6 +222,13 @@ _Last updated: 2026-10-19 by omnirush.ai_
 - **Tests:** Node `npm test` -> 19 hook tests plus prior tests in the merged lane; `npm pack --dry-run` -> 4 intended package files; focused Python guard/importer tests -> 6 passed. The first full check exposed only two missing docs index entries; no lane code failed. Full rerun is pending after this index update.
 - **Docs updated:** `docs/INDEX.md` now indexes hooks and instruction block; Phase Board marks 17 and 18 complete.
 - **Handoff note:** S2 contract and implementation merge passed after docs correction. Lane A is unlocked for Phase 20. Lane B and C are waiting for S3/Phase 21 instructions.
+### 2026-10-19 Sync S3
+- **Pre-flight:** Re-read `AGENTS.md`, `PROMPT.md` final audit rules, `PROMPT-2.md` Phase 20/21 requirements and Definition of Done, `PROMPT-2-PARALLEL.md` S3/Phase 21 ownership, `Progress.md`, and `docs/INDEX.md`.
+- **Plan:** Merge Lane A budgets/stats and Lane C's owner-side doctor measurement fix; update the docs index; run `make all`, Node tests, conformance fixtures, package dry-run, and diff checks; then implement the integrator-owned two-session proof and guard demo.
+- **Done:** Merged Lane A `62b28ef` and Lane C `1cafd1b`; honored the cross-lane request by having the doctor owner implement measured cap checks. Full check initially exposed only the missing token-budget index entry; fixed before Phase 21.
+- **Tests:** Node lane reports: 28 and 24 passing respectively; package build and `npm pack --dry-run` passed. Full Python check is rerun after indexing `docs/token-budgets.md`; current merged result is 301 passing with clean Ruff/mypy.
+- **Docs updated:** `docs/INDEX.md` now indexes `token-budgets.md`; Phase Board marks Phase 20 complete.
+- **Handoff note:** S3 is ready. Lane A/B/C work is merged. Integrator owns Phase 21 e2e, `grudge demo --guard`, final audit, and final report.
 ### 2026-10-15 Session 1
 - **Pre-flight:** read AGENTS.md y, read PROMPT.md y, read docs/PROGRESS.md y (empty), read docs/INDEX.md n (missing).
 - **Plan:**
