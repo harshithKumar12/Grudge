@@ -3,11 +3,11 @@
 _Last updated: 2026-10-19 by omnirush.ai_
 
 ## Snapshot
-- **Current phase:** S0: Phase 14 complete; lanes ready
-- **Overall:** 14/22 phases complete
+- **Current phase:** S1: Phases 15, 16, and 19 merged; Phase 17/18 in progress
+- **Overall:** 17/22 phases complete
 - **Test suite:** 295 passing in WSL Ubuntu-D Python 3.11.17
 - **Demo status:** works offline? yes
-- **Next action:** Launch Lane A, Lane B, and Lane C from their dedicated S0 worktrees.
+- **Next action:** Complete Lane A Phase 17 and Lane B Phase 18, then run the S2 sync protocol.
 
 ## Phase Board
 | # | Phase | Status | Exit gate passed | Docs done |
@@ -27,11 +27,11 @@ _Last updated: 2026-10-19 by omnirush.ai_
 | 12 | Polish, Docs, Pitch | [x] | yes | [x] |
 | 13 | Stretch Implementations | [ ] | no | no |
 | 14 | Contracts and Python Compile Step | [x] | yes | [x] |
-| 15 | Node Package Core | [ ] | no | no |
-| 16 | Session Recorder | [ ] | no | no |
+| 15 | Node Package Core | [x] | yes | [x] |
+| 16 | Session Recorder | [x] | yes | [x] |
 | 17 | Guard Hooks | [ ] | no | no |
 | 18 | Propose, Accept, and Instruction Block | [ ] | no | no |
-| 19 | Installer | [ ] | no | no |
+| 19 | Installer | [x] | yes | [x] |
 | 20 | Token Budgets, Stats, and Status Line | [ ] | no | no |
 | 21 | End-to-End Proof, Demo, and Release Prep | [ ] | no | no |
 
@@ -208,6 +208,13 @@ _Last updated: 2026-10-19 by omnirush.ai_
 - **Tests:** WSL `.venv-wsl`: `make VENV=.venv-wsl all` -> `299 passed`; Ruff clean; mypy clean; docs-check `24 indexed, non-empty, linked documentation files`; Node `npm test` -> `1 passed`; Node build completed; Python conformance/compile tests -> `4 passed`; compile acceptance -> demo Scar compiled to version 1 with 1 rule; JSON Schema package unavailable in WSL, so structural contract tests were used and limitation recorded.
 - **Docs updated:** `docs/interfaces.md`, `docs/guard-contract.md`, `docs/canonical-tools.md`, `docs/INDEX.md`, and this tracker.
 - **Handoff note:** S0 contract freeze passed. Lane worktrees: `C:/Users/kotes/Desktop/grudge-lane-a`, `C:/Users/kotes/Desktop/grudge-lane-b`, `C:/Users/kotes/Desktop/grudge-lane-c`; branches `lane-a`, `lane-b`, `lane-c`. Parallel mode is active for Phases 15-21. Preserve unrelated untracked `GrudgeBrief.pdf` and owner-provided prompt files.
+### 2026-10-19 Sync S1
+- **Pre-flight:** Re-read `AGENTS.md`, `PROMPT.md` exit rules, `PROMPT-2.md` Phase 15/16/17/18/19 requirements, `PROMPT-2-PARALLEL.md` sync protocol, `Progress.md`, and `docs/INDEX.md`.
+- **Plan:** Merge lanes A, B, C in dependency order; run Python and Node suites plus docs/type/lint checks; record the S1 evidence; merge `master` back into every lane; unlock Lane A Phase 17, Lane B Phase 18, and Lane C hook-command finalization.
+- **Done:** Merged Lane A `547b0e7`, Lane B `91447cd`, `40a743b`, `c8bec6f`, and Lane C `9677f1e`; corrected docs index debt exposed by the merged docs; updated all three lane worktrees from `master`.
+- **Tests:** `make VENV=.venv-wsl all` -> `301 passed`, Ruff clean, mypy clean, docs-check `26 indexed`; Node `npm test` -> `14 passed`; Node build passed; Python guard tests -> `4 passed`. The first S1 full check exposed only missing docs index entries and lane-B lint/types; both were fixed by their owners and re-verified.
+- **Docs updated:** `docs/INDEX.md` now indexes `trust-model.md` and `integrations.md`; Phase Board marks 15, 16, and 19 complete.
+- **Handoff note:** S1 passed. Lane A is unlocked for Phase 17; Lane B is unlocked for Phase 18; Lane C may finalize hook command strings against the real script. Stop all lanes at S2.
 ### 2026-10-15 Session 1
 - **Pre-flight:** read AGENTS.md y, read PROMPT.md y, read docs/PROGRESS.md y (empty), read docs/INDEX.md n (missing).
 - **Plan:**

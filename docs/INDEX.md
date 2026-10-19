@@ -33,6 +33,8 @@
 | [`docs/interfaces.md`](interfaces.md) | Frozen cross-lane Python, Node, session, compiled JSON, and hook interfaces. | 14 | final |
 | [`docs/guard-contract.md`](guard-contract.md) | Compiled predicate schema and deterministic runtime evaluation semantics. | 14 | final |
 | [`docs/canonical-tools.md`](canonical-tools.md) | Canonical tool names and the Claude Code normalization map. | 14 | final |
+| [`docs/trust-model.md`](trust-model.md) | Stored session data, redaction, retention, and local trust boundaries. | 16 | final |
+| [`docs/integrations.md`](integrations.md) | Per-agent installer verification status and safe no-write policy. | 19 | final |
 
 ## Status vocabulary
 
