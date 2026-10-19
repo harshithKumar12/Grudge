@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 220" role="img" aria-labelledby="title desc">
-  <title id="title">Grudge eight-stage pipeline</title>
-  <desc id="desc">Placeholder diagram showing the eight Grudge pipeline stages from recording to the CI gate.</desc>
+  <title id="title">Grudge eight-stage engine pipeline</title>
+  <desc id="desc">Grudge engine stages from recording through the CI gate; the fault locator, fuzzer, and registry are marked as deferred in the documentation.</desc>
   <style>
     .stage { fill: #202938; stroke: #8fb3ff; stroke-width: 2; }
     .label { fill: #f5f7fb; font: 16px sans-serif; text-anchor: middle; }

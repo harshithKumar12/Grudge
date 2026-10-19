@@ -1,9 +1,9 @@
-# Phase 10 CLI, offline demo, and Phase 11 viewer
+# CLI, offline demo, viewer, and fallback recording
 
 **Purpose:** Explain the scriptable CLI pipeline and the deterministic demo.
 **Audience:** Contributors, CI authors, and demo operators.
 **Status:** final
-**Last updated (phase):** 11
+**Last updated (phase):** 12
 
 ## Offline demo
 
@@ -84,11 +84,10 @@ external CDN is needed.
 
 ## Fallback video procedure
 
-The buildathon fallback recording can be made without a provider: run
-`python -m grudge demo --no-browser --fast --json > phase10-events.json`, then
-record the terminal output while replaying the JSON event list in a viewer or
-slide deck. The event log is deterministic apart from its process-local
-sequence numbers and is safe to regenerate offline.
+The step-by-step recording procedure, output location, and headless fallback
+are maintained in [`../scripts/record_fallback_video.md`](../scripts/record_fallback_video.md).
+The event log is safe to regenerate offline; only process-local sequence
+numbers and runtime timestamps may differ between recordings.
 
 ## Manual pipeline
 

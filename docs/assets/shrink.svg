@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 260" role="img" aria-labelledby="title desc">
+  <title id="title">Grudge shrink visual reference</title>
+  <desc id="desc">A long captured trace is reduced to three causal cassette entries: poisoned email, secret read, and HTTP sink.</desc>
+  <style>
+    .bg { fill: #10151f; }
+    .panel { fill: #202938; stroke: #8fb3ff; stroke-width: 2; }
+    .survivor { fill: #153d35; stroke: #59d6a4; stroke-width: 2; }
+    .muted { fill: #293241; stroke: #667085; stroke-width: 1; }
+    .label { fill: #f5f7fb; font: 17px sans-serif; text-anchor: middle; }
+    .small { fill: #b8c3d6; font: 14px sans-serif; text-anchor: middle; }
+    .arrow { fill: none; marker-end: url(#arrowhead); stroke: #8fb3ff; stroke-width: 3; }
+  </style>
+  <defs>
+    <marker id="arrowhead" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto">
+      <polygon points="0 0, 12 4, 0 8" fill="#8fb3ff" />
+    </marker>
+  </defs>
+  <rect class="bg" width="960" height="260" />
+  <text class="label" x="210" y="38">captured trace · 40+ steps</text>
+  <text class="label" x="750" y="38">minimal cassette · 3 entries</text>
+  <g>
+    <rect class="panel" x="40" y="75" width="330" height="125" rx="10" />
+    <rect class="muted" x="58" y="103" width="40" height="42" rx="5" />
+    <rect class="muted" x="108" y="103" width="40" height="42" rx="5" />
+    <rect class="muted" x="158" y="103" width="40" height="42" rx="5" />
+    <rect class="survivor" x="208" y="103" width="40" height="42" rx="5" />
+    <rect class="muted" x="258" y="103" width="40" height="42" rx="5" />
+    <rect class="muted" x="308" y="103" width="40" height="42" rx="5" />
+    <text class="small" x="203" y="176">ordinary reads fade; causal evidence remains</text>
+  </g>
+  <path class="arrow" d="M390 137 H570" />
+  <text class="small" x="480" y="118">ddmin + content reducers</text>
+  <g>
+    <rect class="survivor" x="600" y="75" width="300" height="34" rx="7" />
+    <rect class="survivor" x="600" y="116" width="300" height="34" rx="7" />
+    <rect class="survivor" x="600" y="157" width="300" height="34" rx="7" />
+    <text class="label" x="750" y="98">poisoned email</text>
+    <text class="label" x="750" y="139">read_file(api_keys.txt)</text>
+    <text class="label" x="750" y="180">send_http sink</text>
+  </g>
+  <text class="small" x="480" y="232">same live policy · smaller frozen world · reproducible failure</text>
+</svg>

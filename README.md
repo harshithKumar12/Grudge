@@ -1,55 +1,208 @@
 # Grudge
 
-**Agents repeat mistakes. Grudge turns each failure into a deterministic regression scar.**
+**Agents repeat mistakes. Grudge makes each one happen exactly once.**
 
-Grudge will compile an agent failure into three reviewable artifacts: a minimal
-cassette, a never-again behavioral predicate, and a statistical verdict. The
-Phase 9 CLI exposes the runtime pipeline described in
-[the architecture](docs/architecture.md); later phases add event streaming and
-the supporting viewer.
+## The problem
 
-## Quickstart
+Agent failures are often buried in long, provider-dependent transcripts that are difficult to reproduce. A copied transcript can show what happened, but it cannot show whether the live policy would make the same decision when the world changes. Grudge turns one failure into a small, reviewable regression Scar that can run offline and block the same behavior from returning.
 
-The supported runtime is Python 3.11.11, recorded in `.python-version`.
-Commands below create and use a project-local environment; they do not install
-anything globally.
+## 30-second quickstart
+
+Use Python 3.11 or another interpreter supported by `pyproject.toml`, then run
+the complete offline demo from the repository root:
 
 ```bash
-python3.11 -m venv .venv
-make install
-python -m grudge --help
+pip install -e . && grudge demo
 ```
 
-The Phase 9 CLI wraps the recorder, shrinker, admission court, and statistical
-gate. The offline demo uses only checked-in fake data and the scripted policy:
+The command opens the local viewer and plays the five-beat story: capture the
+vulnerable run, shrink its world, synthesize a predicate, prove red-on-bad and
+green-on-fixed admission, then reintroduce the bug and block it. The demo is
+offline and deterministic: it uses checked-in fake tools, scripted policies,
+the checked-in Scar, and the fallback predicate; it does not call a provider or
+the public network. For a headless smoke run, use
+`grudge demo --no-browser --fast`; for machine output, add `--json`.
 
-```bash
-python -m grudge demo --no-browser
-```
+## What the shrink shows
 
-For the complete command reference and a manual capture → shrink → admit → run
-pipeline, see [`docs/demo-guide.md`](docs/demo-guide.md).
+The headline visual is the shrink: many captured tool responses become the
+small causal world that still reproduces the failure. The repository includes
+a static visual reference for the story; the live viewer animates the same
+transition from the retained `shrink.*` events.
 
-### CLI reference
+![Shrink visual reference: a captured trace reduced to a three-entry cassette](docs/assets/shrink.svg)
+
+## Architecture
+
+The engine is CLI-first. The recorder emits a typed trace, replay freezes only
+the external world while the policy stays live, the shrinker reduces the
+cassette, deterministic predicate code checks behavior, admission proves that
+the rule discriminates, and the gate turns repeated clean runs into a CI
+decision. The local demo server adds an event stream consumed by the static
+viewer; the viewer never owns pipeline state or verdict logic.
+
+![Grudge pipeline architecture](docs/assets/pipeline.svg)
 
 ```text
-grudge capture <agent_module> --out trace.jsonl [--json] [--debug]
-grudge shrink <trace.jsonl> --failure <seed-rule> --out cassette.json [--agent <module>] [--json] [--debug]
-grudge admit <cassette.json> --bad <module> --good <module> --out <scars-dir> [--json] [--debug]
-grudge run --scars <file-or-dir> --agent <module> [--runs N] [--threshold T] [--json] [--debug]
-grudge demo [--live] [--port 8765] [--no-browser] [--json] [--debug]
-grudge scars list|show|retire [--json] [--debug]
+agent run → trace → cassette + live policy → minimal cassette
+                                      ↓
+                         predicate → admission proof → statistical gate
+                                      ↓
+                         demo events → local SSE server → static viewer
 ```
 
-Every command supports `--json` for machine-readable output and `--debug` for
-a traceback on stderr. Missing files, schema failures, and other expected
-engine failures exit 2. A gate passes with exit 0 and is blocked with exit 1.
+The full contracts and boundaries are in
+[`docs/architecture.md`](docs/architecture.md).
 
-## Checks
+## How a failure becomes a Scar
 
-Run the single reproducible check bundle:
+Each Scar contains three reviewable artifacts:
+
+1. **Cassette — the frozen world.** An ordered set of task/tool-response
+   entries. Replay serves only cassette responses, with strict matching and
+   single-use entries, while the policy computes its next action from the
+   resulting messages. This keeps replay hermetic without replaying a
+   transcript verbatim. See [`docs/cassette-format.md`](docs/cassette-format.md)
+   and [`docs/why-not-replay.md`](docs/why-not-replay.md).
+2. **Predicate — the never-again rule.** A small readable DSL expresses call
+   shape, ordering, and MVP-lite taint flow. The parser/compiler returns exact
+   trace evidence and a deterministic `PredicateResult`; optional model
+   synthesis can draft text, but deterministic code decides. See
+   [`docs/predicate-dsl.md`](docs/predicate-dsl.md).
+3. **Verdict — proof and gate evidence.** Admission requires witnessed red
+   bad-agent runs, clean successful fixed-agent runs, nonempty benign controls,
+   and fail-closed replay/checker behavior. The statistical gate repeats an
+   admitted Scar and passes only when its Wilson lower bound reaches the
+   threshold. Offline repetitions demonstrate repeatability, not independent
+   statistical samples. See [`docs/statistics.md`](docs/statistics.md) and
+   [`docs/architecture.md`](docs/architecture.md#admission-rules).
+
+## CLI reference
+
+Run `grudge --help` or append `--help` to any command. Every implemented
+command accepts `--json` for one machine-readable document on stdout and
+`--debug` for a traceback on stderr. Expected input/engine failures use exit
+code `2`; a gate passes with `0` and is blocked with `1`.
+
+### Capture
+
+```text
+grudge capture AGENT_MODULE --out PATH [--json] [--debug]
+```
+
+Calls the module's `run_agent` or `run` entry point and writes canonical JSONL
+trace output.
+
+### Shrink
+
+```text
+grudge shrink TRACE --failure RULE --out PATH
+    [--agent AGENT_MODULE] [--json] [--debug]
+```
+
+Reduces a trace-derived cassette while retaining the supplied DSL rule.
+`--failure demo` selects the checked-in hand-verified demo rule;
+`--agent` defaults to `examples.leaky_agent.agent`.
+
+### Admit
+
+```text
+grudge admit CASSETTE --bad AGENT_MODULE --good AGENT_MODULE --out PATH
+    [--id TEXT] [--predicate RULE|demo] [--controls PATH] [--runs INT]
+    [--json] [--debug]
+```
+
+Builds a candidate Scar and admits it only after repeated red/green proof and
+benign controls. `--controls` defaults to
+`examples/leaky_agent/controls`; `--runs` defaults to `3`; `--predicate demo`
+uses the fallback rule.
+
+### Run the gate
+
+```text
+grudge run --scars PATH --agent AGENT_MODULE
+    [--runs INT] [--threshold FLOAT] [--json] [--debug]
+```
+
+Runs one Scar file or every `*.scar.json` in a directory. Defaults come from
+`grudge.config` (`20` runs and threshold `0.80`). The report labels the normal
+path `offline/deterministic`.
+
+### Demo and viewer
+
+```text
+grudge demo [--live] [--port INT] [--no-browser] [--runs INT] [--fast]
+    [--json] [--debug]
+grudge viewer [--json] [--debug]
+```
+
+`demo` defaults to the local viewer server on port `8765`; `--no-browser`
+prints the URL instead. `--fast` removes presenter pacing. `--live` is a
+reserved future provider mode and currently reports an error. `viewer` remains
+an explicit roadmap stub; the supported viewer path is `grudge demo`.
+
+### Browse Scars
+
+```text
+grudge scars list [--scars PATH] [--json] [--debug]
+grudge scars show SCAR [--scars PATH] [--json] [--debug]
+grudge scars retire SCAR [--json] [--debug]
+```
+
+`list` and `show` are implemented. `retire` is reserved for the future
+registry and returns an explicit roadmap error.
+
+For a shell pipeline and JSON/error examples, see
+[`docs/demo-guide.md`](docs/demo-guide.md).
+
+## Status
+
+| Area | MVP status | STRETCH status |
+|---|---|---|
+| Typed trace, cassette, predicate, and Scar schemas | Implemented and persisted | — |
+| Recording and redaction | Recorder, decorator, raw SDK boundary, and configurable redaction implemented | MCP and LangGraph adapters are stubs |
+| Replay and shrinking | Hermetic cassette replay, ddmin, content reducers, and deterministic history implemented | Fault locator is a stub |
+| Predicates | Call shape, ordering, and MVP-lite taint flow implemented; outcome AST parses | Outcome checker is a stub |
+| Admission and statistics | Red/green proof, controls, Wilson gate, Rich/Markdown reports implemented | Changed-Scar selector is a stub |
+| CLI and demo | Capture, shrink, admit, run, demo, and Scar list/show implemented | `viewer` and `scars retire` commands are explicit stubs |
+| Static viewer | CDN-free event-driven dashboard with replay, pause, reconnect, and evidence panels implemented | Full Scar browser/registry integration remains a stub/minimal boundary |
+| Ecosystem integrations | Local/offline path needs no external service | SQLite registry, fuzzer, locator, pytest/GitHub integrations, and workflow are deferred |
+
+The complete stub/design register is [`docs/roadmap.md`](docs/roadmap.md).
+
+## Benchmark status
+
+The row below is a measured offline CLI run on WSL Ubuntu-D with Python 3.11.17
+using the checked-in vulnerable agent and the command path documented in
+`docs/demo-guide.md`. Wall time includes capture and shrink; cassette bytes are
+the pretty-printed JSON artifact written by `grudge shrink --json`. Repeat on a
+different machine before comparing timings; do not infer measurements from the
+demo narration.
+
+| Workload | Original steps | Minimal steps / entries | Oracle calls | Wall time | Cassette bytes |
+|---|---:|---:|---:|---:|---:|
+| Demo leak (offline, deterministic; WSL Ubuntu-D / Python 3.11.17) | 71 | 23 | 1,254 | 46.357 s | 3,756 |
+
+The implementation already reports shrink statistics (`original_entries`,
+`minimal_entries`, `oracle_calls`, and byte sizes) in `grudge shrink --json`,
+which is the source for the measured row above. The deterministic input helper
+can generate a configurable trace for stress tests and future benchmark runs:
 
 ```bash
+python scripts/generate_trace.py --steps 40 --output artifacts/phase12/trace.jsonl
+```
+
+It does not time shrinking or aggregate measurements automatically; benchmark
+rows must be captured from a clean run and recorded with their environment.
+
+## Checks and reproducibility
+
+The supported runtime is Python 3.11, recorded in `.python-version`, and the
+lockfile is `requirements.lock`. The project Makefile keeps dependencies in a
+local virtual environment:
+
+```bash
+make install
 make test
 make lint
 make typecheck
@@ -57,60 +210,20 @@ make docs-check
 make all
 ```
 
-`requirements.lock` pins the direct and development dependencies. The Makefile
-detects `.venv/bin/python` on POSIX systems and `.venv/Scripts/python` on
-Windows. After activating the environment, its commands run `python -m ...`
-through that project interpreter.
-
-## Container build and deployment
-
-The Dockerfile pins the Python base image and installs the lockfile into the
-image:
+The offline path needs no API keys or real personal data. Copy `.env.example`
+only when experimenting with the optional provider boundary; never commit a
+key. Docker remains an optional reproducibility path:
 
 ```bash
-docker build -t grudge:phase-9 .
-docker run --rm grudge:phase-9
+docker build -t grudge:phase-12 .
+docker run --rm grudge:phase-12
 ```
-
-To deploy, push the same image to the registry used by your target platform:
-
-```bash
-docker tag grudge:phase-9 REGISTRY/PROJECT/grudge:phase-9
-docker push REGISTRY/PROJECT/grudge:phase-9
-```
-
-No API keys or real personal data are needed for the offline path. Copy
-`.env.example` only when a later live-LLM phase requires provider settings.
 
 ## Repository guide
 
-### Phase 7 admission proof (offline)
-
-The prebuilt example is `scars/sample_leak.scar.json`. From the project root,
-activate the project environment and verify its repeated bad/red, fixed/green,
-and benign-control proof:
-
-```bash
-source .venv/bin/activate
-python -m pytest tests/test_admission_court.py tests/test_sample_scar.py
-```
-
-To explicitly regenerate the fixture after a new successful proof:
-
-```bash
-python -m scripts.build_sample_scar --runs 3
-```
-
-This replaces the sample only on successful admission. No API key or real
-network is used. See [Admission rules](docs/architecture.md#admission-rules)
-for rejection behavior, evidence, and the empty-trace interpretation. The
-`grudge admit` command is available for the manual pipeline; see the demo
-guide for its required options.
-
-- [Architecture](docs/architecture.md) — pipeline stages and contracts.
-- [Roadmap](docs/roadmap.md) — honest stubs and deferred work.
+- [Architecture](docs/architecture.md) — contracts and pipeline boundaries.
 - [Documentation index](docs/INDEX.md) — every documentation file and owner phase.
-- [Progress tracker](Progress.md) — the source of truth for phase status.
-
-The project is built one phase at a time. See `PROMPT.md` for acceptance gates
-and `AGENTS.md` for owner coding rules.
+- [Roadmap](docs/roadmap.md) — every deferred stub and its design notes.
+- [Demo guide](docs/demo-guide.md) — presenter, server, JSON, and shell operation.
+- [Pitch artifacts](pitch/one_liner.md) — one-liner, 90-second script, and slides.
+- [Progress tracker](Progress.md) — canonical phase status.

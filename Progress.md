@@ -3,11 +3,11 @@
 _Last updated: 2026-10-18 by omnirush.ai_
 
 ## Snapshot
-- **Current phase:** 11: Viewer complete
-- **Overall:** 12/14 phases complete
-- **Test suite:** 287 passing in WSL Ubuntu-D Python 3.11.17
+- **Current phase:** 12: Polish, Docs, Pitch complete
+- **Overall:** 13/14 phases complete
+- **Test suite:** 295 passing in WSL Ubuntu-D Python 3.11.17
 - **Demo status:** works offline? yes
-- **Next action:** Begin Phase 12 only after owner approval.
+- **Next action:** Begin Phase 13 only after explicit approval; stretch work remains deferred.
 
 ## Phase Board
 | # | Phase | Status | Exit gate passed | Docs done |
@@ -24,7 +24,7 @@ _Last updated: 2026-10-18 by omnirush.ai_
 | 9 | CLI | [x] | yes | [x] |
 | 10 | Demo Orchestrator & Event Stream | [x] | yes | [x] |
 | 11 | Viewer | [x] | yes | [x] |
-| 12 | Polish, Docs, Pitch | [ ] | no | no |
+| 12 | Polish, Docs, Pitch | [x] | yes | [x] |
 | 13 | Stretch Implementations | [ ] | no | no |
 
 ## Task Checklist
@@ -128,7 +128,10 @@ _Last updated: 2026-10-18 by omnirush.ai_
 - [x] Integrate the normal CLI demo path with the local viewer server and document presenter operation.
 
 ### Phase 12
-- [ ] Final docs, pitch material, benchmarks, and audit.
+- [x] Final docs, pitch material, benchmarks, and audit.
+- [x] Finalize README, architecture/roadmap documentation, pitch artifacts, and fallback recording procedure.
+- [x] Add deterministic synthetic trace generation and a measured offline benchmark row.
+- [x] Run the full reproducibility, offline-network, and clean Linux audit checks.
 
 ### Phase 13
 - [ ] Stretch implementations, one sub-entry per item.
@@ -397,3 +400,15 @@ _Last updated: 2026-10-18 by omnirush.ai_
 - **Tests:** Focused viewer/CLI tests → `16 passed`; clean WSL `make VENV=.venv-wsl all` → `287 passed`, Ruff clean, `Success: no issues found in 77 source files`, docs-check `20 indexed, non-empty, linked documentation files`; Ruff format → `107 files already formatted`; JavaScript module syntax checks passed with Node; `git diff --check` passed.
 - **Acceptance:** Static tests verify the module graph, mount exports, all Phase 10 event discriminators, no external dependencies, EventSource/reconnect, replay, pause/resume, and responsive viewer assets. CLI integration verifies the viewer server starts without opening a browser. Fast demo smoke emitted `demo.finished` and `regression.detected`.
 - **Handoff note:** Phase 11 implementation and focused verification are complete; the clean WSL full exit bundle and phase commit remain. Do not start Phase 12 until the phase commit is recorded. Preserve unrelated `GrudgeBrief.pdf` and `PROMPT-2-PARALLEL.md`.
+
+### 2026-10-19 Session 19
+- **Pre-flight:** Read `AGENTS.md`, Phase 12 requirements and Exit Protocol in `PROMPT.md`, `Progress.md`, `docs/INDEX.md`, README, roadmap, pitch placeholders, and benchmark placeholder. Verified commit `eec891b`; unrelated untracked files remain untouched.
+- **Plan:**
+  - Finalize the README, documentation index/metadata, architecture and roadmap, pitch script/slides/one-liner, and fallback recording procedure.
+  - Replace the benchmark generator stub with a deterministic standard-library synthetic trace CLI and add benchmark/audit tests.
+  - Measure the real capture → shrink path in the pinned WSL environment and record original steps, minimal entries, oracle calls, wall time, and cassette bytes without inventing values.
+  - Run the full Linux checks, offline network guard, reproducibility checks, and Phase Exit Protocol; commit Phase 12 and stop before Phase 13.
+- **Done:** Finalized the project narrative and status table, added shrink/pipeline visuals, completed pitch and fallback materials, expanded the deferred-stub roadmap, implemented deterministic trace generation, added Phase 12 tests, and recorded a measured WSL benchmark row.
+- **Tests:** Focused Phase 12 tests → `8 passed`; clean WSL `make VENV=.venv-wsl all` → `295 passed`, Ruff clean, `Success: no issues found in 77 source files`, docs-check `21 indexed, non-empty, linked documentation files`; Ruff format → `108 files already formatted`; `git diff --check` passed. Unlazy G1-G4 all passed.
+- **Acceptance:** README quickstart, CLI/status table, architecture, pitch, fallback procedure, and roadmap are final/indexed. Measured benchmark: 71 original trace steps, 23 minimal cassette entries, 1,254 oracle calls, 46.357 seconds capture/shrink wall time, 3,756 cassette bytes on WSL Ubuntu-D/Python 3.11.17. Offline demo passed with socket access blocked.
+- **Handoff note:** Phase 12 implementation and Exit Protocol are complete; the phase commit and post-commit fresh-archive audit remain. Do not start Phase 13 until the phase commit is recorded. Preserve unrelated `GrudgeBrief.pdf` and `PROMPT-2-PARALLEL.md`.

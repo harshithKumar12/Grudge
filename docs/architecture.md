@@ -1,9 +1,9 @@
 # Architecture
 
-**Purpose:** Describe the typed contract boundaries from the Phase 1 core through the Phase 11 static viewer.
+**Purpose:** Describe the typed contract boundaries from the Phase 1 core through the Phase 12 demo and documentation surface.
 **Audience:** Contributors designing or implementing a pipeline stage, and reviewers checking stage boundaries.
-**Status:** draft
-**Last updated (phase):** 11
+**Status:** final
+**Last updated (phase):** 12
 
 ## System boundary
 
@@ -34,7 +34,7 @@ agent run
                                       [8 CI Gate + Runner]
 ```
 
-The exported placeholder is [`assets/pipeline.svg`](assets/pipeline.svg). Stage 6 and stage 7 are intentionally deferred; their contracts are recorded in [`roadmap.md`](roadmap.md).
+The exported engine diagram is [`assets/pipeline.svg`](assets/pipeline.svg). Stage 2's fault locator and stages 6-7 remain intentionally deferred; their contracts and all other runtime stubs are recorded in [`roadmap.md`](roadmap.md). The demo event stream and static viewer are presentation layers around the deterministic core, not additional decision stages.
 
 ## Data flow and contracts
 
@@ -211,4 +211,4 @@ with the ordering decision recorded in
 The Phase 6 grammar and checking/synthesis limits are described in
 [`predicate-dsl.md`](predicate-dsl.md). The model boundary is recorded in
 [`adr/0003-llm-drafts-deterministic-code-decides.md`](adr/0003-llm-drafts-deterministic-code-decides.md).
-Deferred work is tracked in [`roadmap.md`](roadmap.md).
+All deferred work, including explicit module and CLI stubs, is tracked in [`roadmap.md`](roadmap.md).
