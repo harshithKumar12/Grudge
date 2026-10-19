@@ -3,11 +3,11 @@
 _Last updated: 2026-10-18 by omnirush.ai_
 
 ## Snapshot
-- **Current phase:** 10: Demo Orchestrator & Event Stream complete
-- **Overall:** 11/14 phases complete
-- **Test suite:** 281 passing in WSL Ubuntu-D Python 3.11.17
+- **Current phase:** 11: Viewer complete
+- **Overall:** 12/14 phases complete
+- **Test suite:** 287 passing in WSL Ubuntu-D Python 3.11.17
 - **Demo status:** works offline? yes
-- **Next action:** Begin Phase 11 only after owner approval.
+- **Next action:** Begin Phase 12 only after owner approval.
 
 ## Phase Board
 | # | Phase | Status | Exit gate passed | Docs done |
@@ -23,7 +23,7 @@ _Last updated: 2026-10-18 by omnirush.ai_
 | 8 | Gate & Statistics | [x] | yes | [x] |
 | 9 | CLI | [x] | yes | [x] |
 | 10 | Demo Orchestrator & Event Stream | [x] | yes | [x] |
-| 11 | Viewer | [ ] | no | no |
+| 11 | Viewer | [x] | yes | [x] |
 | 12 | Polish, Docs, Pitch | [ ] | no | no |
 | 13 | Stretch Implementations | [ ] | no | no |
 
@@ -122,7 +122,10 @@ _Last updated: 2026-10-18 by omnirush.ai_
 - [x] Document the event contract, server endpoints, pacing, and fallback video procedure.
 
 ### Phase 11
-- [ ] Static viewer and viewer tests.
+- [x] Static viewer and viewer tests.
+- [x] CDN-free responsive viewer renders the Phase 10 event stream with timeline, shrink, predicate, gate, regression, and evidence panels.
+- [x] Viewer supports replay, pause/resume, beat progress, disconnected/reconnect state, and static asset serving.
+- [x] Integrate the normal CLI demo path with the local viewer server and document presenter operation.
 
 ### Phase 12
 - [ ] Final docs, pitch material, benchmarks, and audit.
@@ -381,3 +384,16 @@ _Last updated: 2026-10-18 by omnirush.ai_
 - **Tests:** Focused Phase 10/CLI tests → `16 passed`; clean WSL `make VENV=.venv-wsl all` → `281 passed`, Ruff clean, `Success: no issues found in 77 source files`, docs-check `20 indexed, non-empty, linked documentation files`; Ruff format → `106 files already formatted`; `git diff --check` passed. The unlazy G1-G5 ledger gates all passed, including the full Linux check bundle.
 - **Acceptance:** `grudge demo --no-browser --fast` emits all required event types and exits successfully; event order is demo start → beats 1-5 → finished; beat 4 emits vulnerable blocked and fixed passing gate results; beat 5 emits a blocked vulnerable gate and PR regression comment. The server replays completed events over SSE, returns state, restarts runs, and serves `viewer/` assets without network use by the orchestrator.
 - **Handoff note:** Phase 10 implementation, acceptance, Exit Protocol, and commit are pending only the owner commit action. Do not start Phase 11 until the phase commit is recorded. Preserve unrelated `GrudgeBrief.pdf` and `PROMPT-2-PARALLEL.md`.
+
+### 2026-10-19 Session 18
+- **Pre-flight:** Read `AGENTS.md`, Phase 11 requirements and Exit Protocol in `PROMPT.md`, `Progress.md`, `docs/INDEX.md`, Phase 10 server/event contracts, and all viewer stubs. Verified commit `5efbbf5`; unrelated untracked files remain untouched.
+- **Plan:**
+  - Replace the placeholder viewer with a CDN-free responsive vanilla HTML/CSS/JS dashboard and the required component modules.
+  - Render all Phase 10 event types, including timeline trace steps, shrink animation, predicate provenance, admission/gate outcomes, regression PR comment, and minimal Scar evidence browser.
+  - Add reconnect/disconnected state, replay via `POST /restart`, beat indicator, and keyboard pause/resume behavior.
+  - Integrate the default CLI demo path with the local server/browser while preserving the fast machine/test path; add static and CLI integration tests and viewer documentation.
+  - Run the Phase 11 Exit Protocol, commit this phase, and stop before Phase 12.
+- **Done:** Implemented the static viewer, required component modules, static asset tests, CLI server/browser integration, presenter controls, and viewer documentation. The default demo serves and opens the viewer; `--fast` and `--json` retain direct offline output for tests and automation.
+- **Tests:** Focused viewer/CLI tests → `16 passed`; clean WSL `make VENV=.venv-wsl all` → `287 passed`, Ruff clean, `Success: no issues found in 77 source files`, docs-check `20 indexed, non-empty, linked documentation files`; Ruff format → `107 files already formatted`; JavaScript module syntax checks passed with Node; `git diff --check` passed.
+- **Acceptance:** Static tests verify the module graph, mount exports, all Phase 10 event discriminators, no external dependencies, EventSource/reconnect, replay, pause/resume, and responsive viewer assets. CLI integration verifies the viewer server starts without opening a browser. Fast demo smoke emitted `demo.finished` and `regression.detected`.
+- **Handoff note:** Phase 11 implementation and focused verification are complete; the clean WSL full exit bundle and phase commit remain. Do not start Phase 12 until the phase commit is recorded. Preserve unrelated `GrudgeBrief.pdf` and `PROMPT-2-PARALLEL.md`.

@@ -1,9 +1,9 @@
 # Architecture
 
-**Purpose:** Describe the Phase 1 architecture and typed contract boundaries that later stages consume.
+**Purpose:** Describe the typed contract boundaries from the Phase 1 core through the Phase 11 static viewer.
 **Audience:** Contributors designing or implementing a pipeline stage, and reviewers checking stage boundaries.
 **Status:** draft
-**Last updated (phase):** 10
+**Last updated (phase):** 11
 
 ## System boundary
 
@@ -47,6 +47,7 @@ The exported placeholder is [`assets/pipeline.svg`](assets/pipeline.svg). Stage 
 7. **Scar Registry** can deduplicate, score, quarantine, and retire artifacts.
 8. **CI Gate + Runner** executes admitted Scars repeatedly, treats successful nonviolating replays as passes, computes the Wilson lower bound, and emits Rich/PR-style reports. Offline runs are intentionally deterministic and labeled as such.
 9. **Demo Orchestrator + Event Stream** runs the real engines as one five-beat offline story. Typed events are retained by an in-process bus, streamed to the viewer over standard-library SSE, and replayed through `/state`; the viewer remains a pure consumer of those events.
+10. **Static Viewer** loads one module entry point with no build step or external dependencies. `app.js` subscribes to the Phase 10 event types with `EventSource`, reconnects after disconnects, buffers events while paused, and delegates rendering to focused timeline, shrink, predicate, gate, PR-comment, and Scar-browser components. Replay calls `POST /restart`; pipeline state and decisions remain in Python.
 
 The deterministic core is the replay sandbox, shrinker, predicate checker, admission court, and gate. Replay keeps the policy live while replacing external tools with a cassette, and blocks filesystem/network access outside that cassette. Live model calls are isolated to predicate drafting and are protected by a cache and offline fallback.
 
@@ -165,6 +166,21 @@ the cache/fallback path and admission/gate use the checked-in Scar and benign
 controls. `grudge.demo.server` is deliberately stdlib-only: it serves
 `viewer/`, replays the in-memory event history from `/state`, streams `/events`
 with Server-Sent Events, and starts a fresh run on `POST /restart`.
+
+## Static viewer boundary
+
+The Phase 11 viewer is a CDN-free collection of browser-native ES modules and
+CSS. `viewer/index.html` is the static entry point and loads `app.js`; the app
+imports the six component modules and passes each event to their `handle`
+functions. Components only update DOM nodes supplied by the page. They do not
+call the replay, admission, shrink, or gate engines, and they do not create
+pipeline state of their own. This keeps the visual layer replaceable while
+the Phase 10 event contract remains the integration seam.
+
+The static checks in `tests/test_viewer_static.py` verify the module graph,
+mount exports, core event vocabulary, EventSource/reconnect/replay/pause
+behavior, and the absence of CDN or package imports. They intentionally read
+the assets as text so they remain offline and do not require a browser runtime.
 
 ## Gate and statistics
 

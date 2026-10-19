@@ -5,10 +5,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from examples.leaky_agent.agent import run_agent
 from grudge.cli.main import app
+from grudge.demo.events import DemoFinished, DemoStarted, EventBus
 from grudge.replay.sandbox import run_agent as replay_agent
 from grudge.replay.scripted_llm import ScriptedLLM
 from grudge.schema.scar import Scar
@@ -233,7 +235,7 @@ def test_run_returns_one_for_blocked_vulnerable_agent() -> None:
 
 
 def test_demo_and_scar_browsing_emit_json(tmp_path: Path) -> None:
-    demo = CliRunner().invoke(app, ["demo", "--runs", "20", "--json"])
+    demo = CliRunner().invoke(app, ["demo", "--runs", "20", "--fast", "--json"])
     listed = CliRunner().invoke(
         app,
         ["scars", "list", "--scars", "scars", "--json"],
@@ -250,6 +252,22 @@ def test_demo_and_scar_browsing_emit_json(tmp_path: Path) -> None:
     assert shown.exit_code == 0
     assert json.loads(shown.stdout)["scar"]["id"] == "sample_leak"
     del tmp_path
+
+
+def test_demo_starts_viewer_server_without_browser(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_demo(*, bus: EventBus, runs: int) -> list[object]:
+        del runs
+        bus.publish(DemoStarted())
+        bus.publish(DemoFinished())
+        return []
+
+    monkeypatch.setattr("grudge.cli.demo.orchestrate_demo", fake_demo)
+    result = CliRunner().invoke(app, ["demo", "--no-browser", "--port", "0"])
+
+    assert result.exit_code == 0, result.stdout
+    assert "Grudge viewer: http://127.0.0.1:" in result.stdout
 
 
 def test_missing_file_is_friendly_json_error_and_retire_is_stub(tmp_path: Path) -> None:

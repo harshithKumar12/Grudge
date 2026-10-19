@@ -4,18 +4,22 @@
 # ruff: noqa: B008
 
 import json
+import webbrowser
+from threading import Event
 from typing import Any
 
 import typer
 
 from grudge.cli._common import command, finish
 from grudge.config import DEFAULTS, SCARS_DIR
+from grudge.demo.events import EventBus
 from grudge.demo.orchestrator import run_demo as orchestrate_demo
+from grudge.demo.server import DemoServer
 
 
 def run_demo(
     live: bool = typer.Option(False, "--live", help="Reserved for a live provider."),
-    port: int = typer.Option(8765, "--port", help="Viewer port reserved for Phase 10."),
+    port: int = typer.Option(8765, "--port", help="Local viewer server port."),
     no_browser: bool = typer.Option(
         False, "--no-browser", help="Do not open a browser."
     ),
@@ -31,7 +35,33 @@ def run_demo(
             raise RuntimeError(
                 "live demo mode is reserved for a future provider integration"
             )
-        _ = (port, no_browser)
+        if not fast and not json_output:
+            bus = EventBus()
+            finished = Event()
+            failure: list[BaseException] = []
+
+            def run_viewer_demo() -> None:
+                try:
+                    orchestrate_demo(bus=bus, runs=runs)
+                except BaseException as exc:
+                    failure.append(exc)
+                finally:
+                    finished.set()
+
+            server = DemoServer(
+                port=port,
+                bus=bus,
+                runner=run_viewer_demo,
+            ).start(run_demo=True)
+            url = f"http://{server.address[0]}:{server.address[1]}/"
+            if not no_browser:
+                webbrowser.open(url)
+            typer.echo(f"Grudge viewer: {url}")
+            finished.wait()
+            server.close()
+            if failure:
+                raise RuntimeError("viewer demo failed") from failure[0]
+            return {"command": "demo", "mode": "viewer", "url": url}
         events = orchestrate_demo(fast=fast, runs=runs)
         event_payloads = [event.model_dump(mode="json") for event in events]
         gates = [event for event in event_payloads if event["type"] == "gate.result"]
@@ -61,6 +91,8 @@ def run_demo(
         }
 
     result = command(run, json_output=json_output, debug=debug)
+    if result.get("mode") == "viewer":
+        return
     if json_output:
         finish(result, json_output=True)
     else:

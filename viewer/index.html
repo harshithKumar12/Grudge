@@ -3,12 +3,115 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Grudge viewer</title>
+    <meta name="theme-color" content="#080b12" />
+    <title>Grudge / proof stream</title>
+    <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <main id="app">
-      <h1>Grudge viewer</h1>
-      <p>The event-driven viewer is implemented in Phase 11.</p>
+    <main id="app" class="shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">G</span>
+          <div>
+            <p class="eyebrow">GRUDGE / PHASE 11</p>
+            <h1>Proof stream</h1>
+          </div>
+        </div>
+        <div class="status-cluster">
+          <span id="connection-status" class="status status--connecting" role="status">
+            <span class="status-dot" aria-hidden="true"></span>
+            Connecting
+          </span>
+          <span id="event-count" class="event-count">0 events</span>
+          <button id="pause-button" class="button button--quiet" type="button" aria-pressed="false">
+            Pause <span class="keycap">Space</span>
+          </button>
+          <button id="replay-button" class="button button--accent" type="button">Replay</button>
+        </div>
+      </header>
+
+      <section class="beatbar" aria-label="Demo beats">
+        <div class="beatbar-heading">
+          <span class="eyebrow">LIVE RUN</span>
+          <strong id="beat-title">Waiting for the five-beat proof…</strong>
+        </div>
+        <ol id="beat-indicator" class="beat-indicator">
+          <li data-beat="1"><span>01</span><b>Leak</b></li>
+          <li data-beat="2"><span>02</span><b>Shrink</b></li>
+          <li data-beat="3"><span>03</span><b>Predicate</b></li>
+          <li data-beat="4"><span>04</span><b>Admission</b></li>
+          <li data-beat="5"><span>05</span><b>Regression</b></li>
+        </ol>
+      </section>
+
+      <div id="paused-banner" class="paused-banner" hidden>
+        <strong>Playback paused.</strong> New events are buffered. Press <span class="keycap">Space</span> to resume.
+      </div>
+
+      <section class="dashboard" aria-label="Proof dashboard">
+        <article class="panel panel--timeline panel--wide">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">EVENT LOG</p>
+              <h2>Five beats, one proof</h2>
+            </div>
+            <span id="stream-seq" class="panel-meta">seq —</span>
+          </div>
+          <div id="timeline" class="timeline" aria-live="polite">
+            <div class="empty-state">Waiting for the first event…</div>
+          </div>
+        </article>
+
+        <article class="panel panel--shrink">
+          <div class="panel-heading">
+            <div><p class="eyebrow">BEAT 02</p><h2>Causal shrink</h2></div>
+            <span class="panel-meta" id="shrink-size">—</span>
+          </div>
+          <div id="shrink-animation" class="shrink-animation">
+            <div class="empty-state">Shrink evidence will appear here.</div>
+          </div>
+        </article>
+
+        <article class="panel panel--predicate">
+          <div class="panel-heading">
+            <div><p class="eyebrow">BEAT 03</p><h2>Never-again rule</h2></div>
+            <span id="predicate-source" class="source-badge">—</span>
+          </div>
+          <div id="predicate-card" class="predicate-card">
+            <div class="empty-state">The synthesized predicate will appear here.</div>
+          </div>
+        </article>
+
+        <article class="panel panel--gates panel--wide">
+          <div class="panel-heading">
+            <div><p class="eyebrow">BEAT 04–05</p><h2>Admission &amp; gates</h2></div>
+            <span class="panel-meta">red → green</span>
+          </div>
+          <div id="gate-panel" class="gate-panel">
+            <div class="empty-state">Waiting for the proof gates.</div>
+          </div>
+        </article>
+
+        <article class="panel panel--comment">
+          <div class="panel-heading">
+            <div><p class="eyebrow">REGRESSION</p><h2>PR comment</h2></div>
+            <span class="panel-meta">blocked</span>
+          </div>
+          <div id="pr-comment" class="pr-comment">
+            <div class="empty-state">A reviewer comment appears when the regression is blocked.</div>
+          </div>
+        </article>
+
+        <article class="panel panel--scar">
+          <div class="panel-heading">
+            <div><p class="eyebrow">SCAR</p><h2>Evidence browser</h2></div>
+            <span id="scar-status" class="source-badge">offline</span>
+          </div>
+          <div id="scar-browser" class="scar-browser">
+            <div class="empty-state">The admitted evidence trail will appear here.</div>
+          </div>
+        </article>
+      </section>
     </main>
     <script type="module" src="app.js"></script>
   </body>
