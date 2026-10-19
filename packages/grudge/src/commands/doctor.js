@@ -3,6 +3,10 @@ import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { join, resolve } from "node:path";
 import { parseJson } from "../installer/json-merge.js";
+import { managedBlock } from "../installer/managed-block.js";
+
+const FALLBACK_CAPS = Object.freeze({ sessionStartChars: 1200, blockReasonChars: 400, promptNudgeChars: 200, agentsBlockChars: 1000, agentsBlockLines: 12 });
+const PROMPT_NUDGE = "If this is a repeatable mistake, record it once: node .grudge/bin/grudge.mjs propose --rule '<rule>' --why '<one sentence>'";
 
 /** Inspect an installed repository without changing it. */
 export async function doctor(options = {}) {
@@ -35,9 +39,56 @@ export async function doctor(options = {}) {
   const gitignore = await readOptional(join(root, ".gitignore"));
   const ignored = [".grudge/session/", ".grudge/stats.json", ".grudge/*.log"].filter((line) => gitignore?.split(/\r?\n/).includes(line));
   checks.push({ name: ".gitignore", ok: ignored.length === 3, detail: `${ignored.length}/3 entries` });
-  const result = { ok: checks.every((check) => check.ok), root, checks };
+  const budgetMeasurements = await measureBudgets({ root, compiled, measureOutputs: options.measureOutputs });
+  for (const measurement of budgetMeasurements) {
+    const lineStatus = measurement.withinLineCap === undefined || measurement.withinLineCap;
+    const ok = measurement.withinCap && lineStatus;
+    const lineDetail = measurement.lines === undefined ? "" : `, ${measurement.lines}/${measurement.lineCap} lines`;
+    checks.push({ name: `budget ${measurement.name}`, ok, detail: `${measurement.chars}/${measurement.cap} chars${lineDetail}`, measurement });
+  }
+  const result = { ok: checks.every((check) => check.ok), root, checks, budgetMeasurements };
   if (options.print !== false) for (const check of checks) process.stdout.write(`${check.ok ? "✓" : "✗"} ${check.name}: ${check.detail}\n`);
   return result;
+}
+
+async function measureBudgets({ root, compiled, measureOutputs }) {
+  const outputs = buildOutputs(root, compiled);
+  const measure = measureOutputs ?? await loadMeasureOutputs();
+  return measure(outputs);
+}
+
+function buildOutputs(root, compiled) {
+  const rules = Array.isArray(compiled?.rules) ? compiled.rules.filter((rule) => rule.mode !== "off" && rule.mode !== "pending") : [];
+  const sessionStart = rules.slice(0, 8).map((rule) => `Grudge scar ${rule.id}: ${String(rule.english || "guard active")}`.slice(0, 140)).join("\n");
+  const first = rules[0];
+  const blockReason = first ? `${String(first.english || `Rule ${first.id} matched`)} [scar ${first.id}]. Do not retry; change approach or ask the user.` : "";
+  return { sessionStart: sessionStart ? `${sessionStart}\n` : "", blockReason, promptNudge: PROMPT_NUDGE, agentsBlock: managedBlock(), root };
+}
+
+async function loadMeasureOutputs() {
+  try {
+    const module = await import("../core/budget.js");
+    if (typeof module.measureOutputs === "function") return module.measureOutputs;
+    if (typeof module.budget === "function") {
+      const api = module.budget();
+      if (typeof api?.measureOutputs === "function") return api.measureOutputs;
+    }
+  } catch { /* Phase 20 budget module may not be merged in this worktree yet. */ }
+  return fallbackMeasureOutputs;
+}
+
+function fallbackMeasureOutputs({ sessionStart = "", blockReason = "", promptNudge = "", agentsBlock = "" }) {
+  return [
+    measureFallback("SessionStart injection", sessionStart, FALLBACK_CAPS.sessionStartChars),
+    measureFallback("Block reason", blockReason, FALLBACK_CAPS.blockReasonChars),
+    measureFallback("Prompt nudge", promptNudge, FALLBACK_CAPS.promptNudgeChars),
+    measureFallback("AGENTS.md block", agentsBlock, FALLBACK_CAPS.agentsBlockChars, { lines: String(agentsBlock).split(/\r?\n/).length, lineCap: FALLBACK_CAPS.agentsBlockLines, withinLineCap: String(agentsBlock).split(/\r?\n/).length <= FALLBACK_CAPS.agentsBlockLines }),
+  ];
+}
+
+function measureFallback(name, value, cap, extra = {}) {
+  const chars = String(value ?? "").length;
+  return { name, chars, cap, withinCap: chars <= cap, ...extra };
 }
 
 async function readJson(path) {
