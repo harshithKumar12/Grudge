@@ -68,16 +68,21 @@ def import_session(
                 ToolCall(idx=len(steps), tool=tool, args=args, call_id=call_id, **base)
             )
             result = event.get("result", "")
-            if not isinstance(
-                result, (str, int, float, bool, list, dict)
-            ) and result is not None:
+            if (
+                not isinstance(result, str | int | float | bool | list | dict)
+                and result is not None
+            ):
                 result = str(result)
             steps.append(
                 ToolResult(
                     idx=len(steps),
                     call_id=call_id,
                     content=result,
-                    error=event.get("error") if isinstance(event.get("error"), str) else None,
+                    error=(
+                        event.get("error")
+                        if isinstance(event.get("error"), str)
+                        else None
+                    ),
                     **base,
                 )
             )
