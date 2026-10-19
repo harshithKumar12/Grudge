@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://grudge.local/spec/compiled-predicates.schema.json",
+  "title": "Grudge compiled predicates",
+  "type": "object",
+  "required": ["version", "rules"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"type": "integer", "const": 1},
+    "rules": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/rule"}
+    }
+  },
+  "$defs": {
+    "rule": {
+      "type": "object",
+      "required": ["id", "mode", "kind", "tool", "match", "ordering", "taint", "english", "createdFrom"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "mode": {"enum": ["block", "warn", "off", "pending"]},
+        "kind": {"enum": ["call_shape", "ordering", "taint_flow"]},
+        "tool": {"type": "string", "minLength": 1},
+        "match": {"type": "object"},
+        "ordering": {
+          "type": "object",
+          "required": ["before", "after"],
+          "properties": {"before": {"type": "string"}, "after": {"type": "string"}},
+          "additionalProperties": false
+        },
+        "taint": {
+          "type": "object",
+          "required": ["source", "sink"],
+          "properties": {
+            "source": {"type": "string"},
+            "sink": {"type": "string"},
+            "sourceField": {"type": ["string", "null"]},
+            "sinkField": {"type": ["string", "null"]},
+            "sourceMatch": {"type": "object"}
+          },
+          "additionalProperties": false
+        },
+        "english": {"type": "string", "minLength": 1},
+        "createdFrom": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

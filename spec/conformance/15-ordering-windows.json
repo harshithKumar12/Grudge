@@ -1,0 +1,1 @@
+{"name":"ordering-windows","rule":{"id":"r-order","mode":"block","kind":"ordering","tool":"write_file","match":{},"ordering":{"before":"read_file","after":"write_file"},"taint":{"source":"","sink":""},"english":"Read before writing.","createdFrom":"fixture"},"events":[{"tool":"write_file","args":{"path":"C:\\workspace\\x"}}],"expect":{"violated":true,"atEvents":[0]}}

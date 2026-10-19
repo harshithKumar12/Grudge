@@ -1,0 +1,1 @@
+{"name":"call-empty","rule":{"id":"r-call","mode":"block","kind":"call_shape","tool":"read_file","match":{"path":"api_keys.txt"},"ordering":{"before":"","after":""},"taint":{"source":"","sink":""},"english":"Do not read the key file.","createdFrom":"fixture"},"events":[],"expect":{"violated":false,"atEvents":[]}}

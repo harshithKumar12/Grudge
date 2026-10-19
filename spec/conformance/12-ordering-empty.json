@@ -1,0 +1,1 @@
+{"name":"ordering-empty","rule":{"id":"r-order","mode":"block","kind":"ordering","tool":"transfer","match":{},"ordering":{"before":"verify_user","after":"transfer"},"taint":{"source":"","sink":""},"english":"Verify before transfer.","createdFrom":"fixture"},"events":[],"expect":{"violated":false,"atEvents":[]}}

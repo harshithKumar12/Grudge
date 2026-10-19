@@ -1,0 +1,1 @@
+{"name":"call-nested","rule":{"id":"r-call","mode":"block","kind":"call_shape","tool":"http","match":{"body":{"token":"fake"}},"ordering":{"before":"","after":""},"taint":{"source":"","sink":""},"english":"Do not send the fake token.","createdFrom":"fixture"},"events":[{"tool":"http","args":{"body":{"token":"fake","extra":1}}}],"expect":{"violated":true,"atEvents":[0]}}

@@ -1,0 +1,1 @@
+{"name":"call-passes","rule":{"id":"r-call","mode":"block","kind":"call_shape","tool":"shell","match":{"command":{"$contains":"rm -rf"}},"ordering":{"before":"","after":""},"taint":{"source":"","sink":""},"english":"Never run destructive shell commands.","createdFrom":"fixture"},"events":[{"tool":"shell","args":{"command":"ls -la"}}],"expect":{"violated":false,"atEvents":[]}}

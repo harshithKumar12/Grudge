@@ -3,7 +3,7 @@
 **Purpose:** Map every file currently under `docs/` and show its purpose, owner phase, and status.
 **Audience:** Contributors, reviewers, demo operators, and future implementation agents.
 **Status:** final
-**Last updated (phase):** 12
+**Last updated (phase):** 14
 
 ## Documents
 
@@ -30,6 +30,9 @@
 | [`docs/adr/0001-cli-first-with-viewer.md`](adr/0001-cli-first-with-viewer.md) | Records the CLI-first product shape and the viewer's supporting role. | 0 | final |
 | [`docs/assets/pipeline.svg`](assets/pipeline.svg) | Exported eight-stage engine pipeline diagram used by the README and architecture docs. | 0-12 | final |
 | [`docs/assets/shrink.svg`](assets/shrink.svg) | Static visual reference for the trace-to-minimal-cassette shrink story. | 12 | final |
+| [`docs/interfaces.md`](interfaces.md) | Frozen cross-lane Python, Node, session, compiled JSON, and hook interfaces. | 14 | final |
+| [`docs/guard-contract.md`](guard-contract.md) | Compiled predicate schema and deterministic runtime evaluation semantics. | 14 | final |
+| [`docs/canonical-tools.md`](canonical-tools.md) | Canonical tool names and the Claude Code normalization map. | 14 | final |
 
 ## Status vocabulary
 

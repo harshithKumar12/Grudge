@@ -1,13 +1,13 @@
 # Progress.md: Grudge build tracker
 
-_Last updated: 2026-10-18 by omnirush.ai_
+_Last updated: 2026-10-19 by omnirush.ai_
 
 ## Snapshot
-- **Current phase:** 12: Polish, Docs, Pitch complete
-- **Overall:** 13/14 phases complete
+- **Current phase:** S0: Phase 14 complete; lanes ready
+- **Overall:** 14/22 phases complete
 - **Test suite:** 295 passing in WSL Ubuntu-D Python 3.11.17
 - **Demo status:** works offline? yes
-- **Next action:** Begin Phase 13 only after explicit approval; stretch work remains deferred.
+- **Next action:** Launch Lane A, Lane B, and Lane C from their dedicated S0 worktrees.
 
 ## Phase Board
 | # | Phase | Status | Exit gate passed | Docs done |
@@ -26,6 +26,14 @@ _Last updated: 2026-10-18 by omnirush.ai_
 | 11 | Viewer | [x] | yes | [x] |
 | 12 | Polish, Docs, Pitch | [x] | yes | [x] |
 | 13 | Stretch Implementations | [ ] | no | no |
+| 14 | Contracts and Python Compile Step | [x] | yes | [x] |
+| 15 | Node Package Core | [ ] | no | no |
+| 16 | Session Recorder | [ ] | no | no |
+| 17 | Guard Hooks | [ ] | no | no |
+| 18 | Propose, Accept, and Instruction Block | [ ] | no | no |
+| 19 | Installer | [ ] | no | no |
+| 20 | Token Budgets, Stats, and Status Line | [ ] | no | no |
+| 21 | End-to-End Proof, Demo, and Release Prep | [ ] | no | no |
 
 ## Task Checklist
 ### Phase 0
@@ -136,6 +144,16 @@ _Last updated: 2026-10-18 by omnirush.ai_
 ### Phase 13
 - [ ] Stretch implementations, one sub-entry per item.
 
+### Phase 14
+- [ ] Freeze the compiled-predicate JSON Schema and canonical event contract.
+- [ ] Implement deterministic admitted-Scar compilation to `.grudge/compiled.json`.
+- [ ] Add at least 25 shared conformance fixtures and execute them with Python.
+- [ ] Add guard-contract and canonical-tools documentation.
+- [ ] Create lane-owned package stubs, registries, coordination files, and worktrees.
+
+### Phases 15-21
+- [ ] Execute through the parallel lane sync protocol; integrator marks each phase only after its exit gate.
+
 ## Decisions & Conflicts
 | Date | Decision / conflict | Reason | Affects |
 |------|--------------------|--------|---------|
@@ -154,6 +172,9 @@ _Last updated: 2026-10-18 by omnirush.ai_
 | 2026-10-18 | Keep four complete response entries in the admitted demo cassette, including the successful sink response. | Phase 7 rejects tool replay errors; a missing sink response is not a successful complete proof even when the Phase 5 attempted-call predicate still fires. | `scars/sample_leak.scar.json`, sample generator |
 | 2026-10-18 | Make narrow example typing fixes now reached by the sample script, and copy example/control/Scar/docs inputs into Docker. | The new script makes the normal typecheck traverse both example agents, exposing three older typing errors. Shared `Step` annotations and dataclass-instance narrowing fix these without changing trace output. Container copies keep the new offline fixtures available; no dependencies added. | Examples, Dockerfile, Phase 7 reproducibility |
 | 2026-10-18 | Count a gate pass only when replay succeeds and the compiled predicate is clean; use the lower Wilson bound, not observed pass rate, for the threshold decision. | A replay/checker error must not look like a safe run. Small-N pass rates are optimistic, so the lower bound is the conservative CI decision. Offline repeated runs are deterministic and explicitly labeled rather than presented as independent samples. | Phase 8 gate runner, `statistics.md`, reports |
+| 2026-10-19 | Adopt the PROMPT-2 guard product contract: no MCP, hooks plus managed AGENTS.md instructions only. | The sequel explicitly supersedes the earlier MCP installer idea and requires local, offline, fail-open hooks. | Phases 14-21 |
+| 2026-10-19 | Parallel mode for Phases 15-21; Phase 14 remains integrator-only. | `PROMPT-2-PARALLEL.md` permits parallel lanes only after the contract freeze and requires separate worktrees. | Phases 14-21 |
+| 2026-10-19 | Choose PARALLEL mode. | Git worktrees and subagents are available; no git or worker limitation requires sequential fallback. | Phases 15-21 |
 
 ## Blockers
 | Date | Blocker | Tried | Needs |
@@ -175,6 +196,18 @@ _Last updated: 2026-10-18 by omnirush.ai_
 - Phase 8 documentation is complete; documents required in Phases 9-12 remain future work.
 
 ## Session Log (append-only, newest at bottom)
+### 2026-10-19 Session 20
+- **Pre-flight:** Read `AGENTS.md`, `PROMPT.md`, `PROMPT-2.md`, `PROMPT-2-PARALLEL.md`, `Progress.md`, and `docs/INDEX.md`; verified Phases 0-9 are complete, git worktrees are available, and subagents are available.
+- **Plan:**
+  - Freeze the Phase 14 compiled-predicate schema, canonical event shape, and Python/Node interface documentation.
+  - Implement the deterministic Python compiler and `grudge compile` command without changing the existing engine contracts.
+  - Add at least 25 shared conformance fixtures covering call-shape, ordering, taint-flow-lite, empty sessions, repeated calls, path variants, and long arguments.
+  - Create the lane-owned Node package and Python guard stubs with ownership headers, command/hook registries, and coordination files.
+  - Run the Phase 14 acceptance and full exit protocol, commit, then launch the three independent lane workers at S0.
+- **Done:** Added the compiled-predicate schema, deterministic Python compiler and `grudge compile`, 27 shared conformance fixtures, Python conformance tests, guard/canonical/interface docs, Node package/worktree scaffolding, registries, lane coordination files, and the npm lockfile. Created separate lane worktrees from the Phase 14 commit.
+- **Tests:** WSL `.venv-wsl`: `make VENV=.venv-wsl all` -> `299 passed`; Ruff clean; mypy clean; docs-check `24 indexed, non-empty, linked documentation files`; Node `npm test` -> `1 passed`; Node build completed; Python conformance/compile tests -> `4 passed`; compile acceptance -> demo Scar compiled to version 1 with 1 rule; JSON Schema package unavailable in WSL, so structural contract tests were used and limitation recorded.
+- **Docs updated:** `docs/interfaces.md`, `docs/guard-contract.md`, `docs/canonical-tools.md`, `docs/INDEX.md`, and this tracker.
+- **Handoff note:** S0 contract freeze passed. Lane worktrees: `C:/Users/kotes/Desktop/grudge-lane-a`, `C:/Users/kotes/Desktop/grudge-lane-b`, `C:/Users/kotes/Desktop/grudge-lane-c`; branches `lane-a`, `lane-b`, `lane-c`. Parallel mode is active for Phases 15-21. Preserve unrelated untracked `GrudgeBrief.pdf` and owner-provided prompt files.
 ### 2026-10-15 Session 1
 - **Pre-flight:** read AGENTS.md y, read PROMPT.md y, read docs/PROGRESS.md y (empty), read docs/INDEX.md n (missing).
 - **Plan:**

@@ -1,0 +1,1 @@
+{"name":"ordering-violates","rule":{"id":"r-order","mode":"block","kind":"ordering","tool":"transfer","match":{},"ordering":{"before":"verify_user","after":"transfer"},"taint":{"source":"","sink":""},"english":"Verify before transfer.","createdFrom":"fixture"},"events":[{"tool":"transfer","args":{"amount":1}}],"expect":{"violated":true,"atEvents":[0]}}

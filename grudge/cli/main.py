@@ -8,6 +8,7 @@ from grudge._stubs import roadmap
 from grudge.cli._common import command
 from grudge.cli.admit import admit_cassette
 from grudge.cli.capture import capture_agent
+from grudge.cli.compile import compile_command
 from grudge.cli.demo import run_demo
 from grudge.cli.run import run_scars
 from grudge.cli.scars import scars_app
@@ -26,6 +27,7 @@ def _future(command: str) -> NoReturn:
 
 
 app.command("capture")(capture_agent)
+app.command("compile")(compile_command)
 app.command("shrink")(shrink_trace)
 app.command("admit")(admit_cassette)
 app.command("run")(run_scars)
