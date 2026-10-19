@@ -35,6 +35,8 @@
 | [`docs/canonical-tools.md`](canonical-tools.md) | Canonical tool names and the Claude Code normalization map. | 14 | final |
 | [`docs/trust-model.md`](trust-model.md) | Stored session data, redaction, retention, and local trust boundaries. | 16 | final |
 | [`docs/integrations.md`](integrations.md) | Per-agent installer verification status and safe no-write policy. | 19 | final |
+| [`docs/hooks.md`](hooks.md) | Hook event contracts, fail-open behavior, output caps, and measured timings. | 17 | final |
+| [`docs/instruction-block.md`](instruction-block.md) | The compact managed model instruction block and its rationale. | 18 | final |
 
 ## Status vocabulary
 

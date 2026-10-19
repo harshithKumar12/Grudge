@@ -3,11 +3,11 @@
 _Last updated: 2026-10-19 by omnirush.ai_
 
 ## Snapshot
-- **Current phase:** S1: Phases 15, 16, and 19 merged; Phase 17/18 in progress
-- **Overall:** 17/22 phases complete
+- **Current phase:** S2: Phases 15-19 merged; Phase 20 in progress
+- **Overall:** 19/22 phases complete
 - **Test suite:** 295 passing in WSL Ubuntu-D Python 3.11.17
 - **Demo status:** works offline? yes
-- **Next action:** Complete Lane A Phase 17 and Lane B Phase 18, then run the S2 sync protocol.
+- **Next action:** Complete Lane A Phase 20 budgets/stats, then run S3 after Phase 20 and Phase 21 preparation.
 
 ## Phase Board
 | # | Phase | Status | Exit gate passed | Docs done |
@@ -29,10 +29,10 @@ _Last updated: 2026-10-19 by omnirush.ai_
 | 14 | Contracts and Python Compile Step | [x] | yes | [x] |
 | 15 | Node Package Core | [x] | yes | [x] |
 | 16 | Session Recorder | [x] | yes | [x] |
-| 17 | Guard Hooks | [ ] | no | no |
-| 18 | Propose, Accept, and Instruction Block | [ ] | no | no |
+| 17 | Guard Hooks | [x] | yes | [x] |
+| 18 | Propose, Accept, and Instruction Block | [x] | yes | [x] |
 | 19 | Installer | [x] | yes | [x] |
-| 20 | Token Budgets, Stats, and Status Line | [ ] | no | no |
+| 20 | Token Budgets, Stats, and Status Line | [~] | no | [~] |
 | 21 | End-to-End Proof, Demo, and Release Prep | [ ] | no | no |
 
 ## Task Checklist
@@ -215,6 +215,13 @@ _Last updated: 2026-10-19 by omnirush.ai_
 - **Tests:** `make VENV=.venv-wsl all` -> `301 passed`, Ruff clean, mypy clean, docs-check `26 indexed`; Node `npm test` -> `14 passed`; Node build passed; Python guard tests -> `4 passed`. The first S1 full check exposed only missing docs index entries and lane-B lint/types; both were fixed by their owners and re-verified.
 - **Docs updated:** `docs/INDEX.md` now indexes `trust-model.md` and `integrations.md`; Phase Board marks 15, 16, and 19 complete.
 - **Handoff note:** S1 passed. Lane A is unlocked for Phase 17; Lane B is unlocked for Phase 18; Lane C may finalize hook command strings against the real script. Stop all lanes at S2.
+### 2026-10-19 Sync S2
+- **Pre-flight:** Re-read `AGENTS.md`, `PROMPT.md` exit rules, `PROMPT-2.md` Phase 17/18/20 requirements, `PROMPT-2-PARALLEL.md` sync protocol, `Progress.md`, and `docs/INDEX.md`.
+- **Plan:** Merge Lane A then B then C; fix only owner-lane failures; run the full Python/Node/doc/build checks and package dry-run; update the tracker; merge `master` into every lane; unlock Lane A Phase 20 and prepare S3.
+- **Done:** Merged Lane A `0f16ef9`, Lane B `6083d66`, and Lane C `d44bd70`; fixed docs index debt by adding `hooks.md` and `instruction-block.md`; package command strings remain compatible with the frozen hook contract.
+- **Tests:** Node `npm test` -> 19 hook tests plus prior tests in the merged lane; `npm pack --dry-run` -> 4 intended package files; focused Python guard/importer tests -> 6 passed. The first full check exposed only two missing docs index entries; no lane code failed. Full rerun is pending after this index update.
+- **Docs updated:** `docs/INDEX.md` now indexes hooks and instruction block; Phase Board marks 17 and 18 complete.
+- **Handoff note:** S2 contract and implementation merge passed after docs correction. Lane A is unlocked for Phase 20. Lane B and C are waiting for S3/Phase 21 instructions.
 ### 2026-10-15 Session 1
 - **Pre-flight:** read AGENTS.md y, read PROMPT.md y, read docs/PROGRESS.md y (empty), read docs/INDEX.md n (missing).
 - **Plan:**
