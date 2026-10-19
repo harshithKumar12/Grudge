@@ -23,6 +23,19 @@ the checked-in Scar, and the fallback predicate; it does not call a provider or
 the public network. For a headless smoke run, use
 `grudge demo --no-browser --fast`; for machine output, add `--json`.
 
+### Install the local guard
+
+```bash
+npx grudge setup --yes --agents claude-code --scope repo
+npx grudge doctor
+```
+
+Claude Code is the verified **Guard** tier. Codex, Gemini CLI, GitHub Copilot,
+OpenCode, and Windsurf are **Advisory** integrations; Cursor is unverified and
+the installer writes no Cursor files. See [the integration matrix](docs/integrations.md).
+Use `npx grudge setup --dry-run` to inspect a plan and `npx grudge uninstall`
+to remove Grudge-managed files.
+
 ## What the shrink shows
 
 The headline visual is the shrink: many captured tool responses become the
@@ -167,6 +180,18 @@ For a shell pipeline and JSON/error examples, see
 | CLI and demo | Capture, shrink, admit, run, demo, and Scar list/show implemented | `viewer` and `scars retire` commands are explicit stubs |
 | Static viewer | CDN-free event-driven dashboard with replay, pause, reconnect, and evidence panels implemented | Full Scar browser/registry integration remains a stub/minimal boundary |
 | Ecosystem integrations | Local/offline path needs no external service | SQLite registry, fuzzer, locator, pytest/GitHub integrations, and workflow are deferred |
+
+### Guard tiers and token budgets
+
+| Tier | Agents | Meaning |
+|---|---|---|
+| **Guard** | Claude Code (verified) | Hooks enforce expressible scars before a tool runs. |
+| **Advisory** | Agents that read instruction files | The model receives the rule; compliance is not guaranteed. |
+| **CI only** | Other agents | Check scars afterward with `grudge run` in CI. |
+
+Injected output is bounded: SessionStart 1,200 characters and 8 scars, block
+reason 400 characters, prompt nudge 200 characters, and the managed block 1,000
+characters across at most 12 lines. Token savings are always labeled **est.**
 
 The complete stub/design register is [`docs/roadmap.md`](docs/roadmap.md).
 
