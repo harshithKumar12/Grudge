@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Literal, cast
 from uuid import uuid4
 
-from grudge.schema import ToolCall, ToolResult, Trace
+from grudge.schema import Step, ToolCall, ToolResult, Trace
 
 
 def _timestamp(value: Any) -> datetime:
@@ -40,7 +40,7 @@ def import_session(
     """Load a session JSONL file into a validated :class:`~grudge.schema.Trace`."""
 
     session_id = run_id or Path(source).stem or str(uuid4())
-    steps: list[ToolCall | ToolResult] = []
+    steps: list[Step] = []
     with Path(source).open(encoding="utf-8") as handle:
         for event_index, line in enumerate(handle):
             if not line.strip():
@@ -59,13 +59,16 @@ def import_session(
                 args = {}
             call_id = f"{session_id}:{event_index}"
             timestamp = _timestamp(event.get("timestamp"))
-            base = {
-                "ts": timestamp,
-                "run_id": session_id,
-                "meta": {"session_event": event_index},
-            }
             steps.append(
-                ToolCall(idx=len(steps), tool=tool, args=args, call_id=call_id, **base)
+                ToolCall(
+                    idx=len(steps),
+                    tool=tool,
+                    args=args,
+                    call_id=call_id,
+                    ts=timestamp,
+                    run_id=session_id,
+                    meta={"session_event": event_index},
+                )
             )
             result = event.get("result", "")
             if (
@@ -83,7 +86,9 @@ def import_session(
                         if isinstance(event.get("error"), str)
                         else None
                     ),
-                    **base,
+                    ts=timestamp,
+                    run_id=session_id,
+                    meta={"session_event": event_index},
                 )
             )
     normalized_outcome = cast(
