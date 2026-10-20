@@ -6,6 +6,6 @@
   "bin": {"grudge": "dist/grudge.mjs"},
   "files": ["dist", "README.md", "package.json", "LICENSE"],
   "engines": {"node": ">=18"},
-  "scripts": {"build": "node scripts/build.mjs", "test": "node --test test/*.test.js"},
+  "scripts": {"build": "node scripts/build.mjs", "test": "npm run build && node --test test/*.test.js"},
   "license": "MIT"
 }
