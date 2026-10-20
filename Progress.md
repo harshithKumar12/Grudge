@@ -1,13 +1,13 @@
 # Progress.md: Grudge build tracker
 
-_Last updated: 2026-10-19 by omnirush.ai_
+_Last updated: 2026-10-20 by omnirush.ai_
 
 ## Snapshot
-- **Current phase:** S3: Phases 15-20 merged; Phase 21 in progress
-- **Overall:** 20/22 phases complete
-- **Test suite:** 295 passing in WSL Ubuntu-D Python 3.11.17
+- **Current phase:** 21: End-to-End Proof, Demo, and Release Prep complete
+- **Overall:** 21/22 phases complete
+- **Test suite:** 301 Python tests and 35 Node tests passing in WSL Python 3.11.17 / Node 22.22.1
 - **Demo status:** works offline? yes
-- **Next action:** Implement the Phase 21 two-session end-to-end guard proof and run the final reproducibility audit.
+- **Next action:** Review the final report, then run the documented push or npm publish commands only when ready to release.
 
 ## Phase Board
 | # | Phase | Status | Exit gate passed | Docs done |
@@ -33,7 +33,7 @@ _Last updated: 2026-10-19 by omnirush.ai_
 | 18 | Propose, Accept, and Instruction Block | [x] | yes | [x] |
 | 19 | Installer | [x] | yes | [x] |
 | 20 | Token Budgets, Stats, and Status Line | [x] | yes | [x] |
-| 21 | End-to-End Proof, Demo, and Release Prep | [~] | no | [~] |
+| 21 | End-to-End Proof, Demo, and Release Prep | [x] | yes | [x] |
 
 ## Task Checklist
 ### Phase 0
@@ -229,6 +229,15 @@ _Last updated: 2026-10-19 by omnirush.ai_
 - **Tests:** Node lane reports: 28 and 24 passing respectively; package build and `npm pack --dry-run` passed. Full Python check is rerun after indexing `docs/token-budgets.md`; current merged result is 301 passing with clean Ruff/mypy.
 - **Docs updated:** `docs/INDEX.md` now indexes `token-budgets.md`; Phase Board marks Phase 20 complete.
 - **Handoff note:** S3 is ready. Lane A/B/C work is merged. Integrator owns Phase 21 e2e, `grudge demo --guard`, final audit, and final report.
+### 2026-10-20 Session 21 / Final audit
+- **Pre-flight:** Re-read `AGENTS.md`, `PROMPT.md`, `PROMPT-2.md`, `PROMPT-2-PARALLEL.md`, `Progress.md`, and `docs/INDEX.md`; verified all lane branches had merged through S3.
+- **Plan:** Add the real two-session hook payload flow and `grudge demo --guard`; verify the bundled runtime, package dry-run, adapter/doctor output, offline flow, fresh-clone install, and both test suites; finalize the phase board and report without publishing.
+- **Done:** Added four Claude-style leak fixtures, `scripts/e2e_guard.mjs`, Node/Python e2e coverage, `grudge demo --guard`, a dependency-free source bundler, and the final report. Fixed clean-clone Node test ordering so `npm test` builds the runtime before executing e2e tests.
+- **Tests:** Root WSL `make VENV=.venv-wsl all` -> `301 passed`, Ruff clean, mypy clean, docs-check `30 indexed`; Node `npm test` -> `35 passed`; `npm pack --dry-run` -> 4 intended package files; `node tests/test_e2e_guard.mjs` -> pass; `grudge demo --guard --json` -> `session1 leaked and proposed`, `session2 blocked`; fresh clone `C:/Users/kotes/AppData/Local/Temp/grudge-final-clone-2/repo` -> install succeeded with `uv pip --no-deps -e`, root checks green, Node `35 passed`, e2e pass, guard demo pass.
+- **Measurements:** hook p50/p95 recorded as `1.80/4.86 ms` in the Phase 17 lane report; warm statusline `0.01/0.03 ms`; doctor measured `0/1200`, `0/400`, `123/200`, and `800/1000 chars` (managed block `8/12 lines`).
+- **Adapters:** verified Claude Code, Codex, Gemini CLI, GitHub Copilot, OpenCode, and Windsurf as of 2026-10-19; Cursor remains unverified and no-write. Name availability was not queried; no publish action was performed.
+- **Docs updated:** `README.md`, `docs/INDEX.md`, `docs/FINAL-REPORT.md`, and this tracker. Phase 21 exit gate passed; Phase 13 stretch remains intentionally deferred.
+- **Handoff note:** Release commands are documented but intentionally not run. Preserve unrelated untracked `GrudgeBrief.pdf`.
 ### 2026-10-15 Session 1
 - **Pre-flight:** read AGENTS.md y, read PROMPT.md y, read docs/PROGRESS.md y (empty), read docs/INDEX.md n (missing).
 - **Plan:**
