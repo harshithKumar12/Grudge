@@ -4,8 +4,12 @@
 # ruff: noqa: B008
 
 import json
+import os
+import shutil
+import subprocess
 import webbrowser
 from threading import Event
+from pathlib import Path
 from typing import Any
 
 import typer
@@ -25,6 +29,7 @@ def run_demo(
     ),
     runs: int = typer.Option(DEFAULTS.n_runs, "--runs", min=1),
     fast: bool = typer.Option(False, "--fast", help="Disable presenter pacing."),
+    guard: bool = typer.Option(False, "--guard", help="Run the offline two-session hook proof."),
     json_output: bool = typer.Option(False, "--json", help="Emit JSON output."),
     debug: bool = typer.Option(False, "--debug", help="Show a traceback on errors."),
 ) -> None:
@@ -35,6 +40,29 @@ def run_demo(
             raise RuntimeError(
                 "live demo mode is reserved for a future provider integration"
             )
+        if guard:
+            node = shutil.which("node")
+            if node is None:
+                raise RuntimeError("--guard requires Node.js >= 18 on PATH")
+            script = Path(__file__).resolve().parents[2] / "scripts" / "e2e_guard.mjs"
+            completed = subprocess.run(
+                [node, str(script)],
+                cwd=script.parent.parent,
+                check=False,
+                capture_output=True,
+                text=True,
+                env={**os.environ, "GRUDGE_DISABLE": ""},
+            )
+            if completed.returncode != 0:
+                raise RuntimeError(completed.stderr.strip() or "guard demo failed")
+            payload = json.loads(completed.stdout)
+            payload["command"] = "demo --guard"
+            if json_output:
+                return payload
+            typer.echo("Session 1: leak captured, proposed, and accepted")
+            typer.echo("Session 2: leak blocked before the HTTP call")
+            typer.echo(payload["reason"])
+            return payload
         if not fast and not json_output:
             bus = EventBus()
             finished = Event()
@@ -92,6 +120,10 @@ def run_demo(
 
     result = command(run, json_output=json_output, debug=debug)
     if result.get("mode") == "viewer":
+        return
+    if guard:
+        if json_output:
+            finish(result, json_output=True)
         return
     if json_output:
         finish(result, json_output=True)

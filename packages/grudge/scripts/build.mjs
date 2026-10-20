@@ -1,13 +1,89 @@
 // OWNER: integrator
-import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { pathToFileURL } from "node:url";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const root = resolve(scriptDir, "..");
-const source = resolve(root, "src/cli.js");
 const target = resolve(root, "dist/grudge.mjs");
 await mkdir(dirname(target), { recursive: true });
-const contents = await readFile(source, "utf8");
-await writeFile(target, `#!/usr/bin/env node\n${contents}`, "utf8");
-await cp(resolve(root, "package.json"), resolve(root, "dist/package.json"));
+
+const modules = new Map();
+const external = (specifier) => !specifier.startsWith(".");
+
+function exportNames(source) {
+  const names = [];
+  for (const match of source.matchAll(/export\s+(?:async\s+)?(?:function|const|let|var|class)\s+([A-Za-z_$][\w$]*)/g)) names.push(match[1]);
+  for (const match of source.matchAll(/export\s*\{([^}]+)\}/g)) {
+    for (const item of match[1].split(",")) {
+      const [name, alias] = item.trim().split(/\s+as\s+/);
+      if (name) names.push(alias || name);
+    }
+  }
+  return [...new Set(names)];
+}
+
+async function collect(file) {
+  const key = `./${file.slice(root.length + 5).replaceAll("\\", "/")}`;
+  if (modules.has(key)) return key;
+  let source = await readFile(file, "utf8");
+  modules.set(key, null);
+  for (const match of source.matchAll(/from\s+["']([^"']+)["']/g)) {
+    const specifier = match[1];
+    if (external(specifier)) continue;
+    const dependency = resolve(dirname(file), specifier);
+    await collect(dependency);
+  }
+  const imports = [];
+  source = source.replace(/import\s+\{([^}]+)\}\s+from\s+["']([^"']+)["'];?/g, (_all, names, specifier) => {
+    const bindings = names.split(",").map((item) => {
+      const [original, local] = item.trim().split(/\s+as\s+/);
+      return `${original}: ${local || original}`;
+    }).join(", ");
+    imports.push(`const { ${bindings} } = await __import(${JSON.stringify(specifier)}, __moduleKey);`);
+    return "";
+  });
+  source = source.replace(/import\s+\*\s+as\s+(\w+)\s+from\s+["']([^"']+)["'];?/g, (_all, local, specifier) => {
+    imports.push(`const ${local} = await __import(${JSON.stringify(specifier)}, __moduleKey);`);
+    return "";
+  });
+  const names = exportNames(source);
+  source = source.replace(/export\s+(?=(?:async\s+)?(?:function|const|let|var|class)\s+)/g, "");
+  source = source.replace(/export\s*\{[^}]+\};?/g, "");
+  source = source.replaceAll("import.meta.url", "__moduleUrl");
+  if (key === "./cli.js") {
+    source = source.replace(/if\s*\(process\.argv\[1\][\s\S]*?\n\}/, "");
+  }
+  const returnObject = names.length ? `return { ${names.join(", ")} };` : "return {};";
+  modules.set(key, `${imports.join("\n")}\n${source}\n${returnObject}`);
+  return key;
+}
+
+await collect(resolve(root, "src/cli.js"));
+const encoded = [...modules.entries()].map(([key, source]) => `${JSON.stringify(key)}: async (__moduleUrl, __import, __moduleKey) => {\n${source}\n}`).join(",\n");
+const contents = `#!/usr/bin/env node
+import { createRequire } from "node:module";
+import { dirname, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+const __require = createRequire(import.meta.url);
+const __modules = {\n${encoded}\n};
+const __cache = new Map();
+async function __load(key) {
+  if (__cache.has(key)) return __cache.get(key);
+  const factory = __modules[key];
+  if (!factory) throw new Error(\`Missing bundled module: \${key}\`);
+  const promise = factory(import.meta.url, __import, key);
+  __cache.set(key, promise);
+  return promise;
+}
+async function __import(specifier, parentKey) {
+  if (!specifier.startsWith(".")) return import(specifier);
+  const virtual = new URL(specifier, "file:///virtual/src/" + parentKey.slice(2));
+  const key = "./" + virtual.pathname.slice("/virtual/src/".length);
+  return __load(key);
+}
+const entry = await __load("./cli.js");
+process.exitCode = await entry.main();
+`;
+await writeFile(target, contents, "utf8");

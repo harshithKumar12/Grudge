@@ -144,7 +144,7 @@ path `offline/deterministic`.
 ### Demo and viewer
 
 ```text
-grudge demo [--live] [--port INT] [--no-browser] [--runs INT] [--fast]
+grudge demo [--live] [--guard] [--port INT] [--no-browser] [--runs INT] [--fast]
     [--json] [--debug]
 grudge viewer [--json] [--debug]
 ```
@@ -153,6 +153,9 @@ grudge viewer [--json] [--debug]
 prints the URL instead. `--fast` removes presenter pacing. `--live` is a
 reserved future provider mode and currently reports an error. `viewer` remains
 an explicit roadmap stub; the supported viewer path is `grudge demo`.
+`grudge demo --guard --json` runs the offline two-session proof: it captures a
+real Claude-style hook payload, proposes and accepts the rule, then blocks the
+same data-flow attempt at PreToolUse. The proof uses no network or model call.
 
 ### Browse Scars
 
@@ -177,7 +180,7 @@ For a shell pipeline and JSON/error examples, see
 | Replay and shrinking | Hermetic cassette replay, ddmin, content reducers, and deterministic history implemented | Fault locator is a stub |
 | Predicates | Call shape, ordering, and MVP-lite taint flow implemented; outcome AST parses | Outcome checker is a stub |
 | Admission and statistics | Red/green proof, controls, Wilson gate, Rich/Markdown reports implemented | Changed-Scar selector is a stub |
-| CLI and demo | Capture, shrink, admit, run, demo, and Scar list/show implemented | `viewer` and `scars retire` commands are explicit stubs |
+| CLI and demo | Capture, shrink, admit, run, demo, Guard proof, and Scar list/show implemented | `viewer` and `scars retire` commands are explicit stubs |
 | Static viewer | CDN-free event-driven dashboard with replay, pause, reconnect, and evidence panels implemented | Full Scar browser/registry integration remains a stub/minimal boundary |
 | Ecosystem integrations | Local/offline path needs no external service | SQLite registry, fuzzer, locator, pytest/GitHub integrations, and workflow are deferred |
 
