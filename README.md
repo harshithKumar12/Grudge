@@ -36,7 +36,7 @@ npm --prefix packages/grudge run doctor:repo
 ```
 
 If `grudge` has been published, the equivalent registry workflow is
-`npx grudge ...`. When working from `packages/grudge`, use `node dist/grudge.mjs`
+`npx grudge-cli ...`. When working from `packages/grudge`, use `node dist/grudge.mjs`
 and add `--cwd ../..` when the hooks should target the repository root. The
 short package-directory commands are `npm run setup:repo` and
 `npm run doctor:repo`. Do not combine `cd packages/grudge` with the

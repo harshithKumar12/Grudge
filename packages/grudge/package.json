@@ -1,5 +1,5 @@
 {
-  "name": "grudge",
+  "name": "grudge-cli",
   "version": "0.1.0",
   "description": "Local, deterministic guards for recurring agent mistakes.",
   "type": "module",
