@@ -8,9 +8,9 @@ import os
 import shutil
 import subprocess
 import webbrowser
-from threading import Event
 from pathlib import Path
-from typing import Any
+from threading import Event
+from typing import Any, cast
 
 import typer
 
@@ -29,7 +29,9 @@ def run_demo(
     ),
     runs: int = typer.Option(DEFAULTS.n_runs, "--runs", min=1),
     fast: bool = typer.Option(False, "--fast", help="Disable presenter pacing."),
-    guard: bool = typer.Option(False, "--guard", help="Run the offline two-session hook proof."),
+    guard: bool = typer.Option(
+        False, "--guard", help="Run the offline two-session hook proof."
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit JSON output."),
     debug: bool = typer.Option(False, "--debug", help="Show a traceback on errors."),
 ) -> None:
@@ -55,7 +57,7 @@ def run_demo(
             )
             if completed.returncode != 0:
                 raise RuntimeError(completed.stderr.strip() or "guard demo failed")
-            payload = json.loads(completed.stdout)
+            payload = cast(dict[str, Any], json.loads(completed.stdout))
             payload["command"] = "demo --guard"
             if json_output:
                 return payload
