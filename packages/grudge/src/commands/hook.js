@@ -8,12 +8,21 @@ import { postToolUse } from "../hooks/post-tool-use.js";
 const handlers = { "pre-tool-use": preToolUse, "session-start": sessionStart, "user-prompt-submit": userPromptSubmit, "post-tool-use": postToolUse, stop };
 const aliases = { PreToolUse: "pre-tool-use", SessionStart: "session-start", UserPromptSubmit: "user-prompt-submit", PostToolUse: "post-tool-use", Stop: "stop" };
 
+/** Ensure a handler's fail-open warning is visible to command adapters. */
+export function normalizeHookResult(result) {
+  const value = result && typeof result === "object" ? result : {};
+  if (value.ok === false && value.warning && !value.stderr) {
+    return { ...value, code: 0, stderr: `${String(value.warning)}\n` };
+  }
+  return value;
+}
+
 /** Dispatch one canonical hook event. The returned object is safe to print verbatim. */
 export async function hook(event, payload = {}) {
   const key = aliases[event] || event;
   const handler = handlers[key];
   if (!handler) return { code: 0, stdout: "", stderr: `grudge: unknown hook '${event}'; allowed (fail-open)\n` };
-  try { return await handler(payload); }
+  try { return normalizeHookResult(await handler(payload)); }
   catch { return { code: 0, stdout: "", stderr: "grudge: hook failed; allowed (fail-open)\n" }; }
 }
 
