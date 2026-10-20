@@ -6,6 +6,12 @@
   "bin": {"grudge": "dist/grudge.mjs"},
   "files": ["dist", "src", "README.md", "package.json", "LICENSE"],
   "engines": {"node": ">=18"},
-  "scripts": {"build": "node scripts/build.mjs", "test": "npm run build && node --test test/*.test.js"},
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "npm run build && node --test test/*.test.js",
+    "setup:repo": "node dist/grudge.mjs setup --cwd ../.. --yes --agents claude-code --scope repo",
+    "doctor:repo": "node dist/grudge.mjs doctor --cwd ../..",
+    "uninstall:repo": "node dist/grudge.mjs uninstall --cwd ../.."
+  },
   "license": "MIT"
 }

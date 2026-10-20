@@ -5,24 +5,27 @@ From the repository root, exercise this checkout with:
 
 ```bash
 npm --prefix packages/grudge run build
-node packages/grudge/dist/grudge.mjs setup --yes --agents claude-code --scope repo
-node packages/grudge/dist/grudge.mjs doctor
+npm --prefix packages/grudge run setup:repo
+npm --prefix packages/grudge run doctor:repo
 ```
 
-From this directory, use `node dist/grudge.mjs`. To install into the repository
-root rather than `packages/grudge` itself, pass `--cwd ../..` to both commands:
+From this directory, the short commands are:
 
 ```bash
-node dist/grudge.mjs setup --cwd ../.. --yes --agents claude-code --scope repo
-node dist/grudge.mjs doctor --cwd ../..
+npm run setup:repo
+npm run doctor:repo
 ```
+
+These target the repository root. The direct equivalent is `node dist/grudge.mjs
+...` from this directory, or `node packages/grudge/dist/grudge.mjs ...` from
+the repository root.
 
 This installs the local, offline mistake guard. The installer copies the
 zero-dependency `dist/grudge.mjs` runtime into `.grudge/bin/`, merges Claude
 Code hooks, and adds a short managed instruction block. It is idempotent,
 supports `--dry-run`, creates timestamped backups, and can be reversed with
-`node packages/grudge/dist/grudge.mjs uninstall` from the repository root, or
-`node dist/grudge.mjs uninstall --cwd ../..` from this directory. The `npx
+`npm --prefix packages/grudge run uninstall:repo` from the repository root, or
+`npm run uninstall:repo` from this directory. The `npx
 grudge ...` form is for an installed or published package, not an unlinked
 repository checkout.
 

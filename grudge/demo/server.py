@@ -111,7 +111,12 @@ class _DemoHandler(BaseHTTPRequestHandler):
                 self.wfile.flush()
                 if event.type == "demo.finished":
                     return
-        except (BrokenPipeError, ConnectionResetError, TimeoutError):
+        except (
+            BrokenPipeError,
+            ConnectionAbortedError,
+            ConnectionResetError,
+            TimeoutError,
+        ):
             return
         finally:
             unsubscribe()

@@ -26,16 +26,18 @@ deliberately writes no Cursor files.
 
 ```bash
 # from the repository root
-node packages/grudge/dist/grudge.mjs setup --yes --agents claude-code --scope repo
-node packages/grudge/dist/grudge.mjs setup --dry-run --agents codex --scope repo
-node packages/grudge/dist/grudge.mjs doctor
-node packages/grudge/dist/grudge.mjs uninstall
+npm --prefix packages/grudge run setup:repo
+npm --prefix packages/grudge run doctor:repo
+npm --prefix packages/grudge run uninstall:repo
 
 # from packages/grudge, targeting the repository root
-node dist/grudge.mjs setup --cwd ../.. --yes --agents claude-code --scope repo
-node dist/grudge.mjs doctor --cwd ../..
+npm run setup:repo
+npm run doctor:repo
 ```
 
+For a dry run or another adapter, use the direct command from the repository
+root: `node packages/grudge/dist/grudge.mjs setup --dry-run --agents codex
+--scope repo`.
 The `npx grudge ...` form is for an installed or published package. It does
 not select this checkout automatically. Relative paths are resolved from the
 current directory, so `packages/grudge/dist/grudge.mjs` must not be used after

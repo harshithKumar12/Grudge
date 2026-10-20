@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import socket
 import time
+from types import SimpleNamespace
 from urllib.request import Request, urlopen
 
 import pytest
@@ -26,7 +27,7 @@ from grudge.demo.events import (
     TraceStep,
 )
 from grudge.demo.orchestrator import DEFAULT_PACING, run_demo
-from grudge.demo.server import DemoServer
+from grudge.demo.server import DemoServer, _DemoHandler
 
 
 def _types(events: list[DemoEvent]) -> list[str]:
@@ -166,3 +167,22 @@ def test_server_serves_state_restart_and_sse_replay() -> None:
             assert response.status == 200
     finally:
         server.close()
+
+
+def test_sse_ignores_connection_aborted_client_disconnect() -> None:
+    bus = EventBus()
+    bus.publish(DemoStarted())
+
+    def raise_connection_aborted(_event: DemoEvent) -> None:
+        raise ConnectionAbortedError(10053, "client disconnected")
+
+    handler = SimpleNamespace(
+        server=SimpleNamespace(bus=bus),
+        send_response=lambda _status: None,
+        send_header=lambda *_args: None,
+        end_headers=lambda: None,
+        wfile=SimpleNamespace(flush=lambda: None),
+        _write_event=raise_connection_aborted,
+    )
+
+    _DemoHandler._events(handler)  # type: ignore[arg-type]

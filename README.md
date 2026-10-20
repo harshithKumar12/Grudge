@@ -31,15 +31,16 @@ they do not resolve a package from the npm registry:
 
 ```bash
 npm --prefix packages/grudge run build
-node packages/grudge/dist/grudge.mjs setup --yes --agents claude-code --scope repo
-node packages/grudge/dist/grudge.mjs doctor
+npm --prefix packages/grudge run setup:repo
+npm --prefix packages/grudge run doctor:repo
 ```
 
 If `grudge` has been published, the equivalent registry workflow is
 `npx grudge ...`. When working from `packages/grudge`, use `node dist/grudge.mjs`
-and add `--cwd ../..` when the hooks should target the repository root. Do not
-combine `cd packages/grudge` with the root-relative path
-`packages/grudge/dist/grudge.mjs`, or it resolves to
+and add `--cwd ../..` when the hooks should target the repository root. The
+short package-directory commands are `npm run setup:repo` and
+`npm run doctor:repo`. Do not combine `cd packages/grudge` with the
+root-relative path `packages/grudge/dist/grudge.mjs`, or it resolves to
 `packages/grudge/packages/grudge/dist/grudge.mjs`.
 
 Claude Code is the verified **Guard** tier. Codex, Gemini CLI, GitHub Copilot,
