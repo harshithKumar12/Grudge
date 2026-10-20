@@ -21,20 +21,32 @@ green-on-fixed admission, then reintroduce the bug and block it. The demo is
 offline and deterministic: it uses checked-in fake tools, scripted policies,
 the checked-in Scar, and the fallback predicate; it does not call a provider or
 the public network. For a headless smoke run, use
-`grudge demo --no-browser --fast`; for machine output, add `--json`.
+`python -m grudge demo --no-browser --fast --json`. For the two-session
+Claude-style hook proof, use `python -m grudge demo --guard --json`.
 
 ### Install the local guard
 
+These commands exercise the checkout's Node package from the repository root;
+they do not resolve a package from the npm registry:
+
 ```bash
-npx grudge setup --yes --agents claude-code --scope repo
-npx grudge doctor
+npm --prefix packages/grudge run build
+node packages/grudge/dist/grudge.mjs setup --yes --agents claude-code --scope repo
+node packages/grudge/dist/grudge.mjs doctor
 ```
+
+If `grudge` has been published, the equivalent registry workflow is
+`npx grudge ...`. When working from `packages/grudge`, use `node dist/grudge.mjs`
+and add `--cwd ../..` when the hooks should target the repository root. Do not
+combine `cd packages/grudge` with the root-relative path
+`packages/grudge/dist/grudge.mjs`, or it resolves to
+`packages/grudge/packages/grudge/dist/grudge.mjs`.
 
 Claude Code is the verified **Guard** tier. Codex, Gemini CLI, GitHub Copilot,
 OpenCode, and Windsurf are **Advisory** integrations; Cursor is unverified and
 the installer writes no Cursor files. See [the integration matrix](docs/integrations.md).
-Use `npx grudge setup --dry-run` to inspect a plan and `npx grudge uninstall`
-to remove Grudge-managed files.
+Use `node packages/grudge/dist/grudge.mjs setup --dry-run` to inspect a plan and
+`node packages/grudge/dist/grudge.mjs uninstall` to remove Grudge-managed files.
 
 ## What the shrink shows
 

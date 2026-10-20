@@ -4,7 +4,7 @@
   "description": "Local, deterministic guards for recurring agent mistakes.",
   "type": "module",
   "bin": {"grudge": "dist/grudge.mjs"},
-  "files": ["dist", "README.md", "package.json", "LICENSE"],
+  "files": ["dist", "src", "README.md", "package.json", "LICENSE"],
   "engines": {"node": ">=18"},
   "scripts": {"build": "node scripts/build.mjs", "test": "npm run build && node --test test/*.test.js"},
   "license": "MIT"

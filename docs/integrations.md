@@ -25,11 +25,21 @@ contract during verification. Its adapter prints the snippet and URL but
 deliberately writes no Cursor files.
 
 ```bash
-npx grudge setup --yes --agents claude-code --scope repo
-npx grudge setup --dry-run --agents codex --scope repo
-npx grudge doctor
-npx grudge uninstall
+# from the repository root
+node packages/grudge/dist/grudge.mjs setup --yes --agents claude-code --scope repo
+node packages/grudge/dist/grudge.mjs setup --dry-run --agents codex --scope repo
+node packages/grudge/dist/grudge.mjs doctor
+node packages/grudge/dist/grudge.mjs uninstall
+
+# from packages/grudge, targeting the repository root
+node dist/grudge.mjs setup --cwd ../.. --yes --agents claude-code --scope repo
+node dist/grudge.mjs doctor --cwd ../..
 ```
+
+The `npx grudge ...` form is for an installed or published package. It does
+not select this checkout automatically. Relative paths are resolved from the
+current directory, so `packages/grudge/dist/grudge.mjs` must not be used after
+`cd packages/grudge`.
 
 Hooks call `node .grudge/bin/grudge.mjs` directly; they never invoke `npx`,
 Python, a server, or a network.
