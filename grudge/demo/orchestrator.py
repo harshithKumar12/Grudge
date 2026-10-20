@@ -227,7 +227,9 @@ def run_demo(
             ShrinkAttempt(
                 removed=int(history.get("attempted_removal", 0)),
                 kept=bool(history.get("kept", False)),
-                remaining=int(history.get("size_after", history.get("size_before", 0))),
+                remaining=int(
+                    history.get("size_after") or history.get("size_before") or 0
+                ),
             ),
             delay,
         )

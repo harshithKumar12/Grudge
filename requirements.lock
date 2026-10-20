@@ -1,6 +1,6 @@
 # Grudge Phase 0 direct and development dependencies.
 setuptools==75.8.0
-pydantic==2.10.6
+pydantic==2.12.5
 typer==0.15.1
 click==8.1.8
 rich==13.9.4
@@ -8,5 +8,5 @@ httpx==0.28.1
 pytest==8.3.4
 pytest-cov==6.0.0
 hypothesis==6.123.10
-ruff==0.9.4
-mypy==1.14.1
+ruff==0.14.14
+mypy==1.18.2

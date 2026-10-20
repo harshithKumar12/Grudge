@@ -382,7 +382,12 @@ def test_persistence_does_not_overwrite_existing_files_or_follow_symlinks(
     outside.write_text("original", encoding="utf-8")
     target = output / "mail-leak-7.scar.json"
     if symlink:
-        target.symlink_to(outside)
+        try:
+            target.symlink_to(outside)
+        except OSError as exc:
+            if getattr(exc, "winerror", None) == 1314:
+                pytest.skip("creating symlinks requires the Windows privilege")
+            raise
     else:
         target.write_text("existing proof", encoding="utf-8")
     verdict = _admit(_candidate(), output)

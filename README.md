@@ -8,7 +8,7 @@ Agent failures are often buried in long, provider-dependent transcripts that are
 
 ## 30-second quickstart
 
-Use Python 3.11 or another interpreter supported by `pyproject.toml`, then run
+Use Python 3.14.0 or another interpreter supported by `pyproject.toml`, then run
 the complete offline demo from the repository root:
 
 ```bash
@@ -225,9 +225,10 @@ rows must be captured from a clean run and recorded with their environment.
 
 ## Checks and reproducibility
 
-The supported runtime is Python 3.11, recorded in `.python-version`, and the
-lockfile is `requirements.lock`. The project Makefile keeps dependencies in a
-local virtual environment:
+The default supported runtime is Python 3.14.0, recorded in `.python-version`.
+The package supports Python 3.11 through 3.14, and the lockfile is
+`requirements.lock`. The project Makefile keeps dependencies in a local virtual
+environment:
 
 ```bash
 make install

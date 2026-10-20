@@ -305,7 +305,7 @@ def test_compilation_snapshots_mutable_ast_and_outcome_is_honest_stub() -> None:
     checker = compile_predicate(predicate)
     predicate.args["v"] = "after"
     assert not checker.check(_trace(_call(0, "x", v="before"))).violated
-    with pytest.raises(NotImplementedError, match="roadmap: predicates.outcome"):
+    with pytest.raises(NotImplementedError, match=r"roadmap: predicates\.outcome"):
         compile_predicate(Outcome(outcome="ok"))
 
 

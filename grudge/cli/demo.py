@@ -1,7 +1,6 @@
 """Run the deterministic, offline five-beat demonstration."""
 
 # Typer's declarative Option defaults are intentional here.
-# ruff: noqa: B008
 
 import json
 import os
