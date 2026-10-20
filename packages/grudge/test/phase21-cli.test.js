@@ -5,8 +5,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { normalizeHookResult } from "../src/commands/hook.js";
 
 const cli = fileURLToPath(new URL("../src/cli.js", import.meta.url));
+
+test("fail-open handler warnings are surfaced on stderr with code zero", () => {
+  const result = normalizeHookResult({ ok: false, warning: "guard unavailable" });
+  assert.equal(result.code, 0);
+  assert.equal(result.stderr, "guard unavailable\n");
+});
 
 test("runtime CLI dispatches JSON commands and preserves fail-open hook exit", async () => {
   const root = await mkdtemp(join(tmpdir(), "grudge-cli-"));
