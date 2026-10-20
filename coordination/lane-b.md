@@ -2,7 +2,7 @@
 Branch: lane-b   Worktree: C:/Users/kotes/Desktop/grudge-lane-b   Phases: 16, 18
 
 ## Status
-- Current: Phase 18 complete   Waiting on: S2 merge and integrator verification
+- Current: Phase 16b post-tool hook complete   Waiting on: integrator merge/e2e verification
 
 ## Log (newest at bottom)
 ### 2026-10-19 Phase 14
@@ -19,3 +19,10 @@ Branch: lane-b   Worktree: C:/Users/kotes/Desktop/grudge-lane-b   Phases: 16, 18
 - Docs written: `docs/instruction-block.md`.
 - Requests filed: none.
 - Handoff note: Commit is `phase-18(lane-b): implement propose and Scar lifecycle`; stop at S2 pending integrator merge.
+### 2026-10-20 Phase 16b
+- Plan: Implement the owned PostToolUse recorder against the frozen normalize/session/redact interfaces and verify real Claude-style payloads.
+- Done: Added canonical normalization, recursive redaction, UTF-8 4 KiB result truncation, SHA-256/hash and byte-size metadata, timestamping, JSONL append, and fail-open handling.
+- Tests (command, result): `npm test` -> 26 passed; `npm run build` -> passed; Node syntax checks and `git diff --check` -> passed.
+- Docs written: none.
+- Requests filed: none.
+- Handoff note: Commit is `phase-16(lane-b): implement post tool hook`; stop for integrator merge and Phase 21 e2e rerun.
