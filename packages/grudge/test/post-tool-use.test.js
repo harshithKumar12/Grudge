@@ -26,7 +26,7 @@ test("PostToolUse records a real Claude-style payload with redaction and metadat
     result.event.resultHash,
     createHash("sha256").update(result.event.result).digest("hex"),
   );
-  assert.deepEqual(await read(root, "claude-session-123"), [result.event]);
+  assert.deepEqual(await read(join(root, ".grudge"), "claude-session-123"), [result.event]);
 });
 
 test("PostToolUse truncates by UTF-8 bytes and hashes the stored result", async () => {

@@ -2,8 +2,9 @@
 /** Capture one redacted, bounded canonical event after a tool call. */
 
 import { createHash } from "node:crypto";
+import { join } from "node:path";
 import { normalize } from "../core/normalize.js";
-import { redact, redactValue } from "../core/redact.js";
+import { redactValue } from "../core/redact.js";
 import { append } from "../core/session.js";
 
 const MAX_RESULT_BYTES = 4 * 1024;
@@ -52,7 +53,8 @@ export async function postToolUse(payload = {}, options = {}) {
       byteSize: Buffer.byteLength(boundedResult, "utf8"),
       timestamp: (options.now instanceof Date ? options.now : new Date(options.now ?? Date.now())).toISOString(),
     };
-    await append(options.root ?? payload.cwd ?? process.cwd(), sessionId, event);
+    const root = options.root ?? payload.cwd ?? process.cwd();
+    await append(join(root, ".grudge"), sessionId, event);
     return { ok: true, event };
   } catch {
     // Capture is advisory. A broken guard must never break the host session.
