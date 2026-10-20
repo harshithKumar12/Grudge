@@ -252,13 +252,40 @@ make docs-check
 make all
 ```
 
+### Clean Linux commands
+
+From a fresh checkout, the shortest reproducible workflow is:
+
+```bash
+git clone https://github.com/harshithKumar12/Grudge.git
+cd Grudge
+# Debian/Ubuntu only, if Python reports that ensurepip is unavailable:
+# sudo apt-get install python3.14-venv
+python3.14 --version
+make PYTHON=python3.14 install
+make test
+make demo
+```
+
+The host prerequisites are Python 3.14 with its `venv` module and GNU Make.
+Node.js 18+ is optional for the JavaScript package tests; the Python tests and
+demo do not require Node.js.
+
+`make test` runs the Python suite and the Node package suite when Node.js 18+
+is installed; it remains usable on a Python-only machine. The headless proof
+is useful in CI:
+
+```bash
+.venv/bin/python -m grudge demo --guard --json
+```
+
 The offline path needs no API keys or real personal data. Copy `.env.example`
 only when experimenting with the optional provider boundary; never commit a
 key. Docker remains an optional reproducibility path:
 
 ```bash
-docker build -t grudge:phase-12 .
-docker run --rm grudge:phase-12
+docker build -t grudge:latest .
+docker run --rm grudge:latest
 ```
 
 ## Repository guide

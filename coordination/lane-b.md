@@ -1,5 +1,5 @@
 # Lane B: Capture and Propose
-Branch: lane-b   Worktree: C:/Users/kotes/Desktop/grudge-lane-b   Phases: 16, 18
+Branch: lane-b   Worktree: sibling worktree `grudge-lane-b` (local-only)   Phases: 16, 18
 
 ## Status
 - Current: Phase 16b post-tool hook complete   Waiting on: integrator merge/e2e verification

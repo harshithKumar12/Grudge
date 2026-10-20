@@ -1,5 +1,5 @@
 # Lane C: Installer and Release
-Branch: lane-c   Worktree: C:/Users/kotes/Desktop/grudge-lane-c   Phases: 19, Phase 21 release
+Branch: lane-c   Worktree: sibling worktree `grudge-lane-c` (local-only)   Phases: 19, Phase 21 release
 
 ## Status
 - Current: S3 Phase 20 doctor budget measurements complete   Waiting on: integrator merge

@@ -1,5 +1,5 @@
 # Lane A: Guard
-Branch: lane-a   Worktree: C:/Users/kotes/Desktop/grudge-lane-a   Phases: 15, 17, 20
+Branch: lane-a   Worktree: sibling worktree `grudge-lane-a` (local-only)   Phases: 15, 17, 20
 
 ## Status
 - Current: Phase 21 CLI runtime wiring complete   Waiting on: integrator merge

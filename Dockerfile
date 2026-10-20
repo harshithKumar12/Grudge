@@ -9,6 +9,7 @@ COPY tests ./tests
 COPY examples ./examples
 COPY scars ./scars
 COPY docs ./docs
+COPY viewer ./viewer
 COPY Progress.md ./Progress.md
 
 RUN python -m pip install --no-cache-dir -r requirements.lock \

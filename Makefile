@@ -7,7 +7,7 @@ VENV_PYTHON := $(VENV)/bin/python
 endif
 RUN_PYTHON := $(if $(wildcard $(VENV_PYTHON)),$(VENV_PYTHON),$(PYTHON))
 
-.PHONY: install demo test lint typecheck viewer docs-check node-test node-build all
+.PHONY: install demo test python-test lint typecheck viewer docs-check node-test node-build all
 
 install:
 	$(PYTHON) -m venv $(VENV)
@@ -17,7 +17,9 @@ install:
 demo:
 	$(RUN_PYTHON) -m grudge demo
 
-test:
+test: python-test node-test
+
+python-test:
 	$(RUN_PYTHON) -m pytest
 
 lint:
@@ -38,4 +40,4 @@ node-test:
 node-build:
 	@if command -v node >/dev/null 2>&1 && test -f packages/grudge/package.json; then cd packages/grudge && npm run build; else echo "node-build: Node unavailable; skipped"; fi
 
-all: test lint typecheck docs-check node-test node-build
+all: test lint typecheck docs-check node-build

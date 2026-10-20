@@ -3,6 +3,7 @@
 
 # Local environments and generated Python artifacts.
 .venv/
+.venv*/
 __pycache__/
 *.py[cod]
 .pytest_cache/
