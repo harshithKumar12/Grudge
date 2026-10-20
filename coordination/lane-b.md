@@ -26,3 +26,4 @@ Branch: lane-b   Worktree: C:/Users/kotes/Desktop/grudge-lane-b   Phases: 16, 18
 - Docs written: none.
 - Requests filed: none.
 - Handoff note: Commit is `b6946d9 phase-16(lane-b): implement post tool hook`; it writes under `.grudge/session/`. Stop for integrator merge and Phase 21 e2e rerun.
+- Open request: Lane A/integrator should wire `postToolUse` into the public `hook post-tool-use` dispatcher; Lane B cannot edit that owned file.
