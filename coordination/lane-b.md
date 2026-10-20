@@ -25,4 +25,4 @@ Branch: lane-b   Worktree: C:/Users/kotes/Desktop/grudge-lane-b   Phases: 16, 18
 - Tests (command, result): `npm test` -> 26 passed; `npm run build` -> passed; Node syntax checks and `git diff --check` -> passed.
 - Docs written: none.
 - Requests filed: none.
-- Handoff note: Commit is `phase-16(lane-b): implement post tool hook`; stop for integrator merge and Phase 21 e2e rerun.
+- Handoff note: Commit is `b6946d9 phase-16(lane-b): implement post tool hook`; it writes under `.grudge/session/`. Stop for integrator merge and Phase 21 e2e rerun.
