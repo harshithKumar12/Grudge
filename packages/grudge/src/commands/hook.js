@@ -3,9 +3,10 @@ import { preToolUse } from "../hooks/pre-tool-use.js";
 import { sessionStart } from "../hooks/session-start.js";
 import { userPromptSubmit } from "../hooks/user-prompt-submit.js";
 import { stop } from "../hooks/stop.js";
+import { postToolUse } from "../hooks/post-tool-use.js";
 
-const handlers = { "pre-tool-use": preToolUse, "session-start": sessionStart, "user-prompt-submit": userPromptSubmit, stop };
-const aliases = { PreToolUse: "pre-tool-use", SessionStart: "session-start", UserPromptSubmit: "user-prompt-submit", Stop: "stop" };
+const handlers = { "pre-tool-use": preToolUse, "session-start": sessionStart, "user-prompt-submit": userPromptSubmit, "post-tool-use": postToolUse, stop };
+const aliases = { PreToolUse: "pre-tool-use", SessionStart: "session-start", UserPromptSubmit: "user-prompt-submit", PostToolUse: "post-tool-use", Stop: "stop" };
 
 /** Dispatch one canonical hook event. The returned object is safe to print verbatim. */
 export async function hook(event, payload = {}) {

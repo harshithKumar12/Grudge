@@ -19,6 +19,10 @@ test("runtime CLI dispatches JSON commands and preserves fail-open hook exit", a
     assert.equal(badHook.status, 0);
     assert.match(badHook.stderr, /invalid hook input/);
 
+    const postHook = spawnSync(process.execPath, [cli, "hook", "PostToolUse"], { cwd: root, input: "{}", encoding: "utf8" });
+    assert.equal(postHook.status, 0);
+    assert.match(postHook.stderr, /hook failed; allowed \(fail-open\)/);
+
     const missing = spawnSync(process.execPath, [cli, "accept"], { cwd: root, encoding: "utf8" });
     assert.equal(missing.status, 2);
     assert.match(JSON.parse(missing.stderr).error, /usage/);
