@@ -23,15 +23,17 @@ export const adapters = { "claude-code": claudeCode, codex, cursor, "gemini-cli"
 export async function setup(options = {}) {
   const cwd = resolve(options.cwd ?? process.cwd());
   const home = resolve(options.home ?? homedir());
-  const scope = options.scope ?? "repo";
-  if (!["repo", "local", "global"].includes(scope)) throw new Error("scope must be repo, local, or global");
+  const requestedScope = options.scope;
+  const scope = requestedScope ?? "repo";
+  if (requestedScope !== undefined && !["repo", "local", "global"].includes(requestedScope)) throw new Error("scope must be repo, local, or global");
   const detected = options.detected ?? await detect({ cwd, home });
-  const choice = await prompt({ detected, agents: options.agents ?? [], scope, yes: Boolean(options.yes), inputStream: options.input, outputStream: options.output });
+  const choice = await prompt({ detected, agents: options.agents ?? [], scope: requestedScope, yes: Boolean(options.yes), inputStream: options.input, outputStream: options.output });
+  const selectedScope = choice.scope ?? scope;
   const requested = choice.agents?.length ? choice.agents : detected.filter((item) => item.detected).map((item) => item.id);
   const selected = requested.map((id) => adapters[id]).filter(Boolean);
   const unknown = requested.filter((id) => !adapters[id]);
   if (unknown.length) throw new Error(`unknown agent adapter(s): ${unknown.join(", ")}`);
-  const plans = selected.map((item) => ({ adapter: item, plan: item.plan({ cwd, home, scope }) }));
+  const plans = selected.map((item) => ({ adapter: item, plan: item.plan({ cwd, home, scope: selectedScope }) }));
   const unverified = plans.filter(({ plan }) => !plan.verified).map(({ adapter, plan }) => ({ id: adapter.id, docsUrl: adapter.docsUrl, snippet: plan.snippet ?? managedBlock() }));
   const root = cwd;
   const runtimeSource = options.runtimeScript ? resolve(options.runtimeScript) : resolve(options.packageRoot ?? fileURLToPath(new URL("../..", import.meta.url)), "dist/grudge.mjs");
@@ -49,7 +51,7 @@ export async function setup(options = {}) {
   if (runtimeExists) await planRuntime(runtimeSource, runtimeTarget, context);
   await planGitignore(context);
   const config = await planConfig(root, runtimeTarget, selected.map((adapter) => adapter.id), context, runtimeExists, runtimeSource);
-  const result = { scope, cwd, selected: selected.map((item) => item.id), unverified, detected, dryRun: Boolean(options.dryRun), changes, config, runtimeInstalled: runtimeExists };
+  const result = { scope: selectedScope, cwd, selected: selected.map((item) => item.id), unverified, detected, dryRun: Boolean(options.dryRun), changes, config, runtimeInstalled: runtimeExists };
   if (!options.dryRun && backupEntries.length) await writeBackupManifest(root, timestamp, backupEntries);
   if (options.print !== false) printSetup(result);
   return result;
@@ -96,7 +98,7 @@ async function planConfig(root, runtimeTarget, selected, context, runtimeInstall
   const before = await readOptional(path);
   const old = before ? parseJson(before, path) : {};
   const hash = runtimeInstalled ? createHash("sha256").update(await readFile(context.dryRun ? runtimeSource : runtimeTarget)).digest("hex") : old.scriptHash ?? null;
-  const after = `${JSON.stringify({ ...old, version: 1, packageVersion: "0.1.0", scriptHash: hash, adapters: [...new Set([...(old.adapters ?? []), ...selected])].sort(), mode: old.mode ?? "on", autoAccept: old.autoAccept ?? false, lastBackup: old.lastBackup ?? context.timestamp }, null, 2)}\n`;
+  const after = `${JSON.stringify({ ...old, version: 1, packageVersion: "0.1.1", scriptHash: hash, adapters: [...new Set([...(old.adapters ?? []), ...selected])].sort(), mode: old.mode ?? "on", autoAccept: old.autoAccept ?? false, lastBackup: old.lastBackup ?? context.timestamp }, null, 2)}\n`;
   await writeIfChanged(path, before, after, context, "config");
   return JSON.parse(after);
 }

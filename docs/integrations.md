@@ -38,10 +38,11 @@ npm run doctor:repo
 For a dry run or another adapter, use the direct command from the repository
 root: `node packages/grudge/dist/grudge.mjs setup --dry-run --agents codex
 --scope repo`.
-The `npx grudge-cli ...` form is for an installed or published package. It does
-not select this checkout automatically. Relative paths are resolved from the
-current directory, so `packages/grudge/dist/grudge.mjs` must not be used after
-`cd packages/grudge`.
+The `npx grudge-cli setup` form launches the interactive selector for an
+installed or published package. Use the arrow keys to move, Space to select
+agents, and Enter to confirm. It does not select this checkout automatically.
+Relative paths are resolved from the current directory, so
+`packages/grudge/dist/grudge.mjs` must not be used after `cd packages/grudge`.
 
 Hooks call `node .grudge/bin/grudge.mjs` directly; they never invoke `npx`,
 Python, a server, or a network.

@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, writeFile, access, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { PassThrough } from "node:stream";
 import { setup } from "../src/commands/setup.js";
 import { doctor } from "../src/commands/doctor.js";
 import { uninstall } from "../src/commands/uninstall.js";
@@ -95,4 +96,31 @@ test("uninstall removes managed files and installed runtime", async () => {
   assert.ok(result.removed.length > 0);
   await assert.rejects(access(join(cwd, ".grudge")));
   await assert.rejects(access(join(cwd, "AGENTS.md")));
+});
+
+test("interactive setup applies the selected scope", async () => {
+  const cwd = await scratch();
+  const runtime = join(cwd, "runtime.mjs");
+  await writeFile(runtime, "runtime");
+  const input = new PassThrough();
+  const output = new PassThrough();
+  input.isTTY = true;
+  output.isTTY = true;
+  input.setRawMode = () => {};
+  output.on("data", () => {});
+  setImmediate(() => input.write(" \r\x1b[B\r"));
+
+  const result = await setup({
+    cwd,
+    home: cwd,
+    detected: [{ id: "claude-code", detected: true }],
+    input,
+    output,
+    runtimeScript: runtime,
+    print: false,
+  });
+
+  assert.equal(result.scope, "local");
+  assert.ok(result.selected.includes("claude-code"));
+  await access(join(cwd, ".claude/settings.local.json"));
 });

@@ -1,6 +1,6 @@
 {
   "name": "grudge-cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Local, deterministic guards for recurring agent mistakes.",
   "type": "module",
   "bin": {"grudge": "dist/grudge.mjs"},
