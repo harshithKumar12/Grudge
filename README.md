@@ -24,6 +24,30 @@ the public network. For a headless smoke run, use
 `python -m grudge demo --no-browser --fast --json`. For the two-session
 Claude-style hook proof, use `python -m grudge demo --guard --json`.
 
+## Published packages
+
+Grudge CLI `0.1.1` is available from both public package registries:
+
+- **npm:** [`grudge-cli`](https://www.npmjs.com/package/grudge-cli)
+- **PyPI:** [`grudge-cli`](https://pypi.org/project/grudge-cli/)
+
+Install the Python CLI with:
+
+```bash
+python -m pip install grudge-cli
+grudge --help
+```
+
+Install the Node.js setup wizard with:
+
+```bash
+npx grudge-cli@0.1.1 setup
+```
+
+The setup wizard detects supported agent tools, lets you select agents with
+arrow keys and Space, and asks whether to configure the current repository,
+personal settings, or all projects.
+
 ### Install the local guard
 
 These commands exercise the checkout's Node package from the repository root;
