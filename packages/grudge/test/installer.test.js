@@ -34,7 +34,7 @@ test("setup creates a guarded Claude project and preserves unrelated settings", 
 test("second setup is idempotent and dry-run writes nothing", async () => {
   const cwd = await scratch();
   const runtime = join(cwd, "runtime.mjs");
-  await writeFile(runtime, "runtime");
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
   const first = await setup({ cwd, home: cwd, agents: ["claude-code"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
   const second = await setup({ cwd, home: cwd, agents: ["claude-code"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
   assert.equal(second.changes.length, 0);
@@ -66,7 +66,7 @@ test("unverified adapters produce no files", async () => {
 test("doctor reports a healthy installed runtime", async () => {
   const cwd = await scratch();
   const runtime = join(cwd, "runtime.mjs");
-  await writeFile(runtime, "runtime");
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
   await setup({ cwd, home: cwd, agents: ["claude-code"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
   const result = await doctor({ cwd, print: false });
   assert.equal(result.ok, true);
@@ -88,7 +88,7 @@ test("doctor fails when a measured budget exceeds its cap", async () => {
 test("uninstall removes managed files and installed runtime", async () => {
   const cwd = await scratch();
   const runtime = join(cwd, "runtime.mjs");
-  await writeFile(runtime, "runtime");
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
   await setup({ cwd, home: cwd, agents: ["codex"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
   const before = await readFile(join(cwd, "AGENTS.md"), "utf8");
   assert.ok(before.includes(MANAGED_BEGIN));
@@ -101,7 +101,7 @@ test("uninstall removes managed files and installed runtime", async () => {
 test("interactive setup applies the selected scope", async () => {
   const cwd = await scratch();
   const runtime = join(cwd, "runtime.mjs");
-  await writeFile(runtime, "runtime");
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
   const input = new PassThrough();
   const output = new PassThrough();
   input.isTTY = true;

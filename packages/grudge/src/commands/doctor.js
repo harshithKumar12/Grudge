@@ -4,6 +4,11 @@ import { createHash } from "node:crypto";
 import { join, resolve } from "node:path";
 import { parseJson } from "../installer/json-merge.js";
 import { managedBlock } from "../installer/managed-block.js";
+import { measureOutputs as measureBudgetOutputs } from "../core/budget.js";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
 
 const FALLBACK_CAPS = Object.freeze({ sessionStartChars: 1200, blockReasonChars: 400, promptNudgeChars: 200, agentsBlockChars: 1000, agentsBlockLines: 12 });
 const PROMPT_NUDGE = "If this is a repeatable mistake, record it once: node .grudge/bin/grudge.mjs propose --rule '<rule>' --why '<one sentence>'";
@@ -19,6 +24,15 @@ export async function doctor(options = {}) {
   checks.push({ name: "config", ok: Boolean(config), detail: config ? "parse OK" : "missing or invalid" });
   const runtime = await readOptional(runtimePath);
   checks.push({ name: "runtime", ok: Boolean(runtime), detail: runtime ? "present" : "missing" });
+  if (runtime) {
+    try {
+      await execFileAsync(process.execPath, [runtimePath, "statusline"], { cwd: root, windowsHide: true, timeout: 5000 });
+      checks.push({ name: "runtime load", ok: true, detail: "installed script loaded" });
+    } catch (error) {
+      const detail = String(error?.stderr || error?.message || error).trim().replace(/\s+/g, " ");
+      checks.push({ name: "runtime load", ok: false, detail: `load failed: ${detail}. This is the Node runtime; Python engine commands are separate.` });
+    }
+  } else checks.push({ name: "runtime load", ok: false, detail: "not checked; runtime missing" });
   if (config?.scriptHash && runtime) {
     const hash = createHash("sha256").update(runtime).digest("hex");
     checks.push({ name: "script hash", ok: hash === config.scriptHash, detail: `${hash.slice(0, 12)} vs ${String(config.scriptHash).slice(0, 12)}` });
@@ -53,7 +67,7 @@ export async function doctor(options = {}) {
 
 async function measureBudgets({ root, compiled, measureOutputs }) {
   const outputs = buildOutputs(root, compiled);
-  const measure = measureOutputs ?? await loadMeasureOutputs();
+  const measure = measureOutputs ?? measureBudgetOutputs;
   return measure(outputs);
 }
 
@@ -63,18 +77,6 @@ function buildOutputs(root, compiled) {
   const first = rules[0];
   const blockReason = first ? `${String(first.english || `Rule ${first.id} matched`)} [scar ${first.id}]. Do not retry; change approach or ask the user.` : "";
   return { sessionStart: sessionStart ? `${sessionStart}\n` : "", blockReason, promptNudge: PROMPT_NUDGE, agentsBlock: managedBlock(), root };
-}
-
-async function loadMeasureOutputs() {
-  try {
-    const module = await import("../core/budget.js");
-    if (typeof module.measureOutputs === "function") return module.measureOutputs;
-    if (typeof module.budget === "function") {
-      const api = module.budget();
-      if (typeof api?.measureOutputs === "function") return api.measureOutputs;
-    }
-  } catch { /* Phase 20 budget module may not be merged in this worktree yet. */ }
-  return fallbackMeasureOutputs;
 }
 
 function fallbackMeasureOutputs({ sessionStart = "", blockReason = "", promptNudge = "", agentsBlock = "" }) {

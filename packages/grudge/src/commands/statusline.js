@@ -2,7 +2,7 @@
 import { join } from "node:path";
 import { readJson } from "../core/store.js";
 import { loadConfig } from "../core/config.js";
-import { estimatedTokensSaved, formatEstimatedTokens, readStats } from "../core/stats.js";
+import { aggregate, estimatedTokensSaved, formatEstimatedTokens, readStats } from "../core/stats.js";
 
 // Config is process-stable for a statusLine invocation. Avoid rereading it when
 // Claude Code polls the line repeatedly; hooks and mutating commands still load
@@ -43,7 +43,12 @@ export async function statusline(options = {}) {
   // cached compiled fallback for repositories created before that counter was
   // introduced, without rereading compiled.json on every statusLine poll.
   const scars = await statuslineScars(root, counters);
-  const line = `grudge: ${scars} scars, ${counters.blocks} blocked, ~${formatEstimatedTokens(estimatedTokensSaved(counters.blocks, config.avoidedRetryTokens))} tokens saved (est.)`;
+  const sessionId = typeof options.session === "string" ? options.session : typeof options.sessionId === "string" ? options.sessionId : null;
+  const session = sessionId ? await aggregate(root, sessionId, config.avoidedRetryTokens) : null;
+  const lifetime = await aggregate(root, null, config.avoidedRetryTokens);
+  const line = session
+    ? `grudge: ${scars} scars, ${session.blocked} blocked, ~${formatEstimatedTokens(session.avoidedRetryTokens)} tokens saved (est.) · session ${session.caught} caught/${session.warned} warned`
+    : `grudge: ${scars} scars, ${counters.blocks} blocked, ~${formatEstimatedTokens(lifetime.avoidedRetryTokens || estimatedTokensSaved(counters.blocks, config.avoidedRetryTokens))} tokens saved (est.)`;
   if (options.print !== false) process.stdout.write(`${line}\n`);
   return line;
 }

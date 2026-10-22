@@ -11,6 +11,7 @@ import { writeJsonAtomic } from "../core/store.js";
 import { loadConfig } from "../core/config.js";
 import { accept } from "./accept.js";
 import { paths } from "./scars.js";
+import { appendEvent } from "../core/stats.js";
 
 const EXAMPLE = 'never call shell where command ~ "untrusted instruction"';
 
@@ -109,6 +110,7 @@ export async function propose(options = {}) {
   const targetPaths = paths(root);
   await mkdir(targetPaths.pending, { recursive: true });
   await writeJsonAtomic(join(targetPaths.pending, `${id}.scar.json`), record);
+  try { await appendEvent(root, { type: "proposal", sessionId: target.id, scarId: id }); } catch { /* reporting is advisory */ }
   if ((await loadConfig(root)).autoAccept === true) {
     const promoted = await accept(id, { root });
     return { ...promoted, pending: false, autoAccepted: true, record };

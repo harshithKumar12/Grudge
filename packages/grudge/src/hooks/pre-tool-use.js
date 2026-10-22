@@ -6,6 +6,7 @@ import { loadConfig } from "../core/config.js";
 import { normalize } from "../core/normalize.js";
 import { check } from "../dsl/check.js";
 import { read as readSession } from "../core/session.js";
+import { appendEvent } from "../core/stats.js";
 
 const MAX_REASON = 400;
 const MAX_INPUT = 1024 * 1024;
@@ -46,9 +47,11 @@ async function evaluate(payload) {
     if (!result.violated) continue;
     const reason = message(rule);
     if (rule.mode === "warn") {
+      await appendEvent(root, { type: "catch", outcome: "warned", scarId: rule.id, sessionId: payload.session_id ?? payload.sessionId, injectedChars: `grudge warning: ${reason}\n`.length });
       await incrementStats(root, "warnings", rule.id);
       return { code: 0, stdout: "", stderr: `grudge warning: ${reason}\n`, warning: reason, scarId: rule.id };
     }
+    await appendEvent(root, { type: "catch", outcome: "blocked", scarId: rule.id, sessionId: payload.session_id ?? payload.sessionId, injectedChars: JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: reason }, blocked: true, reason, scarId: rule.id }).length + 1 });
     await incrementStats(root, "blocks", rule.id);
     const output = { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: reason }, blocked: true, reason, scarId: rule.id };
     return { code: 0, stdout: `${JSON.stringify(output)}\n`, stderr: "", blocked: true, reason, scarId: rule.id };

@@ -3,7 +3,7 @@
 **Purpose:** Define the bounded text surfaces and the honest savings calculation.
 **Audience:** Users and maintainers of the local Guard hooks.
 **Status:** final
-**Last updated (phase):** 20
+**Last updated (phase):** 23
 
 ## Caps
 
@@ -21,10 +21,11 @@ estimate is `ceil(characters / 4)`; it is an estimate, not a tokenizer result.
 
 ## Stats and status line
 
-Counters are stored in `.grudge/stats.json`, which is local and gitignored by
-the installer. Missing or corrupt JSON becomes zeroed counters rather than
-breaking a hook. The tracked counters are blocks, warnings, proposals, accepted
-scars, and per-scar counts.
+Savings events are appended to local `.grudge/stats.jsonl`. Readers skip blank
+or corrupt lines. Each event may
+carry a session id, catch outcome, scar id, and injected character count; events
+from Advisory integrations are ignored. The older `.grudge/stats.json` remains a
+compatibility fallback for repositories created before Phase 23.
 
 Estimated savings are always calculated as:
 
@@ -36,6 +37,13 @@ The default assumption is 1,500 avoided retry tokens per blocked mistake. The
 result is always labeled **`est.`**. It is not a measurement of model usage and
 must not be presented as one.
 
+Report overhead is estimated as `ceil(injected characters / 4)`. Net savings are
+`estimated avoided retry tokens - estimated injected tokens`; both values are
+always labeled **`est.`**. `grudge report --session --lifetime --json` returns
+catch, block, warning, proposal, acceptance, overhead, avoided-retry, and net
+figures for the requested scopes. The Stop hook reports only newly caught
+mistakes since the previous report and does not double count them.
+
 The status line is deliberately short:
 
 ```text
@@ -46,6 +54,10 @@ It prints nothing when `GRUDGE_DISABLE=1` or `mode: "off"`, and the lane-local
 test asserts it completes in under 50 ms on a temporary repository. On the lane
 machine, 20 measured calls produced p50 **1.20 ms**, p95 **4.83 ms**, and max
 **4.83 ms** (filesystem reads included; process startup excluded).
+
+When invoked with `--session <id>`, the status line uses that session's caught,
+blocked, warned, and estimated savings totals. Without a session id it retains
+the lifetime compact form.
 
 ## Honest comparison
 

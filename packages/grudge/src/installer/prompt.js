@@ -43,6 +43,7 @@ export async function prompt({ detected = [], agents = [], scope, yes = false, i
         })),
         reader,
         outputStream,
+        initialSelected: available,
       });
       if (!selected.length) selected = available;
     }
@@ -79,8 +80,8 @@ async function promptWithLines({ detected, agents, scope, inputStream, outputStr
   }
 }
 
-async function selectMany({ title, hint, choices, reader, outputStream }) {
-  return select({ title, hint, choices, reader, outputStream, multi: true });
+async function selectMany({ title, hint, choices, reader, outputStream, initialSelected = [] }) {
+  return select({ title, hint, choices, reader, outputStream, multi: true, initialSelected });
 }
 
 async function selectOne({ title, hint, choices, reader, outputStream, initial = 0 }) {
@@ -88,9 +89,9 @@ async function selectOne({ title, hint, choices, reader, outputStream, initial =
   return selected[0];
 }
 
-async function select({ title, hint, choices, reader, outputStream, multi = false, initial = 0 }) {
+async function select({ title, hint, choices, reader, outputStream, multi = false, initial = 0, initialSelected = [] }) {
   if (!choices.length) return [];
-  const checked = new Set();
+  const checked = new Set(initialSelected);
   let cursor = Math.max(0, Math.min(initial, choices.length - 1));
   while (true) {
     renderSelector({ title, hint, choices, cursor, checked, multi, outputStream });

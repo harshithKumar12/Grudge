@@ -2,19 +2,28 @@
 import { join } from "node:path";
 import { readJson } from "../core/store.js";
 import { loadConfig } from "../core/config.js";
-import { estimatedTokensSaved, readStats } from "../core/stats.js";
+import { aggregate, estimatedTokensSaved, readStats } from "../core/stats.js";
 
 /** Return and optionally print local Guard counters. */
 export async function stats(options = {}) {
   const root = options.cwd || process.cwd();
   const config = await loadConfig(root);
   const counters = await readStats(root);
+  const report = await aggregate(root, null, config.avoidedRetryTokens);
   const compiled = await readJson(join(root, ".grudge", "compiled.json"), null);
   const scars = Array.isArray(compiled?.rules) ? compiled.rules.filter((rule) => rule.mode !== "off").length : counters.acceptedScars;
   const result = {
     ...counters,
+    caught: report.caught,
+    blocked: report.blocked,
+    warned: report.warned,
+    proposals: report.proposals,
+    accepted: report.accepted,
+    injectedChars: report.injectedChars,
+    injectedTokens: report.injectedTokens,
+    netSavingsTokens: report.netSavingsTokens,
     scars,
-    estimatedTokensSaved: estimatedTokensSaved(counters.blocks, config.avoidedRetryTokens),
+     estimatedTokensSaved: report.avoidedRetryTokens || estimatedTokensSaved(counters.blocks, config.avoidedRetryTokens),
     estimated: true,
   };
   if (options.json) {

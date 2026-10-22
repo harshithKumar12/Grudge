@@ -1,35 +1,50 @@
-# Final report: Grudge Phases 14-21
+# Final report: Grudge Phases 14-24
 
 **Purpose:** Record final parallel-mode evidence, limitations, and release commands.
 **Audience:** Project owner, reviewers, and release operator.
 **Status:** final
-**Last updated (phase):** 21
+**Last updated (phase):** 24
 
 **Mode:** PARALLEL after Phase 14; three dedicated worktrees, merges A → B → C.
-**Phase board:** 0-12 `[x]`, 13 deferred `[ ]`, 14-21 `[x]`; Phase 21 exit passed.
+**Phase board:** 0-12 `[x]`, 13 deferred `[ ]`, 14-24 `[x]`; Phase 24 walkthrough and release-preparation exit passed.
 
 ## Definition of Done evidence
 
-- Python and Node shared conformance: `make VENV=.venv-wsl all` → **301 Python passed**, Ruff clean, mypy clean, docs-check **30**; `npm test` → **35 Node passed**; **27/27** fixtures pass in both languages.
+- Python and Node shared conformance: the Phase 21 baseline was **301 Python passed**, Ruff clean, mypy clean, docs-check **30**; the Phase 24 rerun is **301 passed, 1 skipped** and **48 Node passed**; **27/27** fixtures pass in both languages.
 - Built hook has no npm runtime imports and fails open: `npm run build`; bundle scan/tests and fail-open hook tests passed; malformed input returns code 0.
 - Two-session offline proof: `node tests/test_e2e_guard.mjs` → pass; `grudge demo --guard --json` → Session 1 proposed/accepted, Session 2 blocked.
 - Installer: Node installer tests pass; `npm pack --dry-run` lists intended package files; doctor reports green in a scratch repo.
 - Adapter safety: verified Claude Code, Codex, Gemini CLI, GitHub Copilot, OpenCode, Windsurf; Cursor is unverified and writes nothing.
 - Budgets: doctor measured `0/1200`, `0/400`, `123/200`, `800/1000 chars`, managed block `8/12 lines`; all within caps; token savings remain labeled **est.**
 - No MCP/server/telemetry/API key/runtime network was added; demo values are fake and labeled.
-- Fresh clone: `uv pip install --no-deps -e <clone>` then `make all` → **301 passed**, Node **35 passed**, e2e and guard demo passed.
+- Fresh clone baseline: `uv pip install --no-deps -e <clone>` then `make all` → **301 passed**, Node **35 passed**, e2e and guard demo passed.
+
+## Phase 22-24 walkthrough and release evidence
+
+- Scratch root: `C:\Users\kotes\AppData\Local\Temp\grudge-phase24-t3-20261022`; no walkthrough commands ran in the repository or home directory.
+- Node release artifact: `npm run build` and `npm pack --dry-run` from `packages/grudge` passed for `grudge-cli@0.1.2`; the tarball contained the bundled runtime and source files with no runtime npm dependencies.
+- Python release artifacts: `python -m build --outdir <scratch>\python-dist` passed for `grudge_cli-0.1.2.tar.gz` and `grudge_cli-0.1.2-py3-none-any.whl`; `twine check` passed for both. No upload or publish command was run.
+- Scratch installer walkthrough passed using the local `0.1.2` npm tarball: repo setup, `doctor` (all checks green), installed `statusline`, scar proposal/acceptance, allowed PreToolUse silence, matching PreToolUse deny, `stats`, `report`, and uninstall cleanup.
+- Python `demo --guard --json` passed from a scratch editable copy: Session 1 leaked and proposed, Session 2 blocked, with no provider or network call.
+- Verification after the release edits: `npm test` → **49 Node passed**; `python -m pytest -q` → **301 passed, 1 skipped**; configured Ruff and mypy targets, docs-check, and `git diff --check` passed.
+- `claude --version` was available (`2.1.283`), but the interactive Claude Code `/hooks` and natural-language Step 7 walkthrough were not run; no interactive agent session was started.
+- Docker was available but the optional Docker build/run was not repeated; WSL was present, but this Windows walkthrough did not claim Linux-specific measurements. Step 0 home-directory cleanup was intentionally not run.
+- Broad `ruff check .` remains blocked by pre-existing formatting findings in `examples/leaky_agent`; broad `mypy .` is blocked by the pre-existing Windows `nul` entry. The configured project checks (`ruff check grudge tests scripts` and `mypy grudge scripts`) are clean.
 
 ## Measurements and limitations
 
 - Hook timing: p50/p95 **1.80/4.86 ms**; warm statusline p50/p95 **0.01/0.03 ms**. Results are environment measurements, not universal guarantees.
 - Python remains the full-engine source of truth; Node implements call-shape, ordering, and taint-lite runtime semantics.
 - Phase 13 stretch work remains deferred. JSON Schema validation used structural contract tests because the optional `jsonschema` package was unavailable in the pinned environment.
-- Adapter documentation was checked on **2026-10-19**. npm name availability was not queried; publishing is intentionally left to the owner.
+- Adapter documentation was checked on **2026-10-19**. npm `grudge-cli@0.1.1`, PyPI `grudge-cli==0.1.1`, and GitHub release `v0.1.1` are published. Version `0.1.2` is prepared but intentionally not published in this task.
 
-## Release commands (not run)
+## Release commands for 0.1.2 (not run)
 
 ```bash
 git push origin master
 cd packages/grudge
 npm publish --access public
+cd ../..
+python -m twine upload release-dist/*
+npm deprecate grudge-cli@0.1.0 "Broken installer, use 0.1.1 or later"
 ```

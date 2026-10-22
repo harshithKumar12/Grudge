@@ -39,6 +39,7 @@
 | [`docs/instruction-block.md`](instruction-block.md) | The compact managed model instruction block and its rationale. | 18 | final |
 | [`docs/token-budgets.md`](token-budgets.md) | Enforced output caps, token estimates, stats, and status-line discipline. | 20 | final |
 | [`docs/FINAL-REPORT.md`](FINAL-REPORT.md) | Final parallel-mode Definition of Done evidence, limitations, and release commands. | 21 | final |
+| [`../TEST.md`](../TEST.md) | Scratch-directory walkthrough for setup, hooks, stats, savings, and uninstall. | 24 | final |
 
 ## Status vocabulary
 

@@ -3,7 +3,7 @@
 **Purpose:** Document the local Claude Code command hooks and their fail-open behavior.
 **Audience:** Developers installing Grudge Guard hooks.
 **Status:** final
-**Last updated (phase):** 17
+**Last updated (phase):** 23
 
 ## Command and official decision mechanism
 
@@ -17,7 +17,7 @@ The event names are `pre-tool-use`, `session-start`, `user-prompt-submit`,
 `post-tool-use`, and `stop` in the command path. The Phase 17 handlers are
 PreToolUse, SessionStart, UserPromptSubmit, and Stop.
 
-Claude Code's hooks reference was checked on 2026-10-19 at
+Claude Code's hooks reference was checked on 2026-10-22 at
 <https://code.claude.com/docs/en/hooks>. A command hook receives one JSON
 object on stdin. A PreToolUse deny is returned on stdout as:
 
@@ -47,11 +47,27 @@ compiled rules, and internal errors emit one short stderr warning and exit 0.
   140 characters and total output is at most 1,200 characters.
 - **UserPromptSubmit:** recognizes configured correction phrases and emits one
   proposal nudge. The nudge is at most 200 characters; unrelated prompts are silent.
-- **Stop:** updates `.grudge/stats.json` only and prints nothing.
+- **Stop:** updates legacy stop bookkeeping and emits one one-line savings
+  message only when the current session has catches that have not appeared in a
+  previous Stop report. Repeating Stop without a new catch is silent. The line
+  is delivered through the documented top-level `systemMessage` field.
 
 `GRUDGE_DISABLE=1` and `mode: "off"` allow immediately. Every handler has a
 default 1,500 ms budget; after the budget expires it allows the action and emits
 one short stderr warning. Oversized input (over 1 MiB) also fails open.
+
+## Stop output mechanism
+
+The official hooks reference documents `systemMessage` as a warning shown to the
+user. Grudge emits the savings line as `{"systemMessage":"..."}` from the Stop
+hook, verified against the current documentation on **2026-10-22**. The
+PreToolUse deny continues to use `hookSpecificOutput.permissionDecision`.
+
+PowerShell users can avoid DSL quote stripping with:
+
+```powershell
+'never call shell where command ~ "RULE"' | grudge propose --rule-stdin --why "reason"
+```
 
 ## Timing evidence
 

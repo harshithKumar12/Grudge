@@ -4,6 +4,7 @@ import { performance } from "node:perf_hooks";
 import { readJson } from "../core/store.js";
 import { loadConfig } from "../core/config.js";
 import { prune } from "../core/session.js";
+import { appendEvent } from "../core/stats.js";
 
 const MAX_LINE = 140;
 const MAX_OUTPUT = 1200;
@@ -27,7 +28,11 @@ export async function sessionStart(payload = {}) {
       lines.push(line);
       total += line.length + (lines.length > 1 ? 1 : 0);
     }
-    return { code: 0, stdout: lines.length ? `${lines.join("\n")}\n` : "", stderr: "", elapsedMs: performance.now() - started };
+    const stdout = lines.length ? `${lines.join("\n")}\n` : "";
+    if (stdout) {
+      try { await appendEvent(root, { type: "injection", sessionId: payload.session_id ?? payload.sessionId, injectedChars: stdout.length }); } catch { /* reporting is advisory */ }
+    }
+    return { code: 0, stdout, stderr: "", elapsedMs: performance.now() - started };
   } catch (error) {
     return { code: 0, stdout: "", stderr: "grudge: session start unavailable; continuing (fail-open)\n", error, elapsedMs: performance.now() - started };
   }

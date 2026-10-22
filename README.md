@@ -8,14 +8,21 @@ Agent failures are often buried in long, provider-dependent transcripts that are
 
 ## 30-second quickstart
 
-Use Python 3.14.0 or another interpreter supported by `pyproject.toml`, then run
-the complete offline demo from the repository root:
+Install the local Guard in a repository, then verify it:
+
+```powershell
+npx grudge-cli@latest setup
+npx grudge-cli@latest doctor
+```
+
+For the complete Python offline demo, use Python 3.14.0 or another interpreter
+supported by `pyproject.toml`, then run:
 
 ```bash
 pip install -e . && grudge demo
 ```
 
-The command opens the local viewer and plays the five-beat story: capture the
+The demo opens the local viewer and plays the five-beat story: capture the
 vulnerable run, shrink its world, synthesize a predicate, prove red-on-bad and
 green-on-fixed admission, then reintroduce the bug and block it. The demo is
 offline and deterministic: it uses checked-in fake tools, scripted policies,
@@ -26,7 +33,8 @@ Claude-style hook proof, use `python -m grudge demo --guard --json`.
 
 ## Published packages
 
-Grudge CLI `0.1.1` is available from both public package registries:
+Grudge CLI `0.1.1` is published in both public package registries. Release
+`0.1.2` is prepared locally but has not been published yet:
 
 - **npm:** [`grudge-cli`](https://www.npmjs.com/package/grudge-cli)
 - **PyPI:** [`grudge-cli`](https://pypi.org/project/grudge-cli/)
@@ -38,15 +46,26 @@ python -m pip install grudge-cli
 grudge --help
 ```
 
+Both packages install a command named `grudge`. The Python package exposes the
+full engine (`capture`, `compile`, `shrink`, `admit`, `run`, and `demo`); the npm
+package exposes the local Node Guard (`setup`, `doctor`, `hook`, `propose`,
+`scars`, `stats`, `report`, and `statusline`).
+
 Install the Node.js setup wizard with:
 
 ```bash
-npx grudge-cli@0.1.1 setup
+npx grudge-cli@latest setup
 ```
 
 The setup wizard detects supported agent tools, lets you select agents with
 arrow keys and Space, and asks whether to configure the current repository,
 personal settings, or all projects.
+
+When PowerShell strips DSL quotes, pass the rule on stdin instead:
+
+```powershell
+'never call shell where command ~ "GRUDGE_TEST"' | grudge propose --rule-stdin --why "harmless test rule" --preventive
+```
 
 ### Install the local guard
 
@@ -319,5 +338,6 @@ docker run --rm grudge:latest
 - [Documentation index](docs/INDEX.md) — every documentation file and owner phase.
 - [Roadmap](docs/roadmap.md) — every deferred stub and its design notes.
 - [Demo guide](docs/demo-guide.md) — presenter, server, JSON, and shell operation.
+- [Walkthrough test](TEST.md) — scratch-directory Guard walkthrough and release checks.
 - [Pitch artifacts](pitch/one_liner.md) — one-liner, 90-second script, and slides.
 - [Progress tracker](Progress.md) — canonical phase status.

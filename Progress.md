@@ -1,13 +1,14 @@
 # Progress.md: Grudge build tracker
 
-_Last updated: 2026-10-20 by omnirush.ai_
+_Last updated: 2026-10-22 by omnirush.ai_
 
 ## Snapshot
-- **Current phase:** 21: End-to-End Proof, Demo, and Release Prep complete
-- **Overall:** 21/22 phases complete
-- **Test suite:** 301 Python tests and 35 Node tests passing in WSL Python 3.11.17 / Node 22.22.1
+- **Current phase:** 24: Walkthrough Validation and Release Prep complete
+- **Overall:** 24/25 phases complete; Phase 13 remains intentionally deferred
+- **Test suite:** 301 Python tests passing (1 skipped) and 48 Node tests passing
 - **Demo status:** works offline? yes
-- **Next action:** Review the final report, then run the documented push or npm publish commands only when ready to release.
+- **Release status:** npm `grudge-cli@0.1.1`, PyPI `grudge-cli==0.1.1`, and GitHub release `v0.1.1` are published. npm/PyPI `0.1.2` is prepared but not published.
+- **Next action:** Review the Phase 22-24 evidence and publish `0.1.2` only when ready.
 
 ## Phase Board
 | # | Phase | Status | Exit gate passed | Docs done |
@@ -34,6 +35,9 @@ _Last updated: 2026-10-20 by omnirush.ai_
 | 19 | Installer | [x] | yes | [x] |
 | 20 | Token Budgets, Stats, and Status Line | [x] | yes | [x] |
 | 21 | End-to-End Proof, Demo, and Release Prep | [x] | yes | [x] |
+| 22 | Install Hardening | [x] | yes | [x] |
+| 23 | Savings Report | [x] | yes | [x] |
+| 24 | Walkthrough Validation and Release Prep | [x] | yes | [x] |
 
 ## Task Checklist
 ### Phase 0
@@ -238,9 +242,15 @@ _Last updated: 2026-10-20 by omnirush.ai_
 - **Done:** Added four Claude-style leak fixtures, `scripts/e2e_guard.mjs`, Node/Python e2e coverage, `grudge demo --guard`, a dependency-free source bundler, and the final report. Fixed clean-clone Node test ordering so `npm test` builds the runtime before executing e2e tests.
 - **Tests:** Root WSL `make VENV=.venv-wsl all` -> `301 passed`, Ruff clean, mypy clean, docs-check `30 indexed`; Node `npm test` -> `35 passed`; `npm pack --dry-run` -> 4 intended package files; `node tests/test_e2e_guard.mjs` -> pass; `grudge demo --guard --json` -> `session1 leaked and proposed`, `session2 blocked`; a fresh clone -> install succeeded with `uv pip --no-deps -e`, root checks green, Node `35 passed`, e2e pass, guard demo pass.
 - **Measurements:** hook p50/p95 recorded as `1.80/4.86 ms` in the Phase 17 lane report; warm statusline `0.01/0.03 ms`; doctor measured `0/1200`, `0/400`, `123/200`, and `800/1000 chars` (managed block `8/12 lines`).
-- **Adapters:** verified Claude Code, Codex, Gemini CLI, GitHub Copilot, OpenCode, and Windsurf as of 2026-10-19; Cursor remains unverified and no-write. Name availability was not queried; no publish action was performed.
+- **Adapters:** verified Claude Code, Codex, Gemini CLI, GitHub Copilot, OpenCode, and Windsurf as of 2026-10-19; Cursor remains unverified and no-write. npm/PyPI `0.1.1` and GitHub release `v0.1.1` are already published; `0.1.2` release preparation is complete but no publish/upload/push action is part of this phase.
 - **Docs updated:** `README.md`, `docs/INDEX.md`, `docs/FINAL-REPORT.md`, and this tracker. Phase 21 exit gate passed; Phase 13 stretch remains intentionally deferred.
 - **Handoff note:** Release commands are documented but intentionally not run. Preserve unrelated untracked `GrudgeBrief.pdf`.
+### 2026-10-22 Phases 22-24 / release hardening
+- **Pre-flight:** Read `AGENTS.md`, `Progress.md`, `docs/FINAL-REPORT.md`, `PROMPT-2.md`, and owner-written `TEST.md`; preserved Phase 13 as deferred and did not edit `AGENTS.md`.
+- **Done:** Hardened bundled runtime installation, post-install smoke validation with rollback, executable doctor checks, version/status/init CLI behavior, PowerShell `--rule-stdin`, Python-engine hints, append-only savings events/reporting, Stop deduplication, scratch walkthrough, and 0.1.2 release artifacts/docs.
+- **Tests:** `npm test` -> 49 passed; `python -m pytest -q` -> 301 passed, 1 skipped; configured Ruff/mypy/docs checks passed; `npm pack --dry-run` and `twine check` passed. Broad Ruff remains limited by pre-existing example formatting, and broad mypy reports the pre-existing duplicate-module layout for `tests/test_leaky_agents.py`; configured targets are clean.
+- **Walkthrough:** scratch setup, doctor, self-contained runtime, proposal/acceptance, allowed/blocked hooks, stats/report, uninstall, and Python guard demo passed. Interactive Claude `/hooks` and natural-language Step 7 remain unverified.
+- **Release state:** prepare 0.1.2 only; never run `git push`, `npm publish`, `npm login`, `twine upload`, or any upload/publish action in this task.
 ### 2026-10-15 Session 1
 - **Pre-flight:** read AGENTS.md y, read PROMPT.md y, read docs/PROGRESS.md y (empty), read docs/INDEX.md n (missing).
 - **Plan:**

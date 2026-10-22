@@ -1,6 +1,6 @@
 {
   "name": "grudge-cli",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Local, deterministic guards for recurring agent mistakes.",
   "type": "module",
   "bin": {"grudge": "dist/grudge.mjs"},
@@ -8,7 +8,7 @@
   "engines": {"node": ">=18"},
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "npm run build && node --test test/*.test.js",
+    "test": "npm run build && node --test --test-concurrency=1 test/*.test.js",
     "setup:repo": "node dist/grudge.mjs setup --cwd ../.. --yes --agents claude-code --scope repo",
     "doctor:repo": "node dist/grudge.mjs doctor --cwd ../..",
     "uninstall:repo": "node dist/grudge.mjs uninstall --cwd ../.."

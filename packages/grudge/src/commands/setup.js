@@ -1,5 +1,5 @@
 // OWNER: lane-c
-import { access, copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, copyFile, mkdir, readFile, writeFile, stat } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 import { homedir } from "node:os";
@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { detect } from "../installer/detect.js";
 import { prompt } from "../installer/prompt.js";
 import { mergeJson, parseJson, mergeObjects } from "../installer/json-merge.js";
-import { backup, writeBackupManifest } from "../installer/backup.js";
+import { backup, restoreEntries, writeBackupManifest } from "../installer/backup.js";
 import { managedBlock, upsertManagedBlock } from "../installer/managed-block.js";
 import { adapter as claudeCode } from "../installer/adapters/claude-code.js";
 import { adapter as codex } from "../installer/adapters/codex.js";
@@ -16,6 +16,7 @@ import { adapter as geminiCli } from "../installer/adapters/gemini-cli.js";
 import { adapter as copilot } from "../installer/adapters/copilot.js";
 import { adapter as windsurf } from "../installer/adapters/windsurf.js";
 import { adapter as opencode } from "../installer/adapters/opencode.js";
+import { VERSION } from "../version.js";
 
 export const adapters = { "claude-code": claudeCode, codex, cursor, "gemini-cli": geminiCli, copilot, windsurf, opencode };
 
@@ -23,6 +24,10 @@ export const adapters = { "claude-code": claudeCode, codex, cursor, "gemini-cli"
 export async function setup(options = {}) {
   const cwd = resolve(options.cwd ?? process.cwd());
   const home = resolve(options.home ?? homedir());
+  const unsafeHome = !options.home && (cwd === home || !(await hasProjectMarker(cwd)));
+  if (unsafeHome && (options.scope !== "global" || options.yes !== true)) {
+    throw new Error("refusing setup in your home directory without a project marker; use --scope global --yes to confirm an all-projects install");
+  }
   const requestedScope = options.scope;
   const scope = requestedScope ?? "repo";
   if (requestedScope !== undefined && !["repo", "local", "global"].includes(requestedScope)) throw new Error("scope must be repo, local, or global");
@@ -33,28 +38,39 @@ export async function setup(options = {}) {
   const selected = requested.map((id) => adapters[id]).filter(Boolean);
   const unknown = requested.filter((id) => !adapters[id]);
   if (unknown.length) throw new Error(`unknown agent adapter(s): ${unknown.join(", ")}`);
-  const plans = selected.map((item) => ({ adapter: item, plan: item.plan({ cwd, home, scope: selectedScope }) }));
+  const root = selectedScope === "global" ? home : cwd;
+  const runtimeCommand = selectedScope === "global" ? `node ${JSON.stringify(join(home, ".grudge/bin/grudge.mjs"))}` : "node .grudge/bin/grudge.mjs";
+  const plans = selected.map((item) => ({ adapter: item, plan: item.plan({ cwd, home, scope: selectedScope, runtimeCommand }) }));
   const unverified = plans.filter(({ plan }) => !plan.verified).map(({ adapter, plan }) => ({ id: adapter.id, docsUrl: adapter.docsUrl, snippet: plan.snippet ?? managedBlock() }));
-  const root = cwd;
-  const runtimeSource = options.runtimeScript ? resolve(options.runtimeScript) : resolve(options.packageRoot ?? fileURLToPath(new URL("../..", import.meta.url)), "dist/grudge.mjs");
+  const runtimeSource = options.runtimeScript
+    ? resolve(options.runtimeScript)
+    : process.argv[1]?.endsWith("grudge.mjs")
+      ? resolve(process.argv[1])
+      : resolve(options.packageRoot ?? fileURLToPath(new URL("../..", import.meta.url)), "dist/grudge.mjs");
   const runtimeTarget = join(root, ".grudge/bin/grudge.mjs");
   const changes = [];
   const backupEntries = [];
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const context = { cwd, home, root, timestamp, backupEntries, changes, dryRun: Boolean(options.dryRun), applyPlan: (plan) => applyPlan(plan, { root, backupEntries, changes, timestamp, dryRun: Boolean(options.dryRun) }), removePlan: () => ({}) };
 
-  for (const item of plans) {
-    if (!item.plan.verified) continue;
-    await item.adapter.apply(context, item.plan);
+  try {
+    for (const item of plans) {
+      if (!item.plan.verified) continue;
+      await item.adapter.apply(context, item.plan);
+    }
+    const runtimeExists = await fileExists(runtimeSource);
+    if (runtimeExists) await planRuntime(runtimeSource, runtimeTarget, context);
+    await planGitignore(context);
+    const config = await planConfig(root, runtimeTarget, selected.map((adapter) => adapter.id), context, runtimeExists, runtimeSource);
+    if (!context.dryRun && runtimeExists) await smokeTest(runtimeTarget, root);
+    const result = { scope: selectedScope, cwd, root, selected: selected.map((item) => item.id), unverified, detected, dryRun: Boolean(options.dryRun), changes, config, runtimeInstalled: runtimeExists, version: VERSION };
+    if (!options.dryRun && backupEntries.length) await writeBackupManifest(root, timestamp, backupEntries);
+    if (options.print !== false) printSetup(result);
+    return result;
+  } catch (error) {
+    if (!context.dryRun && backupEntries.length) await restoreEntries(backupEntries);
+    throw error;
   }
-  const runtimeExists = await fileExists(runtimeSource);
-  if (runtimeExists) await planRuntime(runtimeSource, runtimeTarget, context);
-  await planGitignore(context);
-  const config = await planConfig(root, runtimeTarget, selected.map((adapter) => adapter.id), context, runtimeExists, runtimeSource);
-  const result = { scope: selectedScope, cwd, selected: selected.map((item) => item.id), unverified, detected, dryRun: Boolean(options.dryRun), changes, config, runtimeInstalled: runtimeExists };
-  if (!options.dryRun && backupEntries.length) await writeBackupManifest(root, timestamp, backupEntries);
-  if (options.print !== false) printSetup(result);
-  return result;
 }
 
 async function applyPlan(plan, context) {
@@ -98,7 +114,7 @@ async function planConfig(root, runtimeTarget, selected, context, runtimeInstall
   const before = await readOptional(path);
   const old = before ? parseJson(before, path) : {};
   const hash = runtimeInstalled ? createHash("sha256").update(await readFile(context.dryRun ? runtimeSource : runtimeTarget)).digest("hex") : old.scriptHash ?? null;
-  const after = `${JSON.stringify({ ...old, version: 1, packageVersion: "0.1.1", scriptHash: hash, adapters: [...new Set([...(old.adapters ?? []), ...selected])].sort(), mode: old.mode ?? "on", autoAccept: old.autoAccept ?? false, lastBackup: old.lastBackup ?? context.timestamp }, null, 2)}\n`;
+  const after = `${JSON.stringify({ ...old, version: 1, packageVersion: VERSION, scriptHash: hash, adapters: [...new Set([...(old.adapters ?? []), ...selected])].sort(), mode: old.mode ?? "on", autoAccept: old.autoAccept ?? false, lastBackup: old.lastBackup ?? context.timestamp }, null, 2)}\n`;
   await writeIfChanged(path, before, after, context, "config");
   return JSON.parse(after);
 }
@@ -133,4 +149,27 @@ function printSetup(result) {
   for (const change of result.changes) process.stdout.write(`${result.dryRun ? "would change" : "changed"} ${change.path}\n`);
   for (const item of result.unverified) process.stdout.write(`unverified ${item.id}; no files written. Docs: ${item.docsUrl}\n${item.snippet}\n`);
   if (!result.runtimeInstalled) process.stdout.write("warning: dist/grudge.mjs was not found; build the package before using installed hooks.\n");
+}
+
+async function smokeTest(runtimePath, cwd) {
+  const { spawn } = await import("node:child_process");
+  await new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [runtimePath, "hook", "session-start"], { cwd, windowsHide: true });
+    let stderr = "";
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code === 0 && !/Cannot find module/i.test(stderr)) return resolve();
+      reject(new Error(`installed runtime smoke test failed${stderr ? `: ${stderr.trim()}` : ` with exit code ${code}`}`));
+    });
+    child.stdin.end(JSON.stringify({ session_id: "grudge-install-smoke", hook_event_name: "SessionStart", cwd }));
+  });
+}
+
+async function hasProjectMarker(path) {
+  for (const marker of [".git", ".hg", ".svn", "package.json", "pyproject.toml"]) {
+    try { await stat(join(path, marker)); return true; } catch { /* continue */ }
+  }
+  return false;
 }

@@ -1,5 +1,6 @@
 // OWNER: lane-a
 import { loadConfig } from "../core/config.js";
+import { appendEvent } from "../core/stats.js";
 
 const MAX_NUDGE = 200;
 
@@ -21,6 +22,7 @@ export async function userPromptSubmit(payload = {}) {
     if (process.env.GRUDGE_DISABLE === "1" || config.mode === "off") return { code: 0, stdout: "", stderr: "" };
     if (!correction(payload.prompt, Array.isArray(config.correctionPatterns) ? config.correctionPatterns : [])) return { code: 0, stdout: "", stderr: "" };
     const nudge = "If this is a repeatable mistake, record it once: node .grudge/bin/grudge.mjs propose --rule '<rule>' --why '<one sentence>'";
+    try { await appendEvent(payload.cwd || process.cwd(), { type: "injection", sessionId: payload.session_id ?? payload.sessionId, injectedChars: Math.min(nudge.length, MAX_NUDGE) }); } catch { /* reporting is advisory */ }
     return { code: 0, stdout: `${nudge.slice(0, MAX_NUDGE)}\n`, stderr: "", nudge: nudge.slice(0, MAX_NUDGE) };
   } catch (error) {
     return { code: 0, stdout: "", stderr: "grudge: prompt hook unavailable; continuing (fail-open)\n", error };

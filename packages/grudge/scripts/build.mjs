@@ -7,6 +7,7 @@ import { pathToFileURL } from "node:url";
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const root = resolve(scriptDir, "..");
 const target = resolve(root, "dist/grudge.mjs");
+const packageJson = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
 await mkdir(dirname(target), { recursive: true });
 
 const modules = new Map();
@@ -63,6 +64,7 @@ async function collect(file) {
 await collect(resolve(root, "src/cli.js"));
 const encoded = [...modules.entries()].map(([key, source]) => `${JSON.stringify(key)}: async (__moduleUrl, __import, __moduleKey) => {\n${source}\n}`).join(",\n");
 const contents = `#!/usr/bin/env node
+// Grudge v${packageJson.version}
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -83,7 +85,18 @@ async function __import(specifier, parentKey) {
   const key = "./" + virtual.pathname.slice("/virtual/src/".length);
   return __load(key);
 }
-const entry = await __load("./cli.js");
-process.exitCode = await entry.main();
+try {
+  const entry = await __load("./cli.js");
+  process.exitCode = await entry.main();
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
+  if (process.argv[2] === "hook") {
+    process.stderr.write("grudge: hook failed; allowed (fail-open): " + message + "\\n");
+    process.exitCode = 0;
+  } else {
+    process.stderr.write(JSON.stringify({ error: message }) + "\\n");
+    process.exitCode = 1;
+  }
+}
 `;
 await writeFile(target, contents, "utf8");

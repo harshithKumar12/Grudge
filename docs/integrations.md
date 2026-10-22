@@ -44,5 +44,10 @@ agents, and Enter to confirm. It does not select this checkout automatically.
 Relative paths are resolved from the current directory, so
 `packages/grudge/dist/grudge.mjs` must not be used after `cd packages/grudge`.
 
+The npm and PyPI packages both install a command named `grudge`, but they serve
+different layers: npm provides the local Node Guard and installer, while PyPI
+provides the full Python engine (`capture`, `compile`, `shrink`, `admit`, `run`,
+and `demo`).
+
 Hooks call `node .grudge/bin/grudge.mjs` directly; they never invoke `npx`,
 Python, a server, or a network.
