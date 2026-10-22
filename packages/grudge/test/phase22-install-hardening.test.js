@@ -97,5 +97,6 @@ test("CLI gives Python-engine guidance for engine-only commands", async () => {
 });
 
 test("home setup without a marker requires explicit confirmation", async () => {
-  await assert.rejects(() => setup({ cwd: homedir(), agents: ["codex"], scope: "repo", print: false }), /home directory without a project marker/);
+  await assert.rejects(() => setup({ cwd: homedir(), agents: ["codex"], scope: "repo", print: false }), /home or an unmarked directory/);
+  await assert.rejects(() => setup({ cwd: homedir(), agents: ["codex"], scope: true, yes: true, print: false }), /scope must be repo, local, or global/);
 });
