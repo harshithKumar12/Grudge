@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.6 - 2026-10-23
+- "Write from previous history"
+-
+-
+
 ## 0.1.5 - 2026-10-23
 
 - Make uninstall remove only Grudge-managed marker content and preserve user files.

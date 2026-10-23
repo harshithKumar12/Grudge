@@ -1,76 +1,238 @@
+<div align="center">
+
+<img src="docs/assets/grudge-logo.png" alt="Grudge logo" width="150" />
+
 # Grudge
 
-**Agents repeat mistakes. Grudge makes each one happen exactly once.**
+### Deterministic regression scars for AI agents
 
-## The problem
+Turn one recurring agent mistake into a small, reviewable rule that can be
+replayed offline, checked in CI, and enforced before the same action happens
+again.
 
-Agent failures are often buried in long, provider-dependent transcripts that are difficult to reproduce. A copied transcript can show what happened, but it cannot show whether the live policy would make the same decision when the world changes. Grudge turns one failure into a small, reviewable regression Scar that can run offline and block the same behavior from returning.
+<p>
+  <a href="https://www.npmjs.com/package/grudge-cli"><img src="https://img.shields.io/npm/v/grudge-cli?logo=npm&logoColor=white" alt="npm version" /></a>
+  <a href="https://pypi.org/project/grudge-cli/"><img src="https://img.shields.io/pypi/v/grudge-cli?logo=pypi&logoColor=white" alt="PyPI version" /></a>
+  <a href="https://github.com/harshithKumar12/Grudge/blob/master/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" /></a>
+  <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-18%2B-339933?logo=node.js&logoColor=white" alt="Node.js 18 or newer" /></a>
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.11--3.14-3776AB?logo=python&logoColor=white" alt="Python 3.11 to 3.14" /></a>
+</p>
 
-## 30-second quickstart
+<p>
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#how-it-works">How it works</a> ·
+  <a href="#cli-reference">CLI reference</a> ·
+  <a href="#development">Development</a>
+</p>
 
-Install the local Guard in a repository, then verify it:
+</div>
 
-```powershell
+> **Release status:** source version `0.1.6` is being prepared. Verify the
+> package registries and complete the release checklist before publishing.
+
+## Table of contents
+
+- [Overview](#overview)
+- [Why Grudge](#why-grudge)
+- [Features](#features)
+- [How it works](#how-it-works)
+- [Architecture](#architecture)
+- [Quick start](#quick-start)
+- [Install the packages](#install-the-packages)
+- [Docker](#docker)
+- [CLI reference](#cli-reference)
+- [Integrations](#integrations)
+- [Project structure](#project-structure)
+- [Configuration and data](#configuration-and-data)
+- [Testing](#testing)
+- [Troubleshooting](#troubleshooting)
+- [Development](#development)
+- [Release checklist](#release-checklist)
+- [Security and privacy](#security-and-privacy)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Overview
+
+AI agents can repeat the same unsafe or incorrect action after a prompt change,
+tool-result change, or model change. A transcript can show the failure, but it
+does not provide a compact regression test that can be replayed against the
+live policy.
+
+Grudge turns the failure into a **Scar**:
+
+1. Capture the agent's typed trace.
+2. Freeze only the external world in a replay cassette.
+3. Shrink the cassette to the smallest causal example.
+4. Describe the failure with a readable deterministic predicate.
+5. Prove that the bad behavior is red and the fixed behavior is green.
+6. Run the Scar again in CI or enforce it locally before a tool executes.
+
+The core workflow is local-first, deterministic, and designed to work without
+provider credentials or network access.
+
+## Why Grudge
+
+| Problem | Grudge's answer |
+|---|---|
+| Long transcripts are difficult to review | Store a compact cassette and predicate |
+| Replaying a transcript can hide policy changes | Replay the world while keeping the policy live |
+| Generated rules can be vague | Compile and evaluate deterministic DSL predicates |
+| A one-off test is easy to over-trust | Require red/green admission evidence and benign controls |
+| Agents can repeat a known mistake locally | Install a lightweight Node Guard with Claude Code hooks |
+| Tool output may contain secrets | Redact captured content before persistence |
+
+## Features
+
+### Python engine
+
+- Typed trace capture and schema validation.
+- Secret-aware redaction for recorded traces.
+- Strict cassette replay with ordered, single-use entries.
+- Delta debugging and content reducers for shrinking failures.
+- Deterministic predicates for call shape, ordering, and MVP taint flow.
+- Scar admission with bad-agent, fixed-agent, and benign-control evidence.
+- Wilson-bound statistical gating for repeated checks.
+- Offline demo, JSON output, Markdown/Rich reports, and a local event viewer.
+
+### Node Guard
+
+- Interactive setup for repository, user, or all-project scopes.
+- Claude Code hook registration for `SessionStart`, `UserPromptSubmit`,
+  `PreToolUse`, `PostToolUse`, and `Stop`.
+- Deterministic blocking of admitted mistakes before a tool runs.
+- Duplicate hook accounting protection across overlapping scopes.
+- Status-line reporting with estimated savings.
+- `doctor` diagnostics, dry-run setup, timestamped backups, and safe uninstall.
+- Selective cleanup that preserves user content and third-party hooks/status
+  lines.
+- Self-contained bundled runtime with no npm runtime dependencies.
+
+### Documentation and operations
+
+- Architecture, trust-model, integration, hook, and token-budget docs.
+- Local package smoke tests for npm and Python artifacts.
+- Release metadata consistency checks.
+- No telemetry, hosted service, MCP server, or runtime network requirement.
+
+## How it works
+
+```text
+agent run
+    │
+    ▼
+typed trace ──► cassette ──► shrinker ──► minimal causal world
+    │                                      │
+    │                                      ▼
+    └──────────────────────────────► predicate and Scar
+                                           │
+                                           ▼
+                              admission proof and CI gate
+                                           │
+                                           ▼
+                              local Guard enforcement
+```
+
+### The three Scar artifacts
+
+1. **Cassette** — the frozen external world. Replay serves only matching,
+   single-use responses; the policy still computes its next action.
+2. **Predicate** — the readable never-again rule. It describes the call shape,
+   ordering, or taint flow that identifies the failure.
+3. **Verdict** — the evidence that the rule discriminates correctly: red on the
+   vulnerable path, green on the fixed path, and nonempty benign controls.
+
+## Architecture
+
+![Grudge pipeline architecture](docs/assets/pipeline.svg)
+
+The engine is CLI-first. The recorder emits typed events, replay freezes only
+the external world, the shrinker minimizes the cassette, deterministic code
+evaluates predicates, admission proves the Scar, and the gate turns repeated
+clean runs into a decision.
+
+The local viewer consumes demo events over a local SSE server. It does not own
+pipeline state or verdict logic.
+
+For the detailed contracts, see:
+
+- [`docs/architecture.md`](docs/architecture.md)
+- [`docs/trust-model.md`](docs/trust-model.md)
+- [`docs/cassette-format.md`](docs/cassette-format.md)
+- [`docs/predicate-dsl.md`](docs/predicate-dsl.md)
+- [`docs/statistics.md`](docs/statistics.md)
+
+## Quick start
+
+### 1. Install the local Node Guard
+
+From any repository where you want local protection:
+
+```bash
 npx grudge-cli@latest setup
 npx grudge-cli@latest doctor
 ```
 
-For the complete Python offline demo, use Python 3.14.0 or another interpreter
-supported by `pyproject.toml`, then run:
+For a non-interactive Claude Code repository setup:
 
 ```bash
-pip install -e . && grudge demo
+npx grudge-cli@latest setup --yes --agents claude-code --scope repo
+npx grudge-cli@latest doctor
 ```
 
-The demo opens the local viewer and plays the five-beat story: capture the
-vulnerable run, shrink its world, synthesize a predicate, prove red-on-bad and
-green-on-fixed admission, then reintroduce the bug and block it. The demo is
-offline and deterministic: it uses checked-in fake tools, scripted policies,
-the checked-in Scar, and the fallback predicate; it does not call a provider or
-the public network. For a headless smoke run, use
-`python -m grudge demo --no-browser --fast --json`. For the two-session
-Claude-style hook proof, use `python -m grudge demo --guard --json`.
+Preview changes without writing files:
 
-## Published packages
+```bash
+npx grudge-cli@latest setup --dry-run
+```
 
-Grudge CLI `0.1.5` is published in both public package registries. It includes
-the setup-scope, uninstall-safety, Claude visibility, and duplicate-hook fixes:
+Remove only Grudge-managed content:
 
-- **npm:** [`grudge-cli`](https://www.npmjs.com/package/grudge-cli)
-- **PyPI:** [`grudge-cli`](https://pypi.org/project/grudge-cli/)
+```bash
+npx grudge-cli@latest uninstall
+```
 
-Install the Python CLI with:
+### 2. Install the Python engine
 
 ```bash
 python -m pip install grudge-cli
 grudge --help
 ```
 
-Both packages install a command named `grudge`. The Python package exposes the
-full engine (`capture`, `compile`, `shrink`, `admit`, `run`, and `demo`); the npm
-package exposes the local Node Guard (`setup`, `doctor`, `hook`, `propose`,
-`scars`, `stats`, `report`, and `statusline`).
-
-Install the Node.js setup wizard with:
+For a checkout-based development install:
 
 ```bash
-npx grudge-cli@latest setup
+python -m pip install -e .
 ```
 
-The setup wizard detects supported agent tools, lets you select agents with
-arrow keys and Space, and asks whether to configure the current repository,
-personal settings, or all projects.
+### 3. Run the offline demo
 
-When PowerShell strips DSL quotes, pass the rule on stdin instead:
-
-```powershell
-'never call shell where command ~ "GRUDGE_TEST"' | grudge propose --rule-stdin --why "harmless test rule" --preventive
+```bash
+grudge demo --no-browser --fast --json
 ```
 
-### Install the local guard
+To run the two-session Claude-style hook proof:
 
-These commands exercise the checkout's Node package from the repository root;
-they do not resolve a package from the npm registry:
+```bash
+grudge demo --guard --json
+```
+
+The demo uses checked-in fake tools and scripted policies. It does not call a
+model provider or require public-network access.
+
+## Install the packages
+
+Grudge has two complementary packages with the same user-facing command name:
+
+| Package | Install command | Main responsibility |
+|---|---|---|
+| `grudge-cli` on PyPI | `python -m pip install grudge-cli` | Full trace, replay, shrinking, admission, gates, and demo |
+| `grudge-cli` on npm | `npx grudge-cli setup` | Local Node Guard, hooks, setup, doctor, and uninstall |
+
+### Exercise the npm package from this checkout
+
+From the repository root:
 
 ```bash
 npm --prefix packages/grudge run build
@@ -78,221 +240,214 @@ npm --prefix packages/grudge run setup:repo
 npm --prefix packages/grudge run doctor:repo
 ```
 
-If `grudge` has been published, run the interactive registry setup with
-`npx grudge-cli setup` from any directory. From an unmarked directory such as
-the Desktop, Grudge defaults the scope to **All projects** so it can configure
-your user-level agent settings. Use the arrow keys to move, Space to select
-agents, and Enter to confirm the agent and scope choices. To configure only a
-repository, run the command from that repository (for example,
-`cd C:\Users\kotes\Desktop\Grudge`) and choose **This repository**. When working from `packages/grudge`, use `node dist/grudge.mjs`
-and add `--cwd ../..` when the hooks should target the repository root. The
-short package-directory commands are `npm run setup:repo` and
-`npm run doctor:repo`. Do not combine `cd packages/grudge` with the
-root-relative path `packages/grudge/dist/grudge.mjs`, or it resolves to
-`packages/grudge/packages/grudge/dist/grudge.mjs`.
+From `packages/grudge` itself:
 
-To remove Grudge-managed files, run `npx grudge-cli uninstall`. It prints a
-human-readable summary by default; add `--json` for scripting.
-
-Claude Code is the verified **Guard** tier. Codex, Gemini CLI, GitHub Copilot,
-OpenCode, and Windsurf are **Advisory** integrations; Cursor is unverified and
-the installer writes no Cursor files. See [the integration matrix](docs/integrations.md).
-Use `node packages/grudge/dist/grudge.mjs setup --dry-run` to inspect a plan and
-`node packages/grudge/dist/grudge.mjs uninstall` to remove Grudge-managed files.
-
-## What the shrink shows
-
-The headline visual is the shrink: many captured tool responses become the
-small causal world that still reproduces the failure. The repository includes
-a static visual reference for the story; the live viewer animates the same
-transition from the retained `shrink.*` events.
-
-![Shrink visual reference: a captured trace reduced to a three-entry cassette](docs/assets/shrink.svg)
-
-## Architecture
-
-The engine is CLI-first. The recorder emits a typed trace, replay freezes only
-the external world while the policy stays live, the shrinker reduces the
-cassette, deterministic predicate code checks behavior, admission proves that
-the rule discriminates, and the gate turns repeated clean runs into a CI
-decision. The local demo server adds an event stream consumed by the static
-viewer; the viewer never owns pipeline state or verdict logic.
-
-![Grudge pipeline architecture](docs/assets/pipeline.svg)
-
-```text
-agent run → trace → cassette + live policy → minimal cassette
-                                      ↓
-                         predicate → admission proof → statistical gate
-                                      ↓
-                         demo events → local SSE server → static viewer
+```bash
+npm run build
+npm run setup:repo
+npm run doctor:repo
+npm run uninstall:repo
 ```
 
-The full contracts and boundaries are in
-[`docs/architecture.md`](docs/architecture.md).
+Do not combine `cd packages/grudge` with the root-relative path
+`packages/grudge/dist/grudge.mjs`; use `node dist/grudge.mjs` from that
+directory or `node packages/grudge/dist/grudge.mjs` from the repository root.
 
-## How a failure becomes a Scar
+## Docker
 
-Each Scar contains three reviewable artifacts:
+The project is local-first and does not require Docker for normal use. Docker
+is useful for a clean Linux smoke environment or CI job.
 
-1. **Cassette — the frozen world.** An ordered set of task/tool-response
-   entries. Replay serves only cassette responses, with strict matching and
-   single-use entries, while the policy computes its next action from the
-   resulting messages. This keeps replay hermetic without replaying a
-   transcript verbatim. See [`docs/cassette-format.md`](docs/cassette-format.md)
-   and [`docs/why-not-replay.md`](docs/why-not-replay.md).
-2. **Predicate — the never-again rule.** A small readable DSL expresses call
-   shape, ordering, and MVP-lite taint flow. The parser/compiler returns exact
-   trace evidence and a deterministic `PredicateResult`; optional model
-   synthesis can draft text, but deterministic code decides. See
-   [`docs/predicate-dsl.md`](docs/predicate-dsl.md).
-3. **Verdict — proof and gate evidence.** Admission requires witnessed red
-   bad-agent runs, clean successful fixed-agent runs, nonempty benign controls,
-   and fail-closed replay/checker behavior. The statistical gate repeats an
-   admitted Scar and passes only when its Wilson lower bound reaches the
-   threshold. Offline repetitions demonstrate repeatability, not independent
-   statistical samples. See [`docs/statistics.md`](docs/statistics.md) and
-   [`docs/architecture.md`](docs/architecture.md#admission-rules).
+Example development container:
+
+```dockerfile
+FROM python:3.14-slim
+
+WORKDIR /workspace
+COPY . .
+
+RUN python -m pip install --upgrade pip \
+    && python -m pip install -e .
+
+CMD ["python", "-m", "grudge", "demo", "--no-browser", "--fast", "--json"]
+```
+
+Build and run it from the repository root:
+
+```bash
+docker run --rm grudge-demo
+```
+
+The Docker path is intended for headless Python validation. The Node Guard
+requires access to the agent configuration files it is installing into, so use
+the host environment when testing Claude Code hook behavior.
 
 ## CLI reference
 
-Run `grudge --help` or append `--help` to any command. Every implemented
-command accepts `--json` for one machine-readable document on stdout and
-`--debug` for a traceback on stderr. Expected input/engine failures use exit
-code `2`; a gate passes with `0` and is blocked with `1`.
-
-### Capture
+Run `grudge --help` or append `--help` to any command. Implemented Python
+commands include:
 
 ```text
-grudge capture AGENT_MODULE --out PATH [--json] [--debug]
-```
-
-Calls the module's `run_agent` or `run` entry point and writes canonical JSONL
-trace output.
-
-### Shrink
-
-```text
+grudge capture AGENT_MODULE --out PATH
 grudge shrink TRACE --failure RULE --out PATH
-    [--agent AGENT_MODULE] [--json] [--debug]
-```
-
-Reduces a trace-derived cassette while retaining the supplied DSL rule.
-`--failure demo` selects the checked-in hand-verified demo rule;
-`--agent` defaults to `examples.leaky_agent.agent`.
-
-### Admit
-
-```text
 grudge admit CASSETTE --bad AGENT_MODULE --good AGENT_MODULE --out PATH
-    [--id TEXT] [--predicate RULE|demo] [--controls PATH] [--runs INT]
-    [--json] [--debug]
-```
-
-Builds a candidate Scar and admits it only after repeated red/green proof and
-benign controls. `--controls` defaults to
-`examples/leaky_agent/controls`; `--runs` defaults to `3`; `--predicate demo`
-uses the fallback rule.
-
-### Run the gate
-
-```text
 grudge run --scars PATH --agent AGENT_MODULE
-    [--runs INT] [--threshold FLOAT] [--json] [--debug]
+grudge demo [--guard] [--no-browser] [--fast] [--json]
+grudge scars list [--scars PATH]
+grudge scars show SCAR [--scars PATH]
 ```
 
-Runs one Scar file or every `*.scar.json` in a directory. Defaults come from
-`grudge.config` (`20` runs and threshold `0.80`). The report labels the normal
-path `offline/deterministic`.
-
-### Demo and viewer
+The Node Guard runtime provides:
 
 ```text
-grudge demo [--live] [--guard] [--port INT] [--no-browser] [--runs INT] [--fast]
-    [--json] [--debug]
-grudge viewer [--json] [--debug]
+grudge setup [--yes] [--dry-run] [--scope repo|global|all] [--agents LIST]
+grudge doctor
+grudge uninstall [--json]
+grudge hook SessionStart|UserPromptSubmit|PreToolUse|PostToolUse|Stop
+grudge propose --rule RULE --why EXPLANATION [--preventive]
+grudge accept SCAR_ID
+grudge scars list|show
+grudge stats
+grudge report
+grudge statusline
 ```
 
-`demo` defaults to the local viewer server on port `8765`; `--no-browser`
-prints the URL instead. `--fast` removes presenter pacing. `--live` is a
-reserved future provider mode and currently reports an error. `viewer` remains
-an explicit roadmap stub; the supported viewer path is `grudge demo`.
-`grudge demo --guard --json` runs the offline two-session proof: it captures a
-real Claude-style hook payload, proposes and accepts the rule, then blocks the
-same data-flow attempt at PreToolUse. The proof uses no network or model call.
+Expected input and engine failures use exit code `2`. A passing gate returns
+`0`; a blocked gate returns `1`.
 
-### Browse Scars
+## Integrations
+
+| Integration | Tier | Notes |
+|---|---|---|
+| Claude Code | **Guard** | Verified hook enforcement and scope-aware `CLAUDE.md` instructions |
+| Codex | Advisory | Instruction-file integration; enforcement is not guaranteed |
+| Gemini CLI | Advisory | Instruction-file integration; enforcement is not guaranteed |
+| GitHub Copilot | Advisory | Instruction-file integration; enforcement is not guaranteed |
+| OpenCode | Advisory | Instruction-file integration; enforcement is not guaranteed |
+| Windsurf | Advisory | Instruction-file integration; enforcement is not guaranteed |
+| Cursor | Unverified | The installer writes no Cursor files |
+
+See the full [integration matrix](docs/integrations.md) and
+[hook contract](docs/hooks.md).
+
+## Project structure
 
 ```text
-grudge scars list [--scars PATH] [--json] [--debug]
-grudge scars show SCAR [--scars PATH] [--json] [--debug]
-grudge scars retire SCAR [--json] [--debug]
+grudge/
+├── grudge/                 # Python engine
+├── examples/               # Vulnerable and fixed demo agents
+├── packages/grudge/        # Node Guard package and bundled runtime
+├── tests/                  # Python tests
+├── packages/grudge/test/   # Node tests
+├── docs/                   # Architecture, contracts, and guides
+├── scripts/                # Documentation and release checks
+├── pyproject.toml          # Python package metadata
+├── Makefile                # Reproducible development commands
+└── CHANGELOG.md            # Release history
 ```
 
-`list` and `show` are implemented. `retire` is reserved for the future
-registry and returns an explicit roadmap error.
+## Configuration and data
 
-For a shell pipeline and JSON/error examples, see
-[`docs/demo-guide.md`](docs/demo-guide.md).
+Grudge stores local runtime state in `.grudge/` when the Node Guard is enabled.
+This includes compiled rules, pending proposals, scars, session events, stats,
+and timestamped setup backups.
 
-## Status
+The installer may update:
 
-| Area | MVP status | STRETCH status |
-|---|---|---|
-| Typed trace, cassette, predicate, and Scar schemas | Implemented and persisted | — |
-| Recording and redaction | Recorder, decorator, raw SDK boundary, and configurable redaction implemented | MCP and LangGraph adapters are stubs |
-| Replay and shrinking | Hermetic cassette replay, ddmin, content reducers, and deterministic history implemented | Fault locator is a stub |
-| Predicates | Call shape, ordering, and MVP-lite taint flow implemented; outcome AST parses | Outcome checker is a stub |
-| Admission and statistics | Red/green proof, controls, Wilson gate, Rich/Markdown reports implemented | Changed-Scar selector is a stub |
-| CLI and demo | Capture, shrink, admit, run, demo, Guard proof, and Scar list/show implemented | `viewer` and `scars retire` commands are explicit stubs |
-| Static viewer | CDN-free event-driven dashboard with replay, pause, reconnect, and evidence panels implemented | Full Scar browser/registry integration remains a stub/minimal boundary |
-| Ecosystem integrations | Local/offline path needs no external service | SQLite registry, fuzzer, locator, pytest/GitHub integrations, and workflow are deferred |
+- `.claude/settings.json` or `.claude/settings.local.json`;
+- scope-matching `CLAUDE.md` instruction files;
+- `.gitignore` entries for local Grudge state.
 
-### Guard tiers and token budgets
+Setup is designed to preserve unrelated user content and third-party hooks or
+status lines. Inspect a plan first with `--dry-run`; use `doctor` after setup.
 
-| Tier | Agents | Meaning |
-|---|---|---|
-| **Guard** | Claude Code (verified) | Hooks enforce expressible scars before a tool runs. |
-| **Advisory** | Agents that read instruction files | The model receives the rule; compliance is not guaranteed. |
-| **CI only** | Other agents | Check scars afterward with `grudge run` in CI. |
+## Testing
 
-Injected output is bounded: SessionStart 1,200 characters and 8 scars, block
-reason 400 characters, prompt nudge 200 characters, and the managed block 1,000
-characters across at most 12 lines. Token savings are always labeled **est.**
-
-The complete stub/design register is [`docs/roadmap.md`](docs/roadmap.md).
-
-## Benchmark status
-
-The row below is a measured offline CLI run on WSL Ubuntu-D with Python 3.11.17
-using the checked-in vulnerable agent and the command path documented in
-`docs/demo-guide.md`. Wall time includes capture and shrink; cassette bytes are
-the pretty-printed JSON artifact written by `grudge shrink --json`. Repeat on a
-different machine before comparing timings; do not infer measurements from the
-demo narration.
-
-| Workload | Original steps | Minimal steps / entries | Oracle calls | Wall time | Cassette bytes |
-|---|---:|---:|---:|---:|---:|
-| Demo leak (offline, deterministic; WSL Ubuntu-D / Python 3.11.17) | 71 | 23 | 1,254 | 46.357 s | 3,756 |
-
-The implementation already reports shrink statistics (`original_entries`,
-`minimal_entries`, `oracle_calls`, and byte sizes) in `grudge shrink --json`,
-which is the source for the measured row above. The deterministic input helper
-can generate a configurable trace for stress tests and future benchmark runs:
+Run the primary checks from the repository root:
 
 ```bash
-python scripts/generate_trace.py --steps 40 --output artifacts/phase12/trace.jsonl
+npm test --prefix packages/grudge
+python -m pytest -q
+ruff check scripts tests
+mypy grudge scripts
+python -m scripts.docs_check
+python -m scripts.release_check
+git diff --check
 ```
 
-It does not time shrinking or aggregate measurements automatically; benchmark
-rows must be captured from a clean run and recorded with their environment.
+Build package artifacts without publishing:
 
-## Checks and reproducibility
+```bash
+npm pack --prefix packages/grudge
+python -m build --outdir release-dist
+python -m twine check release-dist/*
+```
 
-The default supported runtime is Python 3.14.0, recorded in `.python-version`.
-The package supports Python 3.11 through 3.14, and the lockfile is
-`requirements.lock`. The project Makefile keeps dependencies in a local virtual
-environment:
+The repository's focused checks are the recommended release gate. Broad lint
+and type commands may inspect example/test modules outside the configured
+package scope; resolve those findings before treating a release as clean.
+
+## Troubleshooting
+
+### npm warns about `allow-scripts`
+
+You may see:
+
+```text
+npm warn Unknown env config "allow-scripts".
+npm warn Unknown user config "allow-scripts".
+```
+
+These are npm configuration warnings from the local environment, not Grudge
+runtime failures. If the setting is obsolete in your environment, inspect it
+with `npm config get allow-scripts` and remove it with `npm config delete
+allow-scripts`.
+
+### Version bump tests still expect the previous version
+
+When moving from `0.1.5` to `0.1.6`, update all version surfaces together:
+
+- `packages/grudge/package.json`;
+- `packages/grudge/package-lock.json`;
+- `packages/grudge/src/version.js`;
+- `pyproject.toml`;
+- release headings and documentation;
+- version assertions in `packages/grudge/test/`;
+- release-check expectations.
+
+The bundled-runtime test and CLI version test intentionally catch stale
+version references. A failure that still expects `0.1.5` means the version
+bump is incomplete; do not weaken the test.
+
+### PowerShell strips rule quotes
+
+Pass the DSL through stdin:
+
+```powershell
+'never call shell where command ~ "GRUDGE_TEST"' |
+  grudge propose --rule-stdin --why "harmless test rule" --preventive
+```
+
+### Setup changes the wrong scope
+
+Use explicit scope flags:
+
+```bash
+npx grudge-cli setup --yes --agents claude-code --scope repo
+npx grudge-cli setup --yes --agents claude-code --scope global
+```
+
+Then run `grudge doctor` and inspect the reported settings and instruction
+files.
+
+### A third-party status line already exists
+
+Grudge preserves an existing third-party status line and reports a warning. It
+does not silently replace another tool's status-line configuration.
+
+## Development
+
+Create a virtual environment and install the locked development dependencies:
 
 ```bash
 make install
@@ -300,51 +455,81 @@ make test
 make lint
 make typecheck
 make docs-check
-make all
+make release-check
 ```
 
-### Clean Linux commands
+The Node package has no runtime npm dependencies. The Python package declares
+its runtime dependencies in `pyproject.toml`; development tools are available
+through the `dev` optional dependency.
 
-From a fresh checkout, the shortest reproducible workflow is:
+### Useful development commands
 
 ```bash
-git clone https://github.com/harshithKumar12/Grudge.git
-cd Grudge
-# Debian/Ubuntu only, if Python reports that ensurepip is unavailable:
-# sudo apt-get install python3.14-venv
-python3.14 --version
-make PYTHON=python3.14 install
-make test
-make demo
+python -m grudge demo --no-browser --fast --json
+python -m grudge demo --guard --json
+npm --prefix packages/grudge run build
+npm --prefix packages/grudge run doctor:repo
 ```
 
-The host prerequisites are Python 3.14 with its `venv` module and GNU Make.
-Node.js 18+ is optional for the JavaScript package tests; the Python tests and
-demo do not require Node.js.
+## Release checklist
 
-`make test` runs the Python suite and the Node package suite when Node.js 18+
-is installed; it remains usable on a Python-only machine. The headless proof
-is useful in CI:
+Before publishing a new version:
+
+1. Update the npm and Python version metadata.
+2. Update `CHANGELOG.md`, README release status, and package docs.
+3. Run Node tests, Python tests, lint, mypy, docs, and release checks.
+4. Build the npm tarball and Python sdist/wheel locally.
+5. Run `twine check` and inspect `npm pack --dry-run --json`.
+6. Commit and tag the release.
+7. Push the tag to GitHub.
+8. Publish npm and PyPI only after the local artifacts and checks are clean.
+
+Publishing is intentionally not performed by ordinary development commands.
+Keep registry tokens and credentials outside the repository.
+
+## Security and privacy
+
+- Grudge is local-first and does not require telemetry.
+- Captured content is redacted before it is persisted where configured.
+- Runtime hook failures are designed to fail open with a visible warning rather
+  than silently blocking the host agent.
+- Review `.grudge/` and backup contents before sharing a workspace.
+- Never commit API keys, tokens, private keys, personal settings, or captured
+  sensitive data.
+
+Read the [trust model](docs/trust-model.md) before enabling capture in a
+production repository.
+
+## Roadmap
+
+The current MVP intentionally leaves several deeper integrations explicit:
+
+- persistent Scar registry and retirement workflow;
+- changed-Scar selection;
+- fault localization and richer outcome predicates;
+- fuzzer and additional recorder adapters;
+- pytest and GitHub workflow integrations;
+- MCP and LangGraph adapters;
+- full viewer-backed Scar browser.
+
+See [`docs/roadmap.md`](docs/roadmap.md) for the maintained roadmap.
+
+## Contributing
+
+Small, focused changes are preferred. Before opening a pull request:
 
 ```bash
-.venv/bin/python -m grudge demo --guard --json
+python -m pytest -q
+npm test --prefix packages/grudge
+python -m scripts.docs_check
+git diff --check
 ```
 
-The offline path needs no API keys or real personal data. Copy `.env.example`
-only when experimenting with the optional provider boundary; never commit a
-key. Docker remains an optional reproducibility path:
+Please include the behavior you changed, the checks you ran, and any platform
+limitations that remain. Do not remove tests to make a check pass.
 
-```bash
-docker build -t grudge:latest .
-docker run --rm grudge:latest
-```
+## License
 
-## Repository guide
+Grudge is released under the [MIT License](LICENSE).
 
-- [Architecture](docs/architecture.md) — contracts and pipeline boundaries.
-- [Documentation index](docs/INDEX.md) — every documentation file and owner phase.
-- [Roadmap](docs/roadmap.md) — every deferred stub and its design notes.
-- [Demo guide](docs/demo-guide.md) — presenter, server, JSON, and shell operation.
-- [Walkthrough test](TEST.md) — scratch-directory Guard walkthrough and release checks.
-- [Pitch artifacts](pitch/one_liner.md) — one-liner, 90-second script, and slides.
-- [Progress tracker](Progress.md) — canonical phase status.
+Copyright © 2026 Grudge contributors.
