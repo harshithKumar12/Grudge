@@ -3,8 +3,8 @@ import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { join, resolve } from "node:path";
 import { homedir } from "node:os";
-import { parseJson } from "../installer/json-merge.js";
-import { managedBlock } from "../installer/managed-block.js";
+import { grudgeHookEvents, isGrudgeStatusLine, parseJson } from "../installer/json-merge.js";
+import { hasManagedBlock, managedBlock } from "../installer/managed-block.js";
 import { measureOutputs as measureBudgetOutputs } from "../core/budget.js";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -13,6 +13,7 @@ const execFileAsync = promisify(execFile);
 
 const FALLBACK_CAPS = Object.freeze({ sessionStartChars: 1200, blockReasonChars: 400, promptNudgeChars: 200, agentsBlockChars: 1000, agentsBlockLines: 12 });
 const PROMPT_NUDGE = "If this is a repeatable mistake, record it once: node .grudge/bin/grudge.mjs propose --rule '<rule>' --why '<one sentence>'";
+const EXPECTED_HOOKS = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop"];
 
 /** Inspect an installed repository without changing it. */
 export async function doctor(options = {}) {
@@ -42,6 +43,11 @@ export async function doctor(options = {}) {
   let hooksPresent = false;
   let projectHookCount = 0;
   let userHookCount = 0;
+  let projectEvents = new Set();
+  let userEvents = new Set();
+  let sameScopeDuplicates = false;
+  let grudgeStatusLine = false;
+  const statusLineConflicts = [];
   const settingsPaths = [
     { path: join(root, ".claude/settings.json"), scope: "project" },
     { path: join(root, ".claude/settings.local.json"), scope: "project" },
@@ -53,8 +59,20 @@ export async function doctor(options = {}) {
     try {
       const settings = parseJson(text, path);
       const count = countGrudgeHooks(settings.hooks);
+      const events = grudgeHookEvents(settings);
       hooksPresent ||= count > 0;
-      if (scope === "user") userHookCount += count; else projectHookCount += count;
+      if (scope === "user") {
+        userHookCount += count;
+        projectOrUserEvents(userEvents, events);
+      } else {
+        projectHookCount += count;
+        projectOrUserEvents(projectEvents, events);
+      }
+      if (count > events.size) sameScopeDuplicates = true;
+      if (settings.statusLine) {
+        if (isGrudgeStatusLine(settings.statusLine)) grudgeStatusLine = true;
+        else statusLineConflicts.push(path);
+      }
       checks.push({ name: `settings ${path}`, ok: true, detail: "parse OK" });
     } catch (error) { checks.push({ name: `settings ${path}`, ok: false, detail: error.message }); }
   }
@@ -64,6 +82,27 @@ export async function doctor(options = {}) {
     warnings.push("Grudge hooks are installed at both user and project scope; duplicate invocations are deduplicated by session and event.");
     checks.push({ name: "hook scopes", ok: true, warning: true, detail: warnings[0] });
   } else checks.push({ name: "hook scopes", ok: true, detail: "no duplicate user/project Grudge hook scopes detected" });
+  if (sameScopeDuplicates) {
+    warnings.push("duplicate Grudge hook entries exist in one settings file; rerun setup to make the file idempotent, then uninstall only if you intend to remove Grudge.");
+    checks.push({ name: "same-scope hooks", ok: true, warning: true, detail: warnings.at(-1) });
+  } else checks.push({ name: "same-scope hooks", ok: true, detail: "no duplicate Grudge hook entries detected" });
+  if ((config?.adapters ?? []).includes("claude-code")) {
+    const events = new Set([...projectEvents, ...userEvents]);
+    const missing = EXPECTED_HOOKS.filter((event) => !events.has(event));
+    checks.push({ name: "hook completeness", ok: missing.length === 0, detail: missing.length ? `missing ${missing.join(", ")}; run grudge setup --agents claude-code` : "all expected Claude Code events are registered" });
+    if (projectEvents.size && !hasManagedBlock(await readOptional(join(root, "CLAUDE.md")))) {
+      warnings.push("project hooks are installed but the managed block is missing from CLAUDE.md; run grudge setup --scope repo --agents claude-code");
+      checks.push({ name: "project instructions", ok: true, warning: true, detail: warnings.at(-1) });
+    }
+    if (userEvents.size && !hasManagedBlock(await readOptional(join(home, ".claude/CLAUDE.md")))) {
+      warnings.push("user hooks are installed but the managed block is missing from ~/.claude/CLAUDE.md; run grudge setup --scope global --agents claude-code --yes");
+      checks.push({ name: "user instructions", ok: true, warning: true, detail: warnings.at(-1) });
+    }
+    if (statusLineConflicts.length) {
+      warnings.push(`existing status line preserved in ${statusLineConflicts.join(", ")}; Grudge statusline was not installed there`);
+      checks.push({ name: "status line", ok: true, warning: true, detail: warnings.at(-1) });
+    } else checks.push({ name: "status line", ok: grudgeStatusLine, detail: grudgeStatusLine ? "Grudge statusline registered" : "not registered; run setup or choose a compatible status-line owner" });
+  }
   const compiled = await readJson(join(root, ".grudge/compiled.json"));
   checks.push({ name: "compiled.json", ok: compiled === null || (compiled.version === 1 && Array.isArray(compiled.rules)), detail: compiled === null ? "not present" : "valid" });
   const gitignore = await readOptional(join(root, ".gitignore"));
@@ -131,4 +170,8 @@ function countGrudgeHooks(value) {
   };
   visit(value);
   return count;
+}
+
+function projectOrUserEvents(target, events) {
+  for (const event of events) target.add(event);
 }

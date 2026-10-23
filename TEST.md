@@ -25,7 +25,7 @@ You need this if Claude Code shows a **SessionStart hook error** mentioning `.gr
    npx grudge-cli@latest uninstall
    ```
 2. Check what is left. Open `%USERPROFILE%\.claude\settings.json` and delete any hook or `statusLine` entry whose command contains `.grudge`. Save the file.
-3. Open `%USERPROFILE%\AGENTS.md` and delete the block between `<!-- grudge:begin` and `<!-- grudge:end -->` if it is there.
+3. Open `%USERPROFILE%\.claude\CLAUDE.md` and delete the block between `<!-- grudge:begin` and `<!-- grudge:end -->` if it is there.
 4. Remove the leftover folder:
    ```powershell
    Remove-Item -Recurse -Force $HOME\.grudge
@@ -58,17 +58,17 @@ git init
 ## Step 2: Install Grudge (pinned, so you do not get a cached old version)
 
 ```powershell
-npx grudge-cli@0.1.2 setup
+npx grudge-cli@0.1.5 setup
 ```
 
 What you should see: a list of agents with **arrow keys to move, Space to toggle, Enter to confirm**, then a question about where to install (choose **this repository**).
 
 Pick **Claude Code** only for this test.
 
-**Check the version** printed during setup. It should be `0.1.2`. If the
+**Check the version** printed during setup. It should be `0.1.5`. If the
 version is older, clear the npx cache or install the intended version again.
-For this unreleased checkout, build the package and install the generated
-`grudge-cli-0.1.2.tgz` into the scratch project; do not substitute the
+For a local unreleased checkout, build the package and install the generated
+`grudge-cli-0.1.5.tgz` into the scratch project; do not substitute the
 repository's `packages/grudge/dist` path for the published package flow.
 
 ---
@@ -191,9 +191,9 @@ Pass: at least one **block** is counted. Token figures are always labeled **est.
 
 ---
 
-## Step 9: The end-of-turn savings line (after the stats update ships)
+## Step 9: The end-of-turn savings line
 
-Once the savings report feature is released, repeat Step 7 and look right after Claude answers. You should see one short line like:
+Repeat Step 7 and look right after Claude answers. You should see one short line like:
 
 ```
 Grudge: 1 mistake caught, 1 blocked. ~1.5k tokens saved (est.), ~1.2k net of what Grudge injected.
@@ -233,9 +233,9 @@ python -m grudge demo
 
 From `grudge-test`:
 ```powershell
-npx grudge-cli@0.1.2 uninstall
+npx grudge-cli@0.1.5 uninstall
 ```
-Then check `.claude\settings.json` has no `.grudge` entries and delete the `.grudge` folder if it is still there.
+Then check `.claude\settings.json` has no `.grudge` entries and that the managed block is gone from `CLAUDE.md`. Uninstall removes only Grudge-managed content; do not manually delete a file containing user content.
 
 ---
 
@@ -243,8 +243,8 @@ Then check `.claude\settings.json` has no `.grudge` entries and delete the `.gru
 
 | What you see | What it means |
 |---|---|
-| `Cannot find module ... commands\index.js` | The installed script is the old unbundled one. Update to the latest version and run setup again. |
-| Setup prints a wall of JSON | You are on an old version. The newer one prints a short summary. |
+| `Cannot find module ... commands\index.js` | The installed script is the old unbundled one. Update to `0.1.5` or later and run setup again. |
+| Setup prints a wall of JSON | You are on an old version. `0.1.5` prints a short summary. |
 | You chose scope "local" but the result says "repo" | Old scope bug. Update and retry. |
 | `doctor` is green but Claude runs the blocked command | Settings file not loaded. Restart Claude Code and check `/hooks`. |
 | Quote errors in `propose` on PowerShell | Use Git Bash or WSL for that one command, or the stdin option if your version has it. |

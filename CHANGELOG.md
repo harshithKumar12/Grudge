@@ -11,6 +11,10 @@
 - Make `npx grudge-cli setup` work from any directory.
 - Default setup from an unmarked directory to the **All projects** scope while keeping repository setup as the default inside marked projects.
 
+## 0.1.3 - 2026-10-22
+
+- Prepared the cross-registry release metadata and bundled runtime after the 0.1.2 hardening work.
+
 ## 0.1.2 - 2026-10-22
 
 - Harden the Node guard installer and runtime validation for the Phase 22-24 release walkthrough.

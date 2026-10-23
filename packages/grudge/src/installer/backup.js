@@ -2,6 +2,7 @@
 import { copyFile, mkdir, readFile, writeFile, access, rm, unlink } from "node:fs/promises";
 import { join, relative, dirname, isAbsolute } from "node:path";
 import { hasManagedBlock, removeManagedBlock } from "./managed-block.js";
+import { parseJson, stripGrudgeSettings } from "./json-merge.js";
 
 export async function backup(root, file, { timestamp = new Date().toISOString().replace(/[:.]/g, "-") } = {}) {
   const absolute = file;
@@ -53,11 +54,14 @@ export async function restoreBackup(root, timestamp, { remove = false } = {}) {
   const manifest = await readBackupManifest(root, timestamp);
   const results = [];
   for (const entry of manifest.entries) {
-    if (entry.existed) {
+    const managed = await cleanManagedFile(entry);
+    if (managed) {
+      results.push(managed);
+    } else if (entry.existed && !isManagedPath(entry.file)) {
       await mkdir(dirname(entry.file), { recursive: true });
       await copyFile(entry.backup, entry.file);
       results.push({ file: entry.file, action: "restored" });
-    } else {
+    } else if (!entry.existed && !isManagedPath(entry.file)) {
       const result = await removeCreatedManagedFile(entry.file);
       if (result) results.push(result);
     }
@@ -83,4 +87,79 @@ async function removeCreatedManagedFile(file) {
   }
   await unlink(file);
   return { file, action: "removed" };
+}
+
+async function cleanManagedFile(entry) {
+  if (isSettingsPath(entry.file)) return cleanSettingsFile(entry.file, entry.existed);
+  if (entry.file.endsWith(".gitignore")) return cleanGitignore(entry.file, entry.existed);
+  if (!isManagedTextPath(entry.file)) return null;
+  const current = await readOptional(entry.file);
+  if (current === null || !hasManagedBlock(current)) return null;
+  const clean = await restoreOriginalSeparator(entry, removeManagedBlock(current));
+  if (clean.trim() || entry.existed) {
+    await writeFile(entry.file, clean, "utf8");
+    return { file: entry.file, action: "cleaned" };
+  }
+  await unlink(entry.file);
+  return { file: entry.file, action: "removed" };
+}
+
+async function restoreOriginalSeparator(entry, clean) {
+  if (!entry.existed || !entry.backup) return clean;
+  const original = await readOptional(entry.backup);
+  return original !== null && clean === `${original}\n` ? original : clean;
+}
+
+async function cleanSettingsFile(file, existed) {
+  const current = await readOptional(file);
+  if (current === null) return null;
+  let parsed;
+  try { parsed = parseJson(current, file); } catch { return null; }
+  const cleaned = stripGrudgeSettings(parsed);
+  if (!cleaned.changed) return null;
+  if (!existed && !Object.keys(cleaned.value).length) {
+    await unlink(file);
+    return { file, action: "removed" };
+  }
+  await writeFile(file, `${JSON.stringify(cleaned.value, null, detectIndent(current))}\n`, "utf8");
+  return { file, action: "cleaned" };
+}
+
+async function cleanGitignore(file, existed) {
+  const current = await readOptional(file);
+  if (current === null) return null;
+  const managed = new Set([".grudge/session/", ".grudge/stats.json", ".grudge/*.log"]);
+  const lines = current.split(/\r?\n/);
+  const cleaned = lines.filter((line) => !managed.has(line)).join("\n");
+  if (cleaned === current) return null;
+  if (!existed && !cleaned.trim()) {
+    await unlink(file);
+    return { file, action: "removed" };
+  }
+  await writeFile(file, cleaned, "utf8");
+  return { file, action: "cleaned" };
+}
+
+async function readOptional(file) {
+  try { return await readFile(file, "utf8"); } catch (error) {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
+function isSettingsPath(file) {
+  return /[\\/]\.claude[\\/]settings(?:\.local)?\.json$/.test(file);
+}
+
+function isManagedTextPath(file) {
+  return /(?:^|[\\/])(?:AGENTS\.md|CLAUDE\.md|GEMINI\.md|\.windsurfrules|copilot-instructions\.md)$/.test(file);
+}
+
+function isManagedPath(file) {
+  return isSettingsPath(file) || file.endsWith(".gitignore") || isManagedTextPath(file);
+}
+
+function detectIndent(text) {
+  const match = String(text).match(/\n([ \t]+)"/);
+  return match ? match[1] : 2;
 }

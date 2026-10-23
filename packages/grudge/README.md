@@ -32,7 +32,7 @@ repository checkout. Uninstall prints a readable summary by default; pass
 
 Claude Code is the verified **Guard** adapter. Codex, Gemini CLI, GitHub
 Copilot, OpenCode, and Windsurf are **Advisory** instruction integrations;
-Cursor is currently unverified and writes nothing. See
-[`docs/integrations.md`](../../docs/integrations.md).
+Cursor is currently unverified and writes nothing. See the
+[integration matrix](https://github.com/harshithKumar12/Grudge/blob/master/docs/integrations.md).
 
 The runtime requires Node.js 18+ and has no npm runtime dependencies.

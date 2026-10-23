@@ -22,6 +22,9 @@ export function upsertManagedBlock(text = "", block = INSTRUCTION_BLOCK) {
   const source = String(text);
   const start = source.indexOf(MANAGED_BEGIN);
   const end = source.indexOf(MANAGED_END, start + MANAGED_BEGIN.length);
+  const begins = count(source, MANAGED_BEGIN);
+  const ends = count(source, MANAGED_END);
+  if (begins !== ends) throw new Error("cannot safely update malformed Grudge markers");
   if (start >= 0 && end >= 0) {
     const replaced = `${source.slice(0, start)}${block.trim()}${source.slice(end + MANAGED_END.length)}`;
     return ensureTrailingNewline(replaced);
@@ -33,10 +36,14 @@ export function upsertManagedBlock(text = "", block = INSTRUCTION_BLOCK) {
 /** Remove only the bytes between the managed markers. */
 export function removeManagedBlock(text = "") {
   const source = String(text);
-  const start = source.indexOf(MANAGED_BEGIN);
-  const end = source.indexOf(MANAGED_END, start + MANAGED_BEGIN.length);
-  if (start < 0 || end < 0) return source;
-  return `${source.slice(0, start)}${source.slice(end + MANAGED_END.length)}`;
+  if (count(source, MANAGED_BEGIN) !== count(source, MANAGED_END)) return source;
+  let clean = source;
+  while (true) {
+    const start = clean.indexOf(MANAGED_BEGIN);
+    const end = clean.indexOf(MANAGED_END, start + MANAGED_BEGIN.length);
+    if (start < 0 || end < 0) return clean;
+    clean = `${clean.slice(0, start)}${clean.slice(end + MANAGED_END.length)}`;
+  }
 }
 
 export function hasManagedBlock(text = "") {
@@ -45,4 +52,8 @@ export function hasManagedBlock(text = "") {
 
 function ensureTrailingNewline(text) {
   return text.endsWith("\n") ? text : `${text}\n`;
+}
+
+function count(source, marker) {
+  return source.split(marker).length - 1;
 }

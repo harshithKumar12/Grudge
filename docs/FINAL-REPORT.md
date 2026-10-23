@@ -1,12 +1,20 @@
-# Final report: Grudge Phases 14-24
+# Final report: Grudge Phases 14-24 and current release audit
 
 **Purpose:** Record final parallel-mode evidence, limitations, and release commands.
 **Audience:** Project owner, reviewers, and release operator.
-**Status:** final
-**Last updated (phase):** 24
+**Status:** historical baseline plus current release note
+**Last updated (phase):** 0.1.5 · 2026-10-23
 
 **Mode:** PARALLEL after Phase 14; three dedicated worktrees, merges A → B → C.
 **Phase board:** 0-12 `[x]`, 13 deferred `[ ]`, 14-24 `[x]`; Phase 24 walkthrough and release-preparation exit passed.
+
+## Current release audit — 2026-10-23
+
+- Local metadata and registry queries report `grudge-cli@0.1.5` on npm and `grudge-cli==0.1.5` on PyPI.
+- Commit `b21be5a` contains the current pre-production fixes: uninstall safety, Claude `CLAUDE.md` visibility, duplicate-hook diagnostics/deduplication, and version `0.1.5` metadata.
+- The current Node suite passes 55 tests; the current Python suite passes with one skip; configured Ruff, mypy, docs, and package checks pass.
+- Broad Ruff and mypy remain blocked by known pre-existing example formatting and duplicate-module discovery issues.
+- The current audit still requires a clean third-party status-line coexistence proof, a full packed-artifact end-to-end install record, and non-Windows platform evidence before claiming universal production readiness.
 
 ## Definition of Done evidence
 
@@ -36,9 +44,9 @@
 - Hook timing: p50/p95 **1.80/4.86 ms**; warm statusline p50/p95 **0.01/0.03 ms**. Results are environment measurements, not universal guarantees.
 - Python remains the full-engine source of truth; Node implements call-shape, ordering, and taint-lite runtime semantics.
 - Phase 13 stretch work remains deferred. JSON Schema validation used structural contract tests because the optional `jsonschema` package was unavailable in the pinned environment.
-- Adapter documentation was checked on **2026-10-19**. npm `grudge-cli@0.1.1`, PyPI `grudge-cli==0.1.1`, and GitHub release `v0.1.1` are published. Version `0.1.2` is prepared but intentionally not published in this task.
+- The historical Phase 24 adapter documentation was checked on **2026-10-19**. The current 0.1.5 audit rechecked the Claude Code documentation on **2026-10-23** and queried npm/PyPI directly; both registries report 0.1.5 as latest.
 
-## Release commands for 0.1.2 (not run)
+## Historical release commands for 0.1.2 (archived; not run in Phase 24)
 
 ```bash
 git push origin master

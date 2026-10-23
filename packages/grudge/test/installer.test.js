@@ -99,6 +99,19 @@ test("uninstall removes managed files and installed runtime", async () => {
   await assert.rejects(access(join(cwd, "AGENTS.md")));
 });
 
+test("setup preserves an existing third-party status line and warns", async () => {
+  const cwd = await scratch();
+  const runtime = join(cwd, "runtime.mjs");
+  await mkdir(join(cwd, ".claude"), { recursive: true });
+  await writeFile(join(cwd, ".claude/settings.json"), JSON.stringify({ statusLine: { type: "command", command: "other-tool status" }, hooks: { PreToolUse: [{ matcher: "*", hooks: [{ type: "command", command: "other-tool hook" }] }] } }));
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  const result = await setup({ cwd, home: cwd, agents: ["claude-code"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
+  const settings = JSON.parse(await readFile(join(cwd, ".claude/settings.json"), "utf8"));
+  assert.equal(settings.statusLine.command, "other-tool status");
+  assert.match(result.warnings[0], /preserved existing status line/);
+  assert.ok(settings.hooks.PreToolUse.some(({ hooks }) => hooks.some(({ command }) => command === "other-tool hook")));
+});
+
 test("uninstall preserves user content in AGENTS.md and CLAUDE.md byte-for-byte", async () => {
   const cwd = await scratch();
   const runtime = join(cwd, "runtime.mjs");
@@ -123,6 +136,46 @@ test("uninstall does not delete a created file after user content is added", asy
   assert.equal(await readFile(join(cwd, "CLAUDE.md"), "utf8"), "\n# User content\n");
 });
 
+test("uninstall preserves third-party settings added after setup", async () => {
+  const cwd = await scratch();
+  const runtime = join(cwd, "runtime.mjs");
+  await mkdir(join(cwd, ".claude"), { recursive: true });
+  await writeFile(join(cwd, ".claude/settings.json"), JSON.stringify({ statusLine: { type: "command", command: "other-tool status" } }));
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  await setup({ cwd, home: cwd, agents: ["claude-code"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
+  const settingsPath = join(cwd, ".claude/settings.json");
+  const settings = JSON.parse(await readFile(settingsPath, "utf8"));
+  settings.hooks.PostToolUse.push({ matcher: "*", hooks: [{ type: "command", command: "other-tool after-setup" }] });
+  await writeFile(settingsPath, `${JSON.stringify(settings, null, 2)}\n`);
+  await uninstall({ cwd, print: false });
+  const after = JSON.parse(await readFile(settingsPath, "utf8"));
+  assert.equal(after.statusLine.command, "other-tool status");
+  assert.ok(after.hooks.PostToolUse.some(({ hooks }) => hooks.some(({ command }) => command === "other-tool after-setup")));
+  assert.equal(JSON.stringify(after).includes("grudge.mjs"), false);
+});
+
+test("malformed managed markers fail safely and survive uninstall", async () => {
+  const cwd = await scratch();
+  const runtime = join(cwd, "runtime.mjs");
+  const malformed = "# User content\n<!-- grudge:begin v1 -->\nDo not delete this line.\n";
+  await writeFile(join(cwd, "CLAUDE.md"), malformed);
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  await assert.rejects(() => setup({ cwd, home: cwd, agents: ["claude-code"], scope: "repo", yes: true, runtimeScript: runtime, print: false }), /malformed Grudge markers/);
+  assert.equal(await readFile(join(cwd, "CLAUDE.md"), "utf8"), malformed);
+  await uninstall({ cwd, print: false });
+  assert.equal(await readFile(join(cwd, "CLAUDE.md"), "utf8"), malformed);
+});
+
+test("repeated uninstall is idempotent", async () => {
+  const cwd = await scratch();
+  const runtime = join(cwd, "runtime.mjs");
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  await setup({ cwd, home: cwd, agents: ["claude-code"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
+  await uninstall({ cwd, print: false });
+  const second = await uninstall({ cwd, print: false });
+  assert.equal(second.removed.length, 0);
+});
+
 test("doctor warns when Grudge hooks exist at user and project scope", async () => {
   const cwd = await scratch();
   const home = await scratch();
@@ -134,6 +187,20 @@ test("doctor warns when Grudge hooks exist at user and project scope", async () 
   assert.equal(result.ok, true);
   assert.equal(result.warnings.length, 1);
   assert.match(result.warnings[0], /user and project scope/);
+});
+
+test("doctor detects a partial Claude hook registration", async () => {
+  const cwd = await scratch();
+  const runtime = join(cwd, "runtime.mjs");
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  await setup({ cwd, home: cwd, agents: ["claude-code"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
+  const settingsPath = join(cwd, ".claude/settings.json");
+  const settings = JSON.parse(await readFile(settingsPath, "utf8"));
+  delete settings.hooks.Stop;
+  await writeFile(settingsPath, `${JSON.stringify(settings, null, 2)}\n`);
+  const result = await doctor({ cwd, home: cwd, print: false });
+  assert.equal(result.ok, false);
+  assert.match(result.checks.find(({ name }) => name === "hook completeness").detail, /missing Stop/);
 });
 
 test("interactive setup applies the selected scope", async () => {

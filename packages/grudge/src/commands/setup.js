@@ -6,7 +6,7 @@ import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { detect } from "../installer/detect.js";
 import { prompt } from "../installer/prompt.js";
-import { mergeJson, parseJson, mergeObjects } from "../installer/json-merge.js";
+import { mergeJson, parseJson, mergeObjects, isGrudgeStatusLine } from "../installer/json-merge.js";
 import { backup, restoreEntries, writeBackupManifest } from "../installer/backup.js";
 import { managedBlock, upsertManagedBlock } from "../installer/managed-block.js";
 import { adapter as claudeCode } from "../installer/adapters/claude-code.js";
@@ -50,9 +50,10 @@ export async function setup(options = {}) {
       : resolve(options.packageRoot ?? fileURLToPath(new URL("../..", import.meta.url)), "dist/grudge.mjs");
   const runtimeTarget = join(root, ".grudge/bin/grudge.mjs");
   const changes = [];
+  const warnings = [];
   const backupEntries = [];
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const context = { cwd, home, root, timestamp, backupEntries, changes, dryRun: Boolean(options.dryRun), applyPlan: (plan) => applyPlan(plan, { root, backupEntries, changes, timestamp, dryRun: Boolean(options.dryRun) }), removePlan: () => ({}) };
+  const context = { cwd, home, root, timestamp, backupEntries, changes, warnings, dryRun: Boolean(options.dryRun), applyPlan: (plan) => applyPlan(plan, { root, backupEntries, changes, warnings, timestamp, dryRun: Boolean(options.dryRun) }), removePlan: () => ({}) };
 
   try {
     for (const item of plans) {
@@ -64,7 +65,7 @@ export async function setup(options = {}) {
     await planGitignore(context);
     const config = await planConfig(root, runtimeTarget, selected.map((adapter) => adapter.id), context, runtimeExists, runtimeSource);
     if (!context.dryRun && runtimeExists) await smokeTest(runtimeTarget, root);
-    const result = { scope: selectedScope, cwd, root, selected: selected.map((item) => item.id), unverified, detected, dryRun: Boolean(options.dryRun), changes, config, runtimeInstalled: runtimeExists, version: VERSION };
+    const result = { scope: selectedScope, cwd, root, selected: selected.map((item) => item.id), unverified, detected, dryRun: Boolean(options.dryRun), changes, warnings: [...new Set(warnings)], config, runtimeInstalled: runtimeExists, version: VERSION };
     if (!options.dryRun && backupEntries.length) await writeBackupManifest(root, timestamp, backupEntries);
     if (options.print !== false) printSetup(result);
     return result;
@@ -82,7 +83,9 @@ async function applyPlan(plan, context) {
     if (file.kind === "claude-settings") {
       const parsed = parseJson(before ?? "{}", file.path);
       const hooks = Object.fromEntries((plan.hooks ?? []).map(({ event, command }) => [event, [{ matcher: "*", hooks: [{ type: "command", command }] }]]));
-      const addition = { hooks, statusLine: { type: "command", command: plan.statusLine } };
+      const addition = { hooks };
+      if (!parsed.statusLine || isGrudgeStatusLine(parsed.statusLine)) addition.statusLine = { type: "command", command: plan.statusLine };
+      else context.warnings.push(`preserved existing status line in ${file.path}; Grudge statusline was not installed. Run grudge statusline manually or choose a compatible status-line owner.`);
       after = `${JSON.stringify(mergeObjects(parsed, addition), null, detectIndent(before))}\n`;
     } else {
       after = upsertManagedBlock(before ?? "", managedBlock());
@@ -149,6 +152,7 @@ function detectIndent(text) {
 function printSetup(result) {
   for (const change of result.changes) process.stdout.write(`${result.dryRun ? "would change" : "changed"} ${change.path}\n`);
   for (const item of result.unverified) process.stdout.write(`unverified ${item.id}; no files written. Docs: ${item.docsUrl}\n${item.snippet}\n`);
+  for (const warning of result.warnings ?? []) process.stdout.write(`warning: ${warning}\n`);
   if (!result.runtimeInstalled) process.stdout.write("warning: dist/grudge.mjs was not found; build the package before using installed hooks.\n");
 }
 
