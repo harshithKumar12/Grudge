@@ -3,7 +3,7 @@
 **Purpose:** Explain where Grudge writes agent instructions and hooks.
 **Audience:** Developers installing the npm package.
 **Status:** final
-**Last updated (phase):** 19/21
+**Last updated (phase):** pre-production fixes · 2026-10-23
 
 `grudge setup` is local and offline. It parses before merging, backs up changed
 files under `.grudge/backups/<timestamp>/`, preserves unrelated JSON keys, and
@@ -12,7 +12,7 @@ but writes nothing. `grudge uninstall` removes only managed content.
 
 | Agent | Tier | Status | Documented target | Source checked |
 |---|---|---|---|---|
-| Claude Code | Guard | **Verified** | `.claude/settings.json`, `.claude/settings.local.json`, `~/.claude/settings.json`; `AGENTS.md` | [settings](https://code.claude.com/docs/en/settings), 2026-10-19 |
+| Claude Code | Guard | **Verified** | `.claude/settings.json`, `.claude/settings.local.json`, `~/.claude/settings.json`; `<repo>/CLAUDE.md`, `~/.claude/CLAUDE.md` | [settings](https://code.claude.com/docs/en/settings) and [memory](https://code.claude.com/docs/en/memory), 2026-10-23 |
 | Codex | Advisory | **Verified** | `AGENTS.md` or `~/.codex/AGENTS.md` | [AGENTS.md](https://developers.openai.com/codex/agent-configuration/agents-md), 2026-10-19 |
 | Gemini CLI | Advisory | **Verified** | `GEMINI.md` or `~/.gemini/GEMINI.md` | [GEMINI.md](https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/gemini-md.md), 2026-10-19 |
 | GitHub Copilot | Advisory | **Verified** | `.github/copilot-instructions.md` | [custom instructions](https://docs.github.com/en/copilot/concepts/prompting-and-context/custom-instructions), 2026-10-19 |

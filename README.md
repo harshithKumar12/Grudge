@@ -33,9 +33,8 @@ Claude-style hook proof, use `python -m grudge demo --guard --json`.
 
 ## Published packages
 
-Grudge CLI `0.1.3` is published in both public package registries. npm
-`0.1.4` contains the setup-scope fix; `0.1.5` contains the pre-production
-uninstall, Claude visibility, and duplicate-hook fixes and is not published:
+Grudge CLI `0.1.5` is published in both public package registries. It includes
+the setup-scope, uninstall-safety, Claude visibility, and duplicate-hook fixes:
 
 - **npm:** [`grudge-cli`](https://www.npmjs.com/package/grudge-cli)
 - **PyPI:** [`grudge-cli`](https://pypi.org/project/grudge-cli/)

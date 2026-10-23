@@ -3,7 +3,7 @@
 **Purpose:** Map every file currently under `docs/` and show its purpose, owner phase, and status.
 **Audience:** Contributors, reviewers, demo operators, and future implementation agents.
 **Status:** final
-**Last updated (phase):** 14
+**Last updated (phase):** 0.1.5 · 2026-10-23
 
 ## Documents
 

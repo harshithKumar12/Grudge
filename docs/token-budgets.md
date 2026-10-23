@@ -3,7 +3,7 @@
 **Purpose:** Define the bounded text surfaces and the honest savings calculation.
 **Audience:** Users and maintainers of the local Guard hooks.
 **Status:** final
-**Last updated (phase):** 23
+**Last updated (phase):** 0.1.5 · 2026-10-23
 
 ## Caps
 
@@ -12,7 +12,7 @@
 | SessionStart injection | 1,200 characters and 8 scars; each line 140 characters | `session-start` selects at most 8 rules and truncates each line and the total deterministically |
 | Block reason | 400 characters | PreToolUse truncates the plain-English reason with its scar ID and retry guidance |
 | Prompt nudge | 200 characters | UserPromptSubmit truncates the propose hint |
-| AGENTS.md block | 1,000 characters and 12 lines | `limitAgentsBlock()` applies the line cap first, then the character cap |
+| Managed instruction block | 1,000 characters and 12 lines | The installer applies the line cap first, then the character cap |
 
 `core/budget.js` exposes the caps, deterministic prefix truncation, and
 doctor-ready measurements. Measurements include characters, UTF-8 bytes,
