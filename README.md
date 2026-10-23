@@ -5,10 +5,7 @@
 # Grudge
 
 ### Deterministic regression scars for AI agents
-
-Turn one recurring agent mistake into a small, reviewable rule that can be
-replayed offline, checked in CI, and enforced before the same action happens
-again.
+every failed agent trace is automatically turned into a regression test, so your agent never makes the same mistake twice.
 
 <p>
   <a href="https://www.npmjs.com/package/grudge-cli"><img src="https://img.shields.io/npm/v/grudge-cli?logo=npm&logoColor=white" alt="npm version" /></a>
