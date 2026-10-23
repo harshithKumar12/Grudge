@@ -88,6 +88,9 @@ export async function dispatch(parsed, { stdin = readStdin } = {}) {
   if (command === "setup" || command === "init") {
     if (options.json) process.stdout.write(outputJson(result));
     else printSetupSummary(result);
+  } else if (command === "uninstall") {
+    if (options.json) process.stdout.write(outputJson(result));
+    else printUninstallSummary(result);
   } else process.stdout.write(outputJson(result));
   if (command === "propose" && result?.accepted === false) return 1;
   if (command === "doctor" && result?.ok === false) return 1;
@@ -130,6 +133,19 @@ function printSetupSummary(result) {
     `agents: ${result.selected.length ? result.selected.join(", ") : "none"}`,
     `files: ${result.changes.length} changed`,
     "next: run grudge doctor",
+  ].join("\n") + "\n");
+}
+
+function printUninstallSummary(result) {
+  const restored = result.restored.length ? result.restored.map(({ file, action }) => `  ✓ ${action} ${file}`) : ["  none"];
+  const removed = result.removed.length ? result.removed.map((path) => `  • ${path}`) : ["  none"];
+  process.stdout.write([
+    "Grudge uninstall complete",
+    `root: ${result.root}`,
+    `restored: ${result.restored.length}`,
+    ...restored,
+    `removed: ${result.removed.length}`,
+    ...removed,
   ].join("\n") + "\n");
 }
 

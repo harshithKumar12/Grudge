@@ -26,13 +26,14 @@ export async function setup(options = {}) {
   const home = resolve(options.home ?? homedir());
   const requestedScope = options.scope;
   if (requestedScope !== undefined && !["repo", "local", "global"].includes(requestedScope)) throw new Error("scope must be repo, local, or global");
-  const unsafeHome = !options.home && (cwd === home || !(await hasProjectMarker(cwd)));
-  if (unsafeHome && (options.scope !== "global" || options.yes !== true)) {
-    throw new Error("refusing setup in the home or an unmarked directory; run from a project or use --scope global --yes to confirm an all-projects install");
+  const projectMarked = await hasProjectMarker(cwd);
+  const unmarkedDirectory = cwd !== home && !projectMarked;
+  if (!options.home && cwd === home && (options.scope !== "global" || options.yes !== true)) {
+    throw new Error("refusing setup in the home directory; run from a project or use --scope global --yes to confirm an all-projects install");
   }
   const scope = requestedScope ?? "repo";
   const detected = options.detected ?? await detect({ cwd, home });
-  const choice = await prompt({ detected, agents: options.agents ?? [], scope: requestedScope, yes: Boolean(options.yes), inputStream: options.input, outputStream: options.output });
+  const choice = await prompt({ detected, agents: options.agents ?? [], scope: requestedScope, defaultScope: unmarkedDirectory ? "global" : scope, yes: Boolean(options.yes), inputStream: options.input, outputStream: options.output });
   const selectedScope = choice.scope ?? scope;
   const requested = choice.agents?.length ? choice.agents : detected.filter((item) => item.detected).map((item) => item.id);
   const selected = requested.map((id) => adapters[id]).filter(Boolean);

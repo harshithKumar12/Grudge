@@ -4,7 +4,7 @@ import { performance } from "node:perf_hooks";
 import { readJson } from "../core/store.js";
 import { loadConfig } from "../core/config.js";
 import { prune } from "../core/session.js";
-import { appendEvent } from "../core/stats.js";
+import { appendEvent, claimHookEvent } from "../core/stats.js";
 
 const MAX_LINE = 140;
 const MAX_OUTPUT = 1200;
@@ -19,6 +19,7 @@ export async function sessionStart(payload = {}) {
     await prune(join(root, ".grudge"));
     const compiled = await readJson(join(root, ".grudge", "compiled.json"), null);
     if (!compiled || !Array.isArray(compiled.rules)) return { code: 0, stdout: "", stderr: "" };
+    if ((await claimHookEvent(root, "SessionStart", payload)).duplicate) return { code: 0, stdout: "", stderr: "" };
     const lines = [];
     let total = 0;
     for (const rule of compiled.rules) {

@@ -30,13 +30,13 @@ export function upsertManagedBlock(text = "", block = INSTRUCTION_BLOCK) {
   return `${prefix}${block.trim()}\n`;
 }
 
-/** Remove only the managed block and its adjacent blank line. */
+/** Remove only the bytes between the managed markers. */
 export function removeManagedBlock(text = "") {
   const source = String(text);
   const start = source.indexOf(MANAGED_BEGIN);
   const end = source.indexOf(MANAGED_END, start + MANAGED_BEGIN.length);
-  if (start < 0 || end < 0) return ensureTrailingNewline(source.trimEnd());
-  return ensureTrailingNewline(`${source.slice(0, start)}${source.slice(end + MANAGED_END.length)}`.replace(/\n{3,}/g, "\n\n").trimEnd());
+  if (start < 0 || end < 0) return source;
+  return `${source.slice(0, start)}${source.slice(end + MANAGED_END.length)}`;
 }
 
 export function hasManagedBlock(text = "") {

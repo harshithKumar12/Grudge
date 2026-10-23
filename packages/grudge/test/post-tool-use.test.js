@@ -49,6 +49,16 @@ test("PostToolUse truncates by UTF-8 bytes and hashes the stored result", async 
   );
 });
 
+test("PostToolUse deduplicates duplicate user/project hook invocations", async () => {
+  const root = await mkdtemp(join(tmpdir(), "grudge-post-tool-duplicate-"));
+  const payload = { session_id: "duplicate-session", tool_name: "Read", tool_input: { file_path: "README.md" }, tool_response: "same" };
+  const first = await postToolUse(payload, { root });
+  const second = await postToolUse(payload, { root });
+  assert.equal(first.ok, true);
+  assert.equal(second.duplicate, true);
+  assert.equal((await read(join(root, ".grudge"), "duplicate-session")).length, 1);
+});
+
 test("PostToolUse fails open for malformed payloads and write errors", async () => {
   const missingSession = await postToolUse({ tool_name: "Read", tool_input: {} }, { root: "bad" });
   assert.equal(missingSession.ok, false);

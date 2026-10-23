@@ -22,7 +22,7 @@ export function truncate(value, cap) {
   return text.length <= cap ? text : text.slice(0, cap);
 }
 
-/** Enforce the line and character caps for the managed AGENTS.md block. */
+/** Enforce the line and character caps for the managed instruction block. */
 export function limitAgentsBlock(value) {
   const lines = String(value ?? "").split(/\r?\n/).slice(0, CAPS.agentsBlockLines);
   return truncate(lines.join("\n"), CAPS.agentsBlockChars);
@@ -48,7 +48,7 @@ export function measureOutputs({ sessionStart = "", blockReason = "", promptNudg
     measure("SessionStart injection", sessionStart, CAPS.sessionStartChars),
     measure("Block reason", blockReason, CAPS.blockReasonChars),
     measure("Prompt nudge", promptNudge, CAPS.promptNudgeChars),
-    measure("AGENTS.md block", agentsBlock, CAPS.agentsBlockChars, { lines: String(agentsBlock).split(/\r?\n/).length, lineCap: CAPS.agentsBlockLines, withinLineCap: String(agentsBlock).split(/\r?\n/).length <= CAPS.agentsBlockLines }),
+    measure("instruction block", agentsBlock, CAPS.agentsBlockChars, { lines: String(agentsBlock).split(/\r?\n/).length, lineCap: CAPS.agentsBlockLines, withinLineCap: String(agentsBlock).split(/\r?\n/).length <= CAPS.agentsBlockLines }),
   ];
 }
 

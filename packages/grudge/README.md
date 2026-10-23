@@ -27,7 +27,8 @@ supports `--dry-run`, creates timestamped backups, and can be reversed with
 `npm --prefix packages/grudge run uninstall:repo` from the repository root, or
 `npm run uninstall:repo` from this directory. The `npx
 grudge-cli ...` form is for an installed or published package, not an unlinked
-repository checkout.
+repository checkout. Uninstall prints a readable summary by default; pass
+`--json` when a script needs machine-readable output.
 
 Claude Code is the verified **Guard** adapter. Codex, Gemini CLI, GitHub
 Copilot, OpenCode, and Windsurf are **Advisory** instruction integrations;

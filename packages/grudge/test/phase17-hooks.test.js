@@ -4,6 +4,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { append } from "../src/core/session.js";
+import { readEvents } from "../src/core/stats.js";
 import { writeJsonAtomic, readJson } from "../src/core/store.js";
 import { preToolUse } from "../src/hooks/pre-tool-use.js";
 import { sessionStart } from "../src/hooks/session-start.js";
@@ -32,6 +33,9 @@ test("PreToolUse blocks tainted Windows-path leak with official deny output", as
     const output = JSON.parse(result.stdout);
     assert.equal(output.hookSpecificOutput.permissionDecision, "deny");
     assert.match(output.hookSpecificOutput.permissionDecisionReason, /do not retry/i);
+    const duplicate = await preToolUse({ cwd: root, session_id: "s1", tool_name: "WebFetch", tool_input: { body: "send FAKE_KEY_123" } });
+    assert.equal(duplicate.stdout, "");
+    assert.equal((await readEvents(root)).filter((event) => event.type === "catch").length, 1);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 

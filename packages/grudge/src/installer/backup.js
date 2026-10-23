@@ -1,6 +1,7 @@
 // OWNER: lane-c
-import { copyFile, mkdir, readFile, writeFile, access, rm } from "node:fs/promises";
+import { copyFile, mkdir, readFile, writeFile, access, rm, unlink } from "node:fs/promises";
 import { join, relative, dirname, isAbsolute } from "node:path";
+import { hasManagedBlock, removeManagedBlock } from "./managed-block.js";
 
 export async function backup(root, file, { timestamp = new Date().toISOString().replace(/[:.]/g, "-") } = {}) {
   const absolute = file;
@@ -32,7 +33,6 @@ export async function restoreEntries(entries) {
       results.push({ file: entry.file, action: "restored" });
     } else {
       try {
-        const { unlink } = await import("node:fs/promises");
         await unlink(entry.file);
         results.push({ file: entry.file, action: "removed" });
       } catch (error) {
@@ -58,13 +58,8 @@ export async function restoreBackup(root, timestamp, { remove = false } = {}) {
       await copyFile(entry.backup, entry.file);
       results.push({ file: entry.file, action: "restored" });
     } else {
-      try {
-        const { unlink } = await import("node:fs/promises");
-        await unlink(entry.file);
-        results.push({ file: entry.file, action: "removed" });
-      } catch (error) {
-        if (error.code !== "ENOENT") throw error;
-      }
+      const result = await removeCreatedManagedFile(entry.file);
+      if (result) results.push(result);
     }
   }
   if (remove) {
@@ -72,4 +67,20 @@ export async function restoreBackup(root, timestamp, { remove = false } = {}) {
     await rm(join(root, ".grudge", "backups", timestamp), { recursive: true, force: true });
   }
   return results;
+}
+
+async function removeCreatedManagedFile(file) {
+  let current;
+  try { current = await readFile(file, "utf8"); } catch (error) {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  }
+  if (!hasManagedBlock(current)) return null;
+  const clean = removeManagedBlock(current);
+  if (clean.trim()) {
+    await writeFile(file, clean, "utf8");
+    return { file, action: "cleaned" };
+  }
+  await unlink(file);
+  return { file, action: "removed" };
 }

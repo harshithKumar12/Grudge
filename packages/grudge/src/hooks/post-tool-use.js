@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { normalize } from "../core/normalize.js";
 import { redactValue } from "../core/redact.js";
 import { append } from "../core/session.js";
+import { claimHookEvent } from "../core/stats.js";
 
 const MAX_RESULT_BYTES = 4 * 1024;
 
@@ -54,6 +55,7 @@ export async function postToolUse(payload = {}, options = {}) {
       timestamp: (options.now instanceof Date ? options.now : new Date(options.now ?? Date.now())).toISOString(),
     };
     const root = options.root ?? payload.cwd ?? process.cwd();
+    if ((await claimHookEvent(root, "PostToolUse", payload)).duplicate) return { ok: true, duplicate: true, event };
     await append(join(root, ".grudge"), sessionId, event);
     return { ok: true, event };
   } catch {

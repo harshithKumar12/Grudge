@@ -11,7 +11,7 @@ export const adapter = {
   tier: "Guard",
   verified: true,
   docsUrl: "https://code.claude.com/docs/en/settings",
-  targetLabel: ".claude/settings.json + AGENTS.md",
+  targetLabel: ".claude/settings.json + CLAUDE.md",
   async detect({ cwd = process.cwd(), home = homedir() } = {}) {
     const paths = [join(cwd, ".claude"), join(home, ".claude")];
     for (const path of paths) if (await fileExists(path)) return { detected: true, path };
@@ -20,10 +20,8 @@ export const adapter = {
   plan({ cwd = process.cwd(), home = homedir(), scope = "repo", runtimeCommand = "node .grudge/bin/grudge.mjs" } = {}) {
     const settings = scope === "global" ? join(home, ".claude/settings.json") : join(cwd, ".claude", scope === "local" ? "settings.local.json" : "settings.json");
     const files = [{ path: settings, kind: "claude-settings" }];
-    const instruction = scope === "global" ? join(home, "AGENTS.md") : join(cwd, "AGENTS.md");
+    const instruction = scope === "global" ? join(home, ".claude/CLAUDE.md") : join(cwd, "CLAUDE.md");
     files.push({ path: instruction, kind: "managed-text" });
-    const claudeMd = scope === "global" ? join(home, "CLAUDE.md") : join(cwd, "CLAUDE.md");
-    files.push({ path: claudeMd, kind: "pointer-if-existing" });
     return { adapter: "claude-code", verified: true, files, hooks: HOOK_EVENTS.map((event) => ({ event, command: commandFor(event, runtimeCommand) })), statusLine: `${runtimeCommand} statusline` };
   },
   async apply(context, plan) {
