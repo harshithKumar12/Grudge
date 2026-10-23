@@ -6,7 +6,7 @@ import { loadConfig } from "../core/config.js";
 import { normalize } from "../core/normalize.js";
 import { check } from "../dsl/check.js";
 import { read as readSession } from "../core/session.js";
-import { appendEvent } from "../core/stats.js";
+import { appendEvent, claimHookEvent } from "../core/stats.js";
 
 const MAX_REASON = 400;
 const MAX_INPUT = 1024 * 1024;
@@ -38,6 +38,7 @@ async function evaluate(payload) {
   if (input.length > MAX_INPUT) return { code: 0, stdout: "", stderr: "grudge: oversized hook input; allowed (fail-open)\n" };
   const compiled = await readJson(join(root, ".grudge", "compiled.json"), null);
   if (!compiled || compiled.version !== 1 || !Array.isArray(compiled.rules)) return { code: 0, stdout: "", stderr: "" };
+  if ((await claimHookEvent(root, "PreToolUse", payload)).duplicate) return { code: 0, stdout: "", stderr: "" };
   const current = normalize(payload);
   const prior = payload.session_id ? await readSession(join(root, ".grudge"), payload.session_id) : [];
   const events = [...prior, current];

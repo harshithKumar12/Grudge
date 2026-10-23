@@ -2,6 +2,7 @@
 import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { join, resolve } from "node:path";
+import { homedir } from "node:os";
 import { parseJson } from "../installer/json-merge.js";
 import { managedBlock } from "../installer/managed-block.js";
 import { measureOutputs as measureBudgetOutputs } from "../core/budget.js";
@@ -16,6 +17,7 @@ const PROMPT_NUDGE = "If this is a repeatable mistake, record it once: node .gru
 /** Inspect an installed repository without changing it. */
 export async function doctor(options = {}) {
   const root = resolve(options.cwd ?? process.cwd());
+  const home = resolve(options.home ?? homedir());
   const configPath = join(root, ".grudge/config.json");
   const runtimePath = join(root, ".grudge/bin/grudge.mjs");
   const config = await readJson(configPath);
@@ -38,16 +40,30 @@ export async function doctor(options = {}) {
     checks.push({ name: "script hash", ok: hash === config.scriptHash, detail: `${hash.slice(0, 12)} vs ${String(config.scriptHash).slice(0, 12)}` });
   } else checks.push({ name: "script hash", ok: false, detail: "not recorded" });
   let hooksPresent = false;
-  for (const path of [join(root, ".claude/settings.json"), join(root, ".claude/settings.local.json")]) {
+  let projectHookCount = 0;
+  let userHookCount = 0;
+  const settingsPaths = [
+    { path: join(root, ".claude/settings.json"), scope: "project" },
+    { path: join(root, ".claude/settings.local.json"), scope: "project" },
+    { path: join(home, ".claude/settings.json"), scope: "user" },
+  ].filter(({ path }, index, entries) => entries.findIndex((entry) => entry.path === path) === index);
+  for (const { path, scope } of settingsPaths) {
     const text = await readOptional(path);
     if (!text) continue;
     try {
       const settings = parseJson(text, path);
-      hooksPresent ||= Boolean(settings.hooks);
+      const count = countGrudgeHooks(settings.hooks);
+      hooksPresent ||= count > 0;
+      if (scope === "user") userHookCount += count; else projectHookCount += count;
       checks.push({ name: `settings ${path}`, ok: true, detail: "parse OK" });
     } catch (error) { checks.push({ name: `settings ${path}`, ok: false, detail: error.message }); }
   }
   checks.push({ name: "hooks", ok: hooksPresent || !(config?.adapters ?? []).includes("claude-code"), detail: hooksPresent ? "present" : "not configured" });
+  const warnings = [];
+  if (userHookCount > 0 && projectHookCount > 0) {
+    warnings.push("Grudge hooks are installed at both user and project scope; duplicate invocations are deduplicated by session and event.");
+    checks.push({ name: "hook scopes", ok: true, warning: true, detail: warnings[0] });
+  } else checks.push({ name: "hook scopes", ok: true, detail: "no duplicate user/project Grudge hook scopes detected" });
   const compiled = await readJson(join(root, ".grudge/compiled.json"));
   checks.push({ name: "compiled.json", ok: compiled === null || (compiled.version === 1 && Array.isArray(compiled.rules)), detail: compiled === null ? "not present" : "valid" });
   const gitignore = await readOptional(join(root, ".gitignore"));
@@ -60,8 +76,8 @@ export async function doctor(options = {}) {
     const lineDetail = measurement.lines === undefined ? "" : `, ${measurement.lines}/${measurement.lineCap} lines`;
     checks.push({ name: `budget ${measurement.name}`, ok, detail: `${measurement.chars}/${measurement.cap} chars${lineDetail}`, measurement });
   }
-  const result = { ok: checks.every((check) => check.ok), root, checks, budgetMeasurements };
-  if (options.print !== false) for (const check of checks) process.stdout.write(`${check.ok ? "✓" : "✗"} ${check.name}: ${check.detail}\n`);
+  const result = { ok: checks.every((check) => check.ok), root, checks, budgetMeasurements, warnings };
+  if (options.print !== false) for (const check of checks) process.stdout.write(`${check.warning ? "⚠" : check.ok ? "✓" : "✗"} ${check.name}: ${check.detail}\n`);
   return result;
 }
 
@@ -84,7 +100,7 @@ function fallbackMeasureOutputs({ sessionStart = "", blockReason = "", promptNud
     measureFallback("SessionStart injection", sessionStart, FALLBACK_CAPS.sessionStartChars),
     measureFallback("Block reason", blockReason, FALLBACK_CAPS.blockReasonChars),
     measureFallback("Prompt nudge", promptNudge, FALLBACK_CAPS.promptNudgeChars),
-    measureFallback("AGENTS.md block", agentsBlock, FALLBACK_CAPS.agentsBlockChars, { lines: String(agentsBlock).split(/\r?\n/).length, lineCap: FALLBACK_CAPS.agentsBlockLines, withinLineCap: String(agentsBlock).split(/\r?\n/).length <= FALLBACK_CAPS.agentsBlockLines }),
+    measureFallback("instruction block", agentsBlock, FALLBACK_CAPS.agentsBlockChars, { lines: String(agentsBlock).split(/\r?\n/).length, lineCap: FALLBACK_CAPS.agentsBlockLines, withinLineCap: String(agentsBlock).split(/\r?\n/).length <= FALLBACK_CAPS.agentsBlockLines }),
   ];
 }
 
@@ -101,4 +117,18 @@ async function readJson(path) {
 
 async function readOptional(path) {
   try { return await readFile(path, "utf8"); } catch (error) { if (error.code === "ENOENT") return null; throw error; }
+}
+
+function countGrudgeHooks(value) {
+  let count = 0;
+  const visit = (item) => {
+    if (typeof item === "string") {
+      if (/grudge(?:\.mjs)?[^\n]*\s+hook\s+(?:SessionStart|UserPromptSubmit|PreToolUse|PostToolUse|Stop)\b/i.test(item)) count += 1;
+      return;
+    }
+    if (Array.isArray(item)) { for (const child of item) visit(child); return; }
+    if (item && typeof item === "object") for (const child of Object.values(item)) visit(child);
+  };
+  visit(value);
+  return count;
 }

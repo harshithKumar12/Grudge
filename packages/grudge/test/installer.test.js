@@ -25,8 +25,8 @@ test("setup creates a guarded Claude project and preserves unrelated settings", 
   assert.equal(settings.hooks.PreToolUse[0].hooks[0].command, "node .grudge/bin/grudge.mjs hook PreToolUse");
   assert.equal(settings.statusLine.command, "node .grudge/bin/grudge.mjs statusline");
   assert.deepEqual(settings.permissions.allow, ["Bash(test)"]);
-  const agents = await readFile(join(cwd, "AGENTS.md"), "utf8");
-  assert.ok(agents.includes(MANAGED_BEGIN) && agents.includes(MANAGED_END));
+  const claude = await readFile(join(cwd, "CLAUDE.md"), "utf8");
+  assert.ok(claude.includes(MANAGED_BEGIN) && claude.includes(MANAGED_END));
   assert.equal((await readFile(join(cwd, ".gitignore"), "utf8")).split(/\r?\n/).filter(Boolean).length, 3);
   assert.ok((await readFile(join(cwd, ".grudge/config.json"), "utf8")).includes("scriptHash"));
 });
@@ -68,9 +68,10 @@ test("doctor reports a healthy installed runtime", async () => {
   const runtime = join(cwd, "runtime.mjs");
   await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
   await setup({ cwd, home: cwd, agents: ["claude-code"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
-  const result = await doctor({ cwd, print: false });
+  const result = await doctor({ cwd, home: cwd, print: false });
   assert.equal(result.ok, true);
-  assert.deepEqual(result.budgetMeasurements.map(({ name }) => name), ["SessionStart injection", "Block reason", "Prompt nudge", "AGENTS.md block"]);
+  assert.equal(result.warnings.length, 0);
+  assert.deepEqual(result.budgetMeasurements.map(({ name }) => name), ["SessionStart injection", "Block reason", "Prompt nudge", "instruction block"]);
   assert.ok(result.budgetMeasurements.every(({ chars, cap }) => chars <= cap));
 });
 
@@ -96,6 +97,43 @@ test("uninstall removes managed files and installed runtime", async () => {
   assert.ok(result.removed.length > 0);
   await assert.rejects(access(join(cwd, ".grudge")));
   await assert.rejects(access(join(cwd, "AGENTS.md")));
+});
+
+test("uninstall preserves user content in AGENTS.md and CLAUDE.md byte-for-byte", async () => {
+  const cwd = await scratch();
+  const runtime = join(cwd, "runtime.mjs");
+  const agentsBefore = "# User AGENTS\r\nKeep this instruction.\r\n";
+  const claudeBefore = "# User Claude\nKeep this instruction.\n";
+  await writeFile(join(cwd, "AGENTS.md"), agentsBefore);
+  await writeFile(join(cwd, "CLAUDE.md"), claudeBefore);
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  await setup({ cwd, home: cwd, agents: ["claude-code"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
+  await uninstall({ cwd, print: false });
+  assert.equal(await readFile(join(cwd, "AGENTS.md"), "utf8"), agentsBefore);
+  assert.equal(await readFile(join(cwd, "CLAUDE.md"), "utf8"), claudeBefore);
+});
+
+test("uninstall does not delete a created file after user content is added", async () => {
+  const cwd = await scratch();
+  const runtime = join(cwd, "runtime.mjs");
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  await setup({ cwd, home: cwd, agents: ["claude-code"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
+  await writeFile(join(cwd, "CLAUDE.md"), `${await readFile(join(cwd, "CLAUDE.md"), "utf8")}# User content\n`);
+  await uninstall({ cwd, print: false });
+  assert.equal(await readFile(join(cwd, "CLAUDE.md"), "utf8"), "\n# User content\n");
+});
+
+test("doctor warns when Grudge hooks exist at user and project scope", async () => {
+  const cwd = await scratch();
+  const home = await scratch();
+  const runtime = join(cwd, "runtime.mjs");
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  await setup({ cwd, home, agents: ["claude-code"], scope: "global", yes: true, runtimeScript: runtime, print: false });
+  await setup({ cwd, home, agents: ["claude-code"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
+  const result = await doctor({ cwd, home, print: false });
+  assert.equal(result.ok, true);
+  assert.equal(result.warnings.length, 1);
+  assert.match(result.warnings[0], /user and project scope/);
 });
 
 test("interactive setup applies the selected scope", async () => {

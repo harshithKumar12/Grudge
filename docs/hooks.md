@@ -3,7 +3,7 @@
 **Purpose:** Document the local Claude Code command hooks and their fail-open behavior.
 **Audience:** Developers installing Grudge Guard hooks.
 **Status:** final
-**Last updated (phase):** 23
+**Last updated (phase):** pre-production fixes · 2026-10-23
 
 ## Command and official decision mechanism
 
@@ -17,7 +17,7 @@ The event names are `pre-tool-use`, `session-start`, `user-prompt-submit`,
 `post-tool-use`, and `stop` in the command path. The Phase 17 handlers are
 PreToolUse, SessionStart, UserPromptSubmit, and Stop.
 
-Claude Code's hooks reference was checked on 2026-10-22 at
+Claude Code's hooks reference was checked on 2026-10-23 at
 <https://code.claude.com/docs/en/hooks>. A command hook receives one JSON
 object on stdin. A PreToolUse deny is returned on stdout as:
 
@@ -60,7 +60,7 @@ one short stderr warning. Oversized input (over 1 MiB) also fails open.
 
 The official hooks reference documents `systemMessage` as a warning shown to the
 user. Grudge emits the savings line as `{"systemMessage":"..."}` from the Stop
-hook, verified against the current documentation on **2026-10-22**. The
+hook, verified against the current documentation on **2026-10-23**. The
 PreToolUse deny continues to use `hookSpecificOutput.permissionDecision`.
 
 PowerShell users can avoid DSL quote stripping with:
@@ -68,6 +68,14 @@ PowerShell users can avoid DSL quote stripping with:
 ```powershell
 'never call shell where command ~ "RULE"' | grudge propose --rule-stdin --why "reason"
 ```
+
+## Claude Code instruction visibility
+
+Claude Code's memory documentation was checked on **2026-10-23** at
+<https://code.claude.com/docs/en/memory>. The installer writes the managed
+Grudge block to `CLAUDE.md` at the matching scope: `<repo>/CLAUDE.md` for a
+repository install and `~/.claude/CLAUDE.md` for a global install. `AGENTS.md`
+remains available for adapters that document it as their instruction file.
 
 ## Timing evidence
 

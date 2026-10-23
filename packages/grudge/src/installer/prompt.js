@@ -20,10 +20,10 @@ const displayName = (id) => ({
 }[id] ?? id);
 
 /** Resolve setup choices. --yes remains non-interactive and deterministic. */
-export async function prompt({ detected = [], agents = [], scope, yes = false, inputStream = input, outputStream = output } = {}) {
+export async function prompt({ detected = [], agents = [], scope, defaultScope = "repo", yes = false, inputStream = input, outputStream = output } = {}) {
   const available = detected.filter((item) => item.detected).map((item) => item.id);
   if (agents.length && scope) return { agents, scope };
-  if (yes) return { agents: agents.length ? agents : available, scope: scope ?? "repo" };
+  if (yes) return { agents: agents.length ? agents : available, scope: scope ?? defaultScope };
 
   const interactive = Boolean(inputStream?.isTTY && outputStream?.isTTY && inputStream?.setRawMode);
   if (!interactive) return promptWithLines({ detected, agents, scope, inputStream, outputStream });
@@ -54,7 +54,7 @@ export async function prompt({ detected = [], agents = [], scope, yes = false, i
       choices: SCOPE_CHOICES,
       reader,
       outputStream,
-      initial: SCOPE_CHOICES.findIndex((item) => item.id === "repo"),
+      initial: SCOPE_CHOICES.findIndex((item) => item.id === defaultScope),
     });
     return { agents: selected, scope: chosenScope };
   } finally {
@@ -72,7 +72,7 @@ async function promptWithLines({ detected, agents, scope, inputStream, outputStr
       ? agents
       : (await rl.question(`Agents (${available.join(", ")}): `)).trim().split(",").map((item) => item.trim()).filter(Boolean);
     const selected = chosen.length ? chosen : available;
-    const answer = scope ?? ((await rl.question("Scope (repo|local|global) [repo]: ")).trim() || "repo");
+    const answer = scope ?? ((await rl.question(`Scope (repo|local|global) [${defaultScope}]: `)).trim() || defaultScope);
     if (!["repo", "local", "global"].includes(answer)) throw new Error("scope must be repo, local, or global");
     return { agents: selected, scope: answer };
   } finally {

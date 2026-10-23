@@ -1,5 +1,6 @@
 // OWNER: lane-a
 import { appendFile, mkdir, readFile, rm } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { readJson, writeJsonAtomic } from "./store.js";
 
@@ -59,11 +60,21 @@ export async function appendEvent(root = process.cwd(), event = {}) {
   if (isAdvisory(value)) return value;
   return withStatsLock(root, async () => {
     const existing = await readEvents(root);
+    if (value.dedupeKey && existing.some((item) => item.dedupeKey === value.dedupeKey)) return { ...value, duplicate: true };
     const maxSeq = existing.reduce((max, item, index) => Math.max(max, Number.isFinite(item.seq) ? item.seq : index + 1), 0);
     value.seq = maxSeq + 1;
     await appendFile(statsLogPath(root), `${JSON.stringify(value)}\n`, "utf8");
-    return value;
+    return { ...value, duplicate: false };
   });
+}
+
+/** Claim one host hook event so duplicate user/project registrations do not re-run accounting. */
+export async function claimHookEvent(root = process.cwd(), eventName, payload = {}) {
+  const sessionId = payload.session_id ?? payload.sessionId;
+  if (typeof sessionId !== "string" || !sessionId) return { duplicate: false, dedupeKey: null };
+  const dedupeKey = `${eventName}:${sessionId}:${createHash("sha256").update(stableJson(payload), "utf8").digest("hex")}`;
+  const result = await appendEvent(root, { type: "hook", hookEvent: eventName, sessionId, dedupeKey });
+  return { duplicate: result.duplicate === true, dedupeKey };
 }
 
 /** Read valid event objects while ignoring blank and corrupt JSONL lines. */
@@ -185,5 +196,11 @@ export function formatEstimatedTokens(tokens) {
 }
 
 export function stats() {
-  return { EMPTY_STATS, readStats, record, appendEvent, readEvents, aggregateEvents, aggregate, reportSinceLast, estimatedTokensSaved, formatEstimatedTokens, statsPath, statsLogPath, reportStatePath };
+  return { EMPTY_STATS, readStats, record, appendEvent, claimHookEvent, readEvents, aggregateEvents, aggregate, reportSinceLast, estimatedTokensSaved, formatEstimatedTokens, statsPath, statsLogPath, reportStatePath };
+}
+
+function stableJson(value) {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  if (value && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(",")}}`;
+  return JSON.stringify(value);
 }

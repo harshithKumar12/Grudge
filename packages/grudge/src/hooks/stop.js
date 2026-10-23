@@ -2,7 +2,7 @@
 import { join } from "node:path";
 import { readJson, writeJsonAtomic } from "../core/store.js";
 import { loadConfig } from "../core/config.js";
-import { formatEstimatedTokens, reportSinceLast } from "../core/stats.js";
+import { claimHookEvent, formatEstimatedTokens, readEvents, reportSinceLast } from "../core/stats.js";
 
 /** Persist stop bookkeeping and report only newly caught mistakes. */
 export async function stop(payload = {}) {
@@ -11,6 +11,9 @@ export async function stop(payload = {}) {
     if (process.env.GRUDGE_DISABLE === "1") return { code: 0, stdout: "", stderr: "" };
     const config = await loadConfig(root);
     if (config.mode === "off") return { code: 0, stdout: "", stderr: "" };
+    const priorEvents = await readEvents(root);
+    const stopCursor = priorEvents.filter((event) => event.type !== "hook").reduce((max, event) => Math.max(max, Number(event.seq) || 0), 0);
+    if ((await claimHookEvent(root, "Stop", { ...payload, __grudge_stop_cursor: stopCursor })).duplicate) return { code: 0, stdout: "", stderr: "" };
     const path = join(root, ".grudge", "stats.json");
     const value = await readJson(path, {});
     const stats = value && typeof value === "object" && !Array.isArray(value) ? value : {};

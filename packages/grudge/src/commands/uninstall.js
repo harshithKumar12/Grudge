@@ -1,5 +1,5 @@
 // OWNER: lane-c
-import { readFile, rm, unlink, writeFile } from "node:fs/promises";
+import { access, readFile, rm, unlink, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { removeManagedBlock } from "../installer/managed-block.js";
 import { parseJson } from "../installer/json-merge.js";
@@ -18,14 +18,15 @@ export async function uninstall(options = {}) {
     if (text === null) continue;
     const clean = removeManagedBlock(text);
     if (clean !== text) {
-      if (clean.trim()) await writeFile(path, clean, "utf8"); else await unlink(path);
+      await writeFile(path, clean, "utf8");
       removed.push(path);
     }
   }
   if (options.removeRuntime !== false) {
     try { await unlink(join(root, ".grudge/bin/grudge.mjs")); removed.push(join(root, ".grudge/bin/grudge.mjs")); } catch (error) { if (error.code !== "ENOENT") throw error; }
   }
-  if (options.removeState !== false) { await rm(join(root, ".grudge"), { recursive: true, force: true }); removed.push(join(root, ".grudge")); }
+  const statePath = join(root, ".grudge");
+  if (options.removeState !== false && await exists(statePath)) { await rm(statePath, { recursive: true, force: true }); removed.push(statePath); }
   const result = { root, removed, restored };
   if (options.print !== false) for (const path of removed) process.stdout.write(`removed ${path}\n`);
   return result;
@@ -39,4 +40,8 @@ async function readJson(path) {
 
 async function readOptional(path) {
   try { return await readFile(path, "utf8"); } catch (error) { if (error.code === "ENOENT") return null; throw error; }
+}
+
+async function exists(path) {
+  try { await access(path); return true; } catch { return false; }
 }

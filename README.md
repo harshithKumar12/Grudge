@@ -33,8 +33,9 @@ Claude-style hook proof, use `python -m grudge demo --guard --json`.
 
 ## Published packages
 
-Grudge CLI `0.1.1` is published in both public package registries. Release
-`0.1.2` is prepared locally but has not been published yet:
+Grudge CLI `0.1.3` is published in both public package registries. npm
+`0.1.4` contains the setup-scope fix; `0.1.5` contains the pre-production
+uninstall, Claude visibility, and duplicate-hook fixes and is not published:
 
 - **npm:** [`grudge-cli`](https://www.npmjs.com/package/grudge-cli)
 - **PyPI:** [`grudge-cli`](https://pypi.org/project/grudge-cli/)
@@ -79,13 +80,20 @@ npm --prefix packages/grudge run doctor:repo
 ```
 
 If `grudge` has been published, run the interactive registry setup with
-`npx grudge-cli setup`. Use the arrow keys to move, Space to select agents, and
-Enter to confirm the agent and scope choices. When working from `packages/grudge`, use `node dist/grudge.mjs`
+`npx grudge-cli setup` from any directory. From an unmarked directory such as
+the Desktop, Grudge defaults the scope to **All projects** so it can configure
+your user-level agent settings. Use the arrow keys to move, Space to select
+agents, and Enter to confirm the agent and scope choices. To configure only a
+repository, run the command from that repository (for example,
+`cd C:\Users\kotes\Desktop\Grudge`) and choose **This repository**. When working from `packages/grudge`, use `node dist/grudge.mjs`
 and add `--cwd ../..` when the hooks should target the repository root. The
 short package-directory commands are `npm run setup:repo` and
 `npm run doctor:repo`. Do not combine `cd packages/grudge` with the
 root-relative path `packages/grudge/dist/grudge.mjs`, or it resolves to
 `packages/grudge/packages/grudge/dist/grudge.mjs`.
+
+To remove Grudge-managed files, run `npx grudge-cli uninstall`. It prints a
+human-readable summary by default; add `--json` for scripting.
 
 Claude Code is the verified **Guard** tier. Codex, Gemini CLI, GitHub Copilot,
 OpenCode, and Windsurf are **Advisory** integrations; Cursor is unverified and
