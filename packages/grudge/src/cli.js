@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { commands } from "./commands/index.js";
 import { runHook } from "./commands/hook.js";
 import { VERSION } from "./version.js";
+import { jsonOutput, renderCommand, renderError } from "./output.js";
 
 /** Parse the small, deliberately dependency-free Grudge command line. */
 export function parseArgs(argv) {
@@ -32,10 +33,6 @@ async function readStdin() {
 
 function rootOptions(options) {
   return { cwd: resolve(options.cwd ?? process.cwd()), root: resolve(options.cwd ?? process.cwd()) };
-}
-
-function outputJson(value) {
-  return `${JSON.stringify(value ?? null)}\n`;
 }
 
 /** Execute parsed arguments and return the process exit code. */
@@ -68,7 +65,7 @@ export async function dispatch(parsed, { stdin = readStdin } = {}) {
   } else if (command === "stats") {
     result = await commands.stats({ ...root, print: false, json: true });
   } else if (command === "report") {
-    result = await commands.report({ ...root, session: options.session, lifetime: options.lifetime, json: Boolean(options.json), print: false });
+    result = await commands.report({ ...root, session: options.session, lifetime: options.lifetime, json: true, print: false });
   } else if (command === "statusline") {
     const line = await commands.statusline({ ...root, print: false, session: options.session });
     if (line) process.stdout.write(`${line}\n`);
@@ -85,15 +82,14 @@ export async function dispatch(parsed, { stdin = readStdin } = {}) {
   } else {
     throw Object.assign(new Error("usage: grudge <hook|propose|accept|scars|stats|report|statusline|setup|init|doctor|uninstall>"), { exitCode: 2 });
   }
-  if (command === "setup" || command === "init") {
-    if (options.json) process.stdout.write(outputJson(result));
-    else printSetupSummary(result);
-  } else if (command === "uninstall") {
-    if (options.json) process.stdout.write(outputJson(result));
-    else printUninstallSummary(result);
-  } else process.stdout.write(outputJson(result));
+  if (options.json) process.stdout.write(jsonOutput(result));
+  else process.stdout.write(renderCommand(command, result, options));
   if (command === "propose" && result?.accepted === false) return 1;
-  if (command === "doctor" && result?.ok === false) return 1;
+  if (command === "doctor" && result?.ok === false) {
+    const notInstalled = !result.checks?.find((check) => check.name === "config")?.ok
+      && !result.checks?.find((check) => check.name === "runtime")?.ok;
+    if (!notInstalled || options.strict) return 1;
+  }
   return 0;
 }
 
@@ -107,47 +103,23 @@ export async function main(argv = process.argv.slice(2)) {
       process.stderr.write(`grudge: hook failed; allowed (fail-open): ${message}\n`);
       return 0;
     }
-    process.stderr.write(`${outputJson({ error: message })}`);
+    if (argv.includes("--json")) process.stderr.write(jsonOutput({ error: message }));
+    else {
+      process.stderr.write(renderError(error, { command: argv[0] || "command", ascii: argv.includes("--ascii") }));
+      if (argv.includes("--debug") && error instanceof Error && error.stack) process.stderr.write(`${error.stack}\n`);
+    }
     return Number.isInteger(error?.exitCode) ? error.exitCode : 1;
   }
 }
 
-async function printStatus(root) {
+async function printStatus(root, options = {}) {
   let result;
   try { result = await commands.doctor({ cwd: root, print: false }); } catch (error) { result = { ok: false, checks: [] }; }
   const check = (name) => result.checks.find((item) => item.name === name);
-  process.stdout.write([
-    `Grudge v${VERSION}`,
-    `root: ${root}`,
-    `runtime: ${check("runtime")?.ok ? "installed" : "missing"}`,
-    `config: ${check("config")?.ok ? "configured" : "missing"}`,
-    `doctor: ${result.ok ? "healthy" : "needs attention"}`,
-  ].join("\n") + "\n");
+  process.stdout.write(options.json ? jsonOutput(result) : renderCommand("status", result, options));
   return 0;
 }
 
-function printSetupSummary(result) {
-  process.stdout.write([
-    `Grudge setup v${result.version} ${result.dryRun ? "preview" : "complete"}`,
-    `scope: ${result.scope}`,
-    `agents: ${result.selected.length ? result.selected.join(", ") : "none"}`,
-    `files: ${result.changes.length} changed`,
-    "next: run grudge doctor",
-  ].join("\n") + "\n");
-}
-
-function printUninstallSummary(result) {
-  const restored = result.restored.length ? result.restored.map(({ file, action }) => `  ✓ ${action} ${file}`) : ["  none"];
-  const removed = result.removed.length ? result.removed.map((path) => `  • ${path}`) : ["  none"];
-  process.stdout.write([
-    "Grudge uninstall complete",
-    `root: ${result.root}`,
-    `restored: ${result.restored.length}`,
-    ...restored,
-    `removed: ${result.removed.length}`,
-    ...removed,
-  ].join("\n") + "\n");
-}
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
   process.exitCode = await main();

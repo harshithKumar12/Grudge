@@ -20,10 +20,11 @@ const displayName = (id) => ({
 }[id] ?? id);
 
 /** Resolve setup choices. --yes remains non-interactive and deterministic. */
-export async function prompt({ detected = [], agents = [], scope, defaultScope = "repo", yes = false, inputStream = input, outputStream = output } = {}) {
+export async function prompt({ detected = [], agents = [], scope, defaultScope = "repo", warnGlobal = false, yes = false, inputStream = input, outputStream = output } = {}) {
   const available = detected.filter((item) => item.detected).map((item) => item.id);
+  const preferred = available.includes("claude-code") ? ["claude-code"] : available;
   if (agents.length && scope) return { agents, scope };
-  if (yes) return { agents: agents.length ? agents : available, scope: scope ?? defaultScope };
+  if (yes) return { agents: agents.length ? agents : preferred, scope: scope ?? defaultScope };
 
   const interactive = Boolean(inputStream?.isTTY && outputStream?.isTTY && inputStream?.setRawMode);
   if (!interactive) return promptWithLines({ detected, agents, scope, inputStream, outputStream });
@@ -43,15 +44,15 @@ export async function prompt({ detected = [], agents = [], scope, defaultScope =
         })),
         reader,
         outputStream,
-        initialSelected: available,
+        initialSelected: preferred,
       });
-      if (!selected.length) selected = available;
+      if (!selected.length) selected = preferred;
     }
 
     const chosenScope = scope ?? await selectOne({
       title: "Where should Grudge be configured?",
       hint: "Choose the settings scope.",
-      choices: SCOPE_CHOICES,
+      choices: SCOPE_CHOICES.map((choice) => choice.id === "global" && warnGlobal ? { ...choice, detail: `${choice.detail} (confirm carefully: this directory is not a detected project)` } : choice),
       reader,
       outputStream,
       initial: SCOPE_CHOICES.findIndex((item) => item.id === defaultScope),
@@ -66,12 +67,13 @@ export async function prompt({ detected = [], agents = [], scope, defaultScope =
 
 async function promptWithLines({ detected, agents, scope, inputStream, outputStream }) {
   const available = detected.filter((item) => item.detected).map((item) => item.id);
+  const preferred = available.includes("claude-code") ? ["claude-code"] : available;
   const rl = createInterface({ input: inputStream, output: outputStream });
   try {
     const chosen = agents.length
       ? agents
       : (await rl.question(`Agents (${available.join(", ")}): `)).trim().split(",").map((item) => item.trim()).filter(Boolean);
-    const selected = chosen.length ? chosen : available;
+    const selected = chosen.length ? chosen : preferred;
     const answer = scope ?? ((await rl.question(`Scope (repo|local|global) [${defaultScope}]: `)).trim() || defaultScope);
     if (!["repo", "local", "global"].includes(answer)) throw new Error("scope must be repo, local, or global");
     return { agents: selected, scope: answer };

@@ -20,7 +20,7 @@ export async function detect({ cwd = process.cwd(), home = homedir(), env = proc
   for (const [id, dirs, binaries] of definitions) {
     const directory = await firstExisting(dirs.map((path) => join(home, path)));
     const binary = await findBinary(binaries, env.PATH, platform);
-    found.push({ id, detected: Boolean(directory || binary), directory, binary });
+  found.push({ id, tier: id === "claude-code" ? "Guard" : "Advisory", detected: Boolean(directory || binary), directory, binary });
   }
   return found;
 }

@@ -10,6 +10,7 @@ from typing import Any
 import typer
 
 from grudge.config import SCARS_DIR
+from grudge.cli._common import finish
 from grudge.guard.compile import compile_scars, load_scars, write_compiled
 
 
@@ -32,6 +33,6 @@ def compile_command(
         "version": payload["version"],
     }
     if json_output:
-        typer.echo(__import__("json").dumps(result, sort_keys=True))
+        finish(result, json_output=True)
     else:
-        typer.echo(f"compiled {result['rules']} rule(s) to {target}")
+        finish(result, json_output=False)

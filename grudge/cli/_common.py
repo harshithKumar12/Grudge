@@ -18,17 +18,29 @@ T = TypeVar("T")
 
 
 def finish(payload: Mapping[str, Any], *, json_output: bool) -> None:
-    """Print a command result as JSON or a compact human-readable summary."""
+    """Print a command result as pretty JSON or a readable summary."""
 
     if json_output:
-        typer.echo(json.dumps(dict(payload), ensure_ascii=False, sort_keys=True))
+        typer.echo(json.dumps(dict(payload), ensure_ascii=False, sort_keys=True, indent=2))
         return
+    command_name = str(payload.get("command", "command"))
+    typer.echo(f"Grudge {command_name} v{_version()}")
+    passed = failed = warnings = 0
     for key, value in payload.items():
+        if key == "command":
+            continue
         if isinstance(value, list):
             for item in value:
-                typer.echo(str(item))
+                typer.echo(f"[ok] {key}: {item}")
+                passed += 1
+        elif isinstance(value, Mapping):
+            typer.echo(f"[ok] {key}: {len(value)} fields")
+            passed += 1
         else:
-            typer.echo(f"{key}: {value}")
+            typer.echo(f"[ok] {key}: {value}")
+            passed += 1
+    typer.echo(f"{passed} passed, {failed} failed, {warnings} warnings")
+    typer.echo(f"Next: {_next_command(command_name)}")
 
 
 def fail(exc: Exception, *, json_output: bool, debug: bool) -> NoReturn:
@@ -46,7 +58,7 @@ def fail(exc: Exception, *, json_output: bool, debug: bool) -> NoReturn:
             )
         )
     else:
-        typer.echo(f"Error: {message}", err=True)
+        typer.echo(f"Error: {message}\nFix: {_fix_for(message)}", err=True)
     raise typer.Exit(code=2)
 
 
@@ -60,6 +72,34 @@ def command(action: Callable[[], T], *, json_output: bool, debug: bool) -> T:
     except Exception as exc:
         fail(exc, json_output=json_output, debug=debug)
     raise AssertionError("unreachable")
+
+
+def _version() -> str:
+    try:
+        from importlib.metadata import version
+
+        return version("grudge-cli")
+    except Exception:
+        return "0.1.7"
+
+
+def _next_command(command_name: str) -> str:
+    if command_name in {"capture", "shrink", "admit"}:
+        return "grudge run --scars .grudge/scars --agent examples.leaky_agent.agent_fixed"
+    if command_name == "run":
+        return "grudge scars list"
+    if command_name == "compile":
+        return "grudge run --scars .grudge/scars --agent examples.leaky_agent.agent_fixed"
+    return "grudge --help"
+
+
+def _fix_for(message: str) -> str:
+    lowered = message.lower()
+    if "does not exist" in lowered or "could not read" in lowered:
+        return "check the path and run the command again"
+    if "import agent" in lowered:
+        return "install the project and verify the agent module name"
+    return "rerun with --debug for the traceback and more detail"
 
 
 def load_callable(module_name: str) -> Callable[..., Any]:

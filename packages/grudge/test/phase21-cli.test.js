@@ -18,7 +18,7 @@ test("fail-open handler warnings are surfaced on stderr with code zero", () => {
 test("runtime CLI dispatches JSON commands and preserves fail-open hook exit", async () => {
   const root = await mkdtemp(join(tmpdir(), "grudge-cli-"));
   try {
-    const stats = spawnSync(process.execPath, [cli, "stats"], { cwd: root, encoding: "utf8" });
+    const stats = spawnSync(process.execPath, [cli, "stats", "--json"], { cwd: root, encoding: "utf8" });
     assert.equal(stats.status, 0);
     assert.equal(JSON.parse(stats.stdout).estimated, true);
 
@@ -30,7 +30,7 @@ test("runtime CLI dispatches JSON commands and preserves fail-open hook exit", a
     assert.equal(postHook.status, 0);
     assert.match(postHook.stderr, /post-tool-use skipped|hook failed; allowed \(fail-open\)/);
 
-    const missing = spawnSync(process.execPath, [cli, "accept"], { cwd: root, encoding: "utf8" });
+    const missing = spawnSync(process.execPath, [cli, "accept", "--json"], { cwd: root, encoding: "utf8" });
     assert.equal(missing.status, 2);
     assert.match(JSON.parse(missing.stderr).error, /usage/);
   } finally {

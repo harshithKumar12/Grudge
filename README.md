@@ -27,7 +27,7 @@ again.
 
 </div>
 
-> **Release status:** source version `0.1.6` is being prepared. Verify the
+> **Release status:** source version `0.1.7` is being prepared. Verify the
 > package registries and complete the release checklist before publishing.
 
 ## Table of contents
@@ -315,6 +315,13 @@ grudge statusline
 Expected input and engine failures use exit code `2`. A passing gate returns
 `0`; a blocked gate returns `1`.
 
+By default, commands print structured human-readable output with grouped
+checks, status marks, a summary, and a suggested next command. Use `--json`
+for stable machine-readable output, `--ascii` for terminals without Unicode,
+and `--debug` when a stack trace is needed. Claude Code hook stdout remains
+machine-readable JSON because the host consumes it directly. See
+[`docs/cli-output.md`](docs/cli-output.md) for the complete command matrix.
+
 ## Integrations
 
 | Integration | Tier | Notes |
@@ -405,7 +412,7 @@ allow-scripts`.
 
 ### Version bump tests still expect the previous version
 
-When moving from `0.1.5` to `0.1.6`, update all version surfaces together:
+When moving from `0.1.6` to `0.1.7`, update all version surfaces together:
 
 - `packages/grudge/package.json`;
 - `packages/grudge/package-lock.json`;
@@ -416,7 +423,7 @@ When moving from `0.1.5` to `0.1.6`, update all version surfaces together:
 - release-check expectations.
 
 The bundled-runtime test and CLI version test intentionally catch stale
-version references. A failure that still expects `0.1.5` means the version
+version references. A failure that still expects `0.1.6` means the version
 bump is incomplete; do not weaken the test.
 
 ### PowerShell strips rule quotes
