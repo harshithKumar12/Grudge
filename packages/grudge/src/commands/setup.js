@@ -33,7 +33,7 @@ export async function setup(options = {}) {
   }
   const scope = requestedScope ?? "repo";
   const detected = options.detected ?? await detect({ cwd, home });
-  const choice = await prompt({ detected, agents: options.agents ?? [], scope: requestedScope, defaultScope: unmarkedDirectory ? "global" : scope, yes: Boolean(options.yes), inputStream: options.input, outputStream: options.output });
+  const choice = await prompt({ detected, agents: options.agents ?? [], scope: requestedScope, defaultScope: "repo", warnGlobal: unmarkedDirectory, yes: Boolean(options.yes), inputStream: options.input, outputStream: options.output });
   const selectedScope = choice.scope ?? scope;
   const requested = choice.agents?.length ? choice.agents : detected.filter((item) => item.detected).map((item) => item.id);
   const selected = requested.map((id) => adapters[id]).filter(Boolean);
@@ -51,6 +51,9 @@ export async function setup(options = {}) {
   const runtimeTarget = join(root, ".grudge/bin/grudge.mjs");
   const changes = [];
   const warnings = [];
+  if (unmarkedDirectory && selectedScope === "global") {
+    warnings.push("this directory is not a detected project; global setup changes all projects. Prefer --scope repo unless you intend a user-level install.");
+  }
   const backupEntries = [];
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const context = { cwd, home, root, timestamp, backupEntries, changes, warnings, dryRun: Boolean(options.dryRun), applyPlan: (plan) => applyPlan(plan, { root, backupEntries, changes, warnings, timestamp, dryRun: Boolean(options.dryRun) }), removePlan: () => ({}) };

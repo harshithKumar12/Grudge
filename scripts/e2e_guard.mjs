@@ -34,13 +34,13 @@ export async function runGuardProof(root) {
   if (session1Read.status !== 0 || session1Leak.status !== 0) throw new Error("Session 1 capture failed");
 
   const proposal = run(
-    ["propose", "--rule", "never call http where body tainted_by read_file", "--why", "Do not send file data over HTTP", "--session", "guard-session-1"],
+    ["propose", "--rule", "never call http where body tainted_by read_file", "--why", "Do not send file data over HTTP", "--session", "guard-session-1", "--json"],
     "",
     root,
   );
   if (proposal.status !== 0) throw new Error(`proposal failed: ${proposal.stderr || proposal.stdout}`);
   const pending = JSON.parse(proposal.stdout);
-  const accepted = run(["accept", pending.id], "", root);
+  const accepted = run(["accept", pending.id, "--json"], "", root);
   if (accepted.status !== 0) throw new Error(`accept failed: ${accepted.stderr || accepted.stdout}`);
 
   const session2Read = run(["hook", "post-tool-use"], await payload("03-read-session-2.json"), root);

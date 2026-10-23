@@ -22,11 +22,10 @@
 
 ## Actual package status
 
-- Local npm metadata: `grudge-cli@0.1.5`.
-- Local PyPI metadata: `grudge-cli==0.1.5`.
-- npm registry query: latest `0.1.5`.
-- PyPI registry query: latest `0.1.5`.
-- Release documentation now states that `0.1.5` is published in both registries and includes a local consistency check.
+- Local npm metadata: `grudge-cli@0.1.7`.
+- Local PyPI metadata: `grudge-cli==0.1.7`.
+- Registry publication of `0.1.7` is intentionally not performed in this task.
+- Release documentation states that `0.1.7` is being prepared and the local release check accepts prepared or published status.
 
 ## Baseline acceptance gaps to verify
 
@@ -43,6 +42,8 @@
 - Added npm repository/homepage/issue metadata and Python classifiers, keywords, and project URLs.
 - Added `scripts/release_check.py`, its test, and `make release-check`; `make all` now includes the local release check.
 - Updated release, integration, token-budget, walkthrough, and package documentation for the current `0.1.5` state.
+- Added a shared Node CLI renderer, structured default output, stable pretty JSON mode, error fixes, not-installed doctor output, and CLI output documentation.
+- Changed unmarked setup to default to repository scope and preselect Claude Code with Guard/Advisory tier labels.
 
 ## Evidence from current checkout
 
@@ -63,4 +64,20 @@
 - Full Claude Code UI/model verification remains unavailable because the earlier API attempt ended with `ECONNREFUSED`.
 - Linux/WSL and macOS compatibility remain unverified.
 - A clean scratch-project run using the freshly packed npm tarball and the complete Claude hook/status-line flow still needs to be recorded.
-- Changes remain uncommitted by instruction; `AGENTS.md` and `CLAUDE.md` retain unrelated newline-only worktree changes.
+- `AGENTS.md` and `CLAUDE.md` retain unrelated newline-only worktree changes and
+  are excluded from the 0.1.7 commit.
+
+## 0.1.7 output work
+
+- Added the shared Node renderer in `packages/grudge/src/output.js`.
+- Default Node CLI output is structured text; `--json` is pretty-printed and
+  preserves the result object; hook stdout remains machine JSON.
+- Added not-installed doctor output, strict-mode handling, error/fix messages,
+  ASCII marks, TTY-aware color behavior, setup scope correction, and Guard /
+  Advisory picker labels.
+- Added `docs/cli-output.md` and renderer regression tests.
+- Current Node verification: **65/65 tests passed** and `npm pack --dry-run`
+  reports `grudge-cli@0.1.7`.
+- Python test, Ruff, mypy, build, and Twine commands were not runnable in the
+  current Linux shell because the required Python tooling is unavailable;
+  documentation and release checks did run successfully.

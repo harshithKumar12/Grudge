@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.7 - 2026-10-23
+
+- Replace default raw JSON command output with structured human-readable output.
+- Preserve the existing JSON shape behind `--json` and keep hook stdout machine-readable.
+- Make repository setup the default scope and preselect Claude Code as the Guard adapter.
+- Add CLI output documentation and a clear not-installed doctor state.
+
 ## 0.1.6 - 2026-10-23
 - "Write from previous history"
 -

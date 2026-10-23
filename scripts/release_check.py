@@ -45,9 +45,10 @@ def check_release(root: Path = ROOT) -> list[str]:
         rf"Grudge CLI `{re.escape(expected)}` is published in both public "
         "package registries"
     )
-    if not re.search(published, readme):
+    prepared = rf"source version `{re.escape(expected)}` is being prepared"
+    if not re.search(published, readme) and not re.search(prepared, readme):
         errors.append(
-            f"README.md does not state that {expected} is published in both registries"
+            f"README.md does not describe {expected} as published or prepared"
         )
     return errors
 
