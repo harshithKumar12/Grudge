@@ -1,38 +1,121 @@
-<!-- OWNER: lane-c -->
-# Grudge npm package
+<div align="center">
 
-From the repository root, exercise this checkout with:
+<img src="https://raw.githubusercontent.com/harshithKumar12/Grudge/master/docs/assets/grudge-logo.png" alt="Grudge logo" width="110" />
+
+# Grudge CLI · Node Guard
+
+Local, deterministic protection against recurring AI-agent mistakes.
+
+<a href="https://github.com/harshithKumar12/Grudge#readme">Full documentation</a>
+
+</div>
+
+## Install
+
+```bash
+npm install --global grudge-cli
+npm --version
+grudge --version
+grudge doctor
+```
+
+For a temporary run without a global install:
+
+```bash
+npx grudge-cli@latest setup
+npx grudge-cli@latest doctor
+```
+
+`npx` is temporary and does not make `grudge` available as a PowerShell
+command. If PowerShell reports that `grudge` is not recognized, add npm's
+global binary directory to the user PATH, reopen PowerShell, and retry:
+
+```powershell
+$npmBin = npm prefix --global
+$userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+if (($userPath -split ';') -notcontains $npmBin) {
+  [Environment]::SetEnvironmentVariable("Path", "$userPath;$npmBin", "User")
+}
+$env:Path = "$npmBin;$env:Path"
+grudge --version
+```
+
+The npm package also exposes `grudge-node` when the Python engine is installed
+alongside it.
+
+For a non-interactive Claude Code repository setup:
+
+```bash
+npx grudge-cli@latest setup --yes --agents claude-code --scope repo
+```
+
+Preview changes before writing:
+
+```bash
+npx grudge-cli@latest setup --dry-run
+```
+
+Remove only Grudge-managed content:
+
+```bash
+npx grudge-cli@latest uninstall
+```
+
+## What this package provides
+
+- Claude Code hook setup and local enforcement.
+- `setup`, `doctor`, `uninstall`, and dry-run workflows.
+- `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, and `Stop`
+  hooks.
+- Local Scar proposals, acceptance, stats, reports, and status-line output.
+- Scope-aware repository, user, and all-project configuration.
+- Timestamped backups and selective uninstall cleanup.
+- A self-contained bundled runtime with no npm runtime dependencies.
+
+Claude Code is the verified **Guard** adapter. Codex, Gemini CLI, GitHub
+Copilot, OpenCode, and Windsurf are **Advisory** integrations; enforcement is
+not guaranteed for those tools. Cursor is unverified and the installer writes
+no Cursor files.
+
+## Development checkout
+
+From the repository root:
 
 ```bash
 npm --prefix packages/grudge run build
 npm --prefix packages/grudge run setup:repo
 npm --prefix packages/grudge run doctor:repo
+npm test --prefix packages/grudge
 ```
 
-From this directory, the short commands are:
+From this directory:
 
 ```bash
+npm run build
 npm run setup:repo
 npm run doctor:repo
+npm run uninstall:repo
 ```
 
-These target the repository root. The direct equivalent is `node dist/grudge.mjs
-...` from this directory, or `node packages/grudge/dist/grudge.mjs ...` from
-the repository root.
+The runtime requires Node.js 18 or newer. The package has no runtime npm
+dependencies.
 
-This installs the local, offline mistake guard. The installer copies the
-zero-dependency `dist/grudge.mjs` runtime into `.grudge/bin/`, merges Claude
-Code hooks, and adds a short managed instruction block. It is idempotent,
-supports `--dry-run`, creates timestamped backups, and can be reversed with
-`npm --prefix packages/grudge run uninstall:repo` from the repository root, or
-`npm run uninstall:repo` from this directory. The `npx
-grudge-cli ...` form is for an installed or published package, not an unlinked
-repository checkout. Uninstall prints a readable summary by default; pass
-`--json` when a script needs machine-readable output.
+## Troubleshooting
 
-Claude Code is the verified **Guard** adapter. Codex, Gemini CLI, GitHub
-Copilot, OpenCode, and Windsurf are **Advisory** instruction integrations;
-Cursor is currently unverified and writes nothing. See the
-[integration matrix](https://github.com/harshithKumar12/Grudge/blob/master/docs/integrations.md).
+If npm prints warnings about an unknown `allow-scripts` configuration, inspect
+the local setting with:
 
-The runtime requires Node.js 18+ and has no npm runtime dependencies.
+```bash
+npm config get allow-scripts
+```
+
+That warning comes from the npm environment. It is separate from Grudge's
+runtime and test behavior.
+
+If a version-bump test still expects the previous version, update all version
+surfaces together, including `src/version.js`, package metadata, Python
+metadata, release docs, and the version assertions under `test/`.
+
+## License
+
+MIT. See the repository [LICENSE](https://github.com/harshithKumar12/Grudge/blob/master/LICENSE).

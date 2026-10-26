@@ -21,7 +21,9 @@ def finish(payload: Mapping[str, Any], *, json_output: bool) -> None:
     """Print a command result as pretty JSON or a readable summary."""
 
     if json_output:
-        typer.echo(json.dumps(dict(payload), ensure_ascii=False, sort_keys=True, indent=2))
+        typer.echo(
+            json.dumps(dict(payload), ensure_ascii=False, sort_keys=True, indent=2)
+        )
         return
     command_name = str(payload.get("command", "command"))
     typer.echo(f"Grudge {command_name} v{_version()}")
@@ -85,11 +87,17 @@ def _version() -> str:
 
 def _next_command(command_name: str) -> str:
     if command_name in {"capture", "shrink", "admit"}:
-        return "grudge run --scars .grudge/scars --agent examples.leaky_agent.agent_fixed"
+        return (
+            "grudge run --scars .grudge/scars "
+            "--agent examples.leaky_agent.agent_fixed"
+        )
     if command_name == "run":
         return "grudge scars list"
     if command_name == "compile":
-        return "grudge run --scars .grudge/scars --agent examples.leaky_agent.agent_fixed"
+        return (
+            "grudge run --scars .grudge/scars "
+            "--agent examples.leaky_agent.agent_fixed"
+        )
     return "grudge --help"
 
 

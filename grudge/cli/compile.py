@@ -9,8 +9,8 @@ from typing import Any
 
 import typer
 
-from grudge.config import SCARS_DIR
 from grudge.cli._common import finish
+from grudge.config import SCARS_DIR
 from grudge.guard.compile import compile_scars, load_scars, write_compiled
 
 

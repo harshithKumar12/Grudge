@@ -171,6 +171,45 @@ npx grudge-cli@latest setup
 npx grudge-cli@latest doctor
 ```
 
+`npx` runs the package temporarily; it does **not** create a permanent
+`grudge` command in PowerShell. To use the Node Guard directly as `grudge`,
+install the package globally:
+
+```powershell
+npm install --global grudge-cli
+Get-Command grudge
+grudge --version
+grudge doctor
+```
+
+For this checkout, install the local build instead of the registry package:
+
+```powershell
+npm --prefix packages/grudge run build
+npm install --global .\packages\grudge
+grudge --version
+```
+
+If PowerShell still says that `grudge` is not recognized, add npm's global
+binary directory to your user PATH, open a new PowerShell window, and retry:
+
+```powershell
+$npmBin = npm prefix --global
+$userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+if (($userPath -split ';') -notcontains $npmBin) {
+  [Environment]::SetEnvironmentVariable("Path", "$userPath;$npmBin", "User")
+}
+$env:Path = "$npmBin;$env:Path"
+grudge --version
+```
+
+If both packages are installed, use the explicit aliases to avoid ambiguity:
+
+```powershell
+grudge-node doctor       # npm Node Guard
+grudge-engine --help     # Python engine
+```
+
 For a non-interactive Claude Code repository setup:
 
 ```bash
@@ -194,8 +233,12 @@ npx grudge-cli@latest uninstall
 
 ```bash
 python -m pip install grudge-cli
-grudge --help
+grudge-engine --help
 ```
+
+The Python package also provides `grudge`, but the npm Node Guard and Python
+engine intentionally share that short name for compatibility. When both are
+installed, prefer `grudge-node` and `grudge-engine`.
 
 For a checkout-based development install:
 
@@ -206,13 +249,13 @@ python -m pip install -e .
 ### 3. Run the offline demo
 
 ```bash
-grudge demo --no-browser --fast --json
+grudge-engine demo --no-browser --fast --json
 ```
 
 To run the two-session Claude-style hook proof:
 
 ```bash
-grudge demo --guard --json
+grudge-engine demo --guard --json
 ```
 
 The demo uses checked-in fake tools and scripted policies. It does not call a
@@ -281,17 +324,17 @@ the host environment when testing Claude Code hook behavior.
 
 ## CLI reference
 
-Run `grudge --help` or append `--help` to any command. Implemented Python
+Run `grudge-engine --help` or append `--help` to any Python command. Implemented Python
 commands include:
 
 ```text
-grudge capture AGENT_MODULE --out PATH
-grudge shrink TRACE --failure RULE --out PATH
-grudge admit CASSETTE --bad AGENT_MODULE --good AGENT_MODULE --out PATH
-grudge run --scars PATH --agent AGENT_MODULE
-grudge demo [--guard] [--no-browser] [--fast] [--json]
-grudge scars list [--scars PATH]
-grudge scars show SCAR [--scars PATH]
+grudge-engine capture AGENT_MODULE --out PATH
+grudge-engine shrink TRACE --failure RULE --out PATH
+grudge-engine admit CASSETTE --bad AGENT_MODULE --good AGENT_MODULE --out PATH
+grudge-engine run --scars PATH --agent AGENT_MODULE
+grudge-engine demo [--guard] [--no-browser] [--fast] [--json]
+grudge-engine scars list [--scars PATH]
+grudge-engine scars show SCAR [--scars PATH]
 ```
 
 The Node Guard runtime provides:
@@ -517,6 +560,17 @@ The current MVP intentionally leaves several deeper integrations explicit:
 - full viewer-backed Scar browser.
 
 See [`docs/roadmap.md`](docs/roadmap.md) for the maintained roadmap.
+
+## Benchmark status
+
+The row below is a measured offline CLI run on WSL Ubuntu-D with Python
+3.11.17 using the checked-in vulnerable agent and the command path documented
+in [`docs/demo-guide.md`](docs/demo-guide.md). Wall time includes capture and
+shrink; repeat on another machine before comparing timings.
+
+| Workload | Original steps | Minimal steps / entries | Oracle calls | Wall time | Cassette bytes |
+|---|---:|---:|---:|---:|---:|
+| Demo leak (offline, deterministic; WSL Ubuntu-D / Python 3.11.17) | 71 | 23 | 1,254 | 46.357 s | 3,756 |
 
 ## Contributing
 

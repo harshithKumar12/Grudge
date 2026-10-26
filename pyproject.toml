@@ -48,6 +48,7 @@ dev = [
 
 [project.scripts]
 grudge = "grudge.cli.main:app"
+grudge-engine = "grudge.cli.main:app"
 
 [tool.setuptools.packages.find]
 include = ["grudge*", "examples*"]
