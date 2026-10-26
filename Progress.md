@@ -81,3 +81,8 @@
 - Python test, Ruff, mypy, build, and Twine commands were not runnable in the
   current Linux shell because the required Python tooling is unavailable;
   documentation and release checks did run successfully.
+- Local commit `6262404` was created. `git push origin master` was attempted
+  once and failed because GitHub HTTPS credentials are unavailable in this
+  shell; no retry was made.
+- Verified global npm installation on Windows: `grudge` and `grudge-node` now
+  resolve from `C:\Users\kotes\AppData\Roaming\npm` and report `0.1.7`.
