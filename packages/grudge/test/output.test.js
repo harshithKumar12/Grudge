@@ -52,6 +52,15 @@ test("doctor renders the not-installed state without treating it as a failure", 
   assert.match(output, /1 passed, 0 failed, 0 warnings/);
 });
 
+test("suggested next commands are real commands", () => {
+  const known = new Set(["accept", "doctor", "hook", "propose", "report", "scars", "setup", "stats", "statusline", "uninstall"]);
+  for (const [command, result] of Object.entries(fixtures)) {
+    const next = renderCommand(command, result, { ascii: true }).match(/Next: grudge (\w+)/);
+    assert.ok(next, `${command} should suggest a next command`);
+    assert.ok(known.has(next[1]), `${command} suggests unknown command "${next[1]}"`);
+  }
+});
+
 test("errors include a fix without a stack trace by default", () => {
   const output = renderError(new Error("runtime missing"), { command: "doctor", ascii: true });
   assert.match(output, /Error: runtime missing/);

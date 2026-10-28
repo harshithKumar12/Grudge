@@ -118,7 +118,7 @@ function nextCommand(command, result) {
   if (command === "doctor") return result?.ok ? "grudge statusline" : "grudge setup --scope repo";
   if (command === "uninstall") return "grudge setup --scope repo";
   if (command === "propose") return result?.pending ? result.run : "grudge scars list";
-  if (command === "accept") return "grudge compile";
+  if (command === "accept") return "grudge doctor";
   if (command === "stats" || command === "report" || command === "statusline") return "grudge doctor";
   return "grudge doctor";
 }
