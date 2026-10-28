@@ -44,6 +44,7 @@ def test_import_session_preserves_order_and_round_trips(tmp_path: Path) -> None:
     assert isinstance(trace.steps[0], ToolCall)
     assert isinstance(trace.steps[1], ToolResult)
     assert trace.steps[0].tool == "read_file"
+    assert isinstance(trace.steps[2], ToolCall)
     assert trace.steps[2].tool == "http"
     round_trip = trace.from_jsonl(trace.to_jsonl()).model_dump(mode="json")
     assert round_trip == trace.model_dump(mode="json")

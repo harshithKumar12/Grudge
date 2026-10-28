@@ -63,5 +63,5 @@ def test_cassette_invalid_public_payloads_raise_schema_error() -> None:
             tool="read_file",
             match=ArgMatcher.any(),
             response={},
-            order_hint="first",
+            order_hint="first",  # type: ignore[arg-type]  # invalid on purpose
         )

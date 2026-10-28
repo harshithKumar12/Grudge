@@ -15,6 +15,7 @@ from grudge.admission import AdmissionVerdict, admit, court
 from grudge.predicates import compile_predicate, parse_predicate
 from grudge.predicates.compiler import PredicateResult
 from grudge.replay.sandbox import CassetteWorld
+from grudge.replay.sandbox import run_agent as sandbox_run_agent
 from grudge.replay.scripted_llm import ScriptedLLM
 from grudge.schema.cassette import ArgMatcher, Cassette, CassetteEntry
 from grudge.schema.predicate import CallShape, Ordering, Outcome, TaintFlow
@@ -265,7 +266,7 @@ def test_missing_tool_response_cannot_hide_inside_ok_trace(tmp_path: Path) -> No
 def test_replay_boundary_exception_fails_closed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    replay = court.run_agent
+    replay = sandbox_run_agent
 
     def raises(agent: Any, *args: Any, **kwargs: Any) -> Trace:
         if agent is bad_agent:

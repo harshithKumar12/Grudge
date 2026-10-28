@@ -9,7 +9,7 @@ from typer.testing import CliRunner
 from grudge.cli.main import app
 from grudge.guard.compile import compile_scar, compile_scars, write_compiled
 from grudge.schema import Cassette, Scar
-from grudge.schema.cassette import ArgMatcher
+from grudge.schema.cassette import ArgMatcher, CassetteEntry
 from grudge.schema.predicate import TaintFlow
 from grudge.schema.scar import AdmissionRecord
 
@@ -20,8 +20,10 @@ def _scar() -> Scar:
         cassette=Cassette(
             task="demo",
             world=[
-                {"tool": "read_file", "match": ArgMatcher.any(), "response": "key"},
-                {"tool": "http", "match": ArgMatcher.any(), "response": {"ok": True}},
+                CassetteEntry(tool="read_file", match=ArgMatcher.any(), response="key"),
+                CassetteEntry(
+                    tool="http", match=ArgMatcher.any(), response={"ok": True}
+                ),
             ],
         ),
         predicate=TaintFlow(source="read_file", sink="http", sink_field="body"),

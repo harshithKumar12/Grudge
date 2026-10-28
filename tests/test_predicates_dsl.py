@@ -142,7 +142,7 @@ def test_schema_nodes_pretty_print_to_equivalent_nodes(
 )
 def test_dsl_ast_round_trips_through_shared_predicate_schema(source: str) -> None:
     predicate = parse_predicate(source)
-    adapter = TypeAdapter(Predicate)
+    adapter: TypeAdapter[Predicate] = TypeAdapter(Predicate)
 
     restored = adapter.validate_json(adapter.dump_json(predicate))
 

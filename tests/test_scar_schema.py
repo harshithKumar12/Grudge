@@ -50,7 +50,7 @@ def test_scar_invalid_payloads_and_paths_raise_schema_error(
         Scar.model_validate({"id": "missing-fields"})
 
     with pytest.raises(SchemaError):
-        AdmissionRecord(admitted=[])
+        AdmissionRecord(admitted=[])  # type: ignore[arg-type]  # invalid on purpose
 
     with pytest.raises(SchemaError):
         make_scar().write(tmp_path / "scar.json")
