@@ -1,88 +1,169 @@
-# Grudge baseline report
+# Grudge progress tracker
 
-**Audit date:** 2026-10-23
-**Branch:** `master`
-**HEAD:** `b21be5a fix: harden pre-production installer and hooks`
+**Purpose:** Canonical, current state of the repository, the phase board, and
+the known issues that still block a universal production claim.
+**Audience:** Project owner, reviewers, and release operator.
+**Status:** current as of the 0.1.7 production-readiness pass.
+**Last updated:** 2026-10-28
 
-## Repository state
+## Current snapshot
 
-- `AGENTS.md` was read and will not be edited.
-- `PROMPT.md`, `PROMPT-2.md`, and `PROMPT-2-PARALLEL.md` are absent; Git history records their prior deletion.
-- `Progress.md` was absent and is recreated as this canonical current baseline.
-- `README.md`, `docs/INDEX.md`, `docs/FINAL-REPORT.md`, `TEST.md`, and relevant architecture/hook/integration docs were read.
-- The worktree has two pre-existing, uncommitted newline-only changes in `AGENTS.md` and `CLAUDE.md`; they are unrelated and excluded from remediation changes.
-- No publish, upload, login, push, or distribution command is authorized for this audit.
+- **Branch:** `master`. **Head at the start of this pass:** `ff720e1 fix: make
+  grudge commands available on Windows`.
+- **Fixes landed in this pass:**
+  - `b995c1c` fail builds on unresolved imports (bundler validates every
+    relative import and exported name).
+  - `52e6cb6` restore original settings on uninstall (byte-identical
+    third-party hooks and `statusLine`).
+  - `2c2e2c3` emit ASCII-only human output (`--ascii`/`NO_COLOR` are
+    compatibility no-ops, `[ok] Healthy`).
+  - `2d8e5aa` make content reduction independent of mapping order.
+  - `a803a41`, `0a8e8e9`, `32f7810` lint and type hygiene for examples, package
+    bases, and tests.
+  - `bd65b53` CI matrix: Ubuntu, macOS, Windows × Python 3.11/3.14, Node suite,
+    build, and `npm pack --dry-run`.
+- **Local versions:** `grudge-cli@0.1.7` (npm) and `grudge-cli==0.1.7` (PyPI
+  metadata). Both registries still serve **0.1.6**: `npm view grudge-cli
+  versions` → `0.1.0` … `0.1.6`; `pip index versions grudge-cli` → `0.1.6`.
+  Publication of `0.1.7` has not been performed.
+- **Verified in this checkout:**
+  - Node suite: **71/71 pass** (`npm test --prefix packages/grudge`).
+  - Python suite: **304 collected, 1 skipped**, exit 0 (`python -m pytest -q`).
+    The single skip and the `pytest_asyncio` deprecation warning are benign.
+  - `ruff check .` passes (whole tree, examples and tests included).
+  - `mypy .` passes: **123 source files**.
+  - `python -m scripts.docs_check`: **32** indexed, non-empty, linked files.
+  - `python -m scripts.release_check`: local npm/PyPI metadata agree.
+  - `npm run build` and `node dist/grudge.mjs --version` → `grudge 0.1.7`.
+  - Benchmark re-measured three times on Windows 11 / Python 3.14.0: capture
+    71 steps, cassette 23 → 23 entries and 11,854 → 2,081 bytes, 1,254 oracle
+    calls, 4.68/4.83/5.31 s. README now carries only this measured row.
+  - Flake probe: the shrinker/cassette-builder assertion ran **200 times** plus
+    eight `PYTHONHASHSEED` values and produced one identical fingerprint
+    `(3 entries, 5e5e8edd…0b31, 199 events, 145 oracle calls)`. No
+    intermittent failure was reproduced, so no `xfail` was added.
 
-## Current implementation
+## Phase board
 
-- Python engine: trace capture, redaction, cassette replay, shrinking, DSL predicates, admission proof, Wilson gate, CLI, offline demo, viewer boundary, and Scar persistence.
-- Node Guard: setup, doctor, uninstall, hooks, proposals, acceptance, stats, reports, statusline, self-contained runtime bundling, backups, rollback, and scope selection.
-- Recent pre-production fixes already in `b21be5a`: managed-block uninstall safety, Claude `CLAUDE.md` visibility, duplicate hook diagnostics/deduplication, and version metadata `0.1.5`.
-- Deferred roadmap items remain explicit: registry, fault locator, fuzzer, changed-Scar selector, GitHub/pytest integrations, outcome predicates, MCP/LangGraph adapters, and full viewer Scar browser.
+- [x] 0. Contracts, repository shape, ADR template
+- [x] 1. Schemas: trace, cassette, predicate, Scar
+- [x] 2. Leaky-agent story and scripted policy
+- [x] 3. Recording and redaction
+- [x] 4. Cassette replay sandbox
+- [x] 5. Two-level shrinking (entries, then content)
+- [x] 6. Predicate DSL and compiler
+- [x] 7. Admission proof (red/green plus controls)
+- [x] 8. Statistics and Wilson gate
+- [x] 9. Python CLI
+- [x] 10. Demo events and local server
+- [x] 11. Static viewer
+- [x] 12. Documentation, pitch, benchmark row, reproducibility audit
+- [ ] 13. Stretch register (registry, locator, fuzzer, selector, integrations,
+      outcome predicates, MCP/LangGraph adapters, full Scar browser) —
+      **intentionally deferred**; the register lives in
+      [`docs/roadmap.md`](docs/roadmap.md)
+- [x] 14. Cross-language guard contract and compiled predicate schema
+- [x] 15. Node Guard command surface
+- [x] 16. Trust model and retention boundaries
+- [x] 17. Hook contracts, fail-open behavior, and output caps
+- [x] 18. Managed instruction block
+- [x] 19. Per-agent installer integration matrix
+- [x] 20. Token budgets and status line
+- [x] 21. Python/Node shared conformance
+- [x] 22. Installer safety: scope selection, backups, rollback, uninstall
+- [x] 23. Doctor diagnostics and duplicate-scope accounting
+- [x] 24. Scratch walkthrough, package artifacts, release preparation
 
-## Actual package status
+## Phase 14-21 checklists
 
-- Local npm metadata: `grudge-cli@0.1.7`.
-- Local PyPI metadata: `grudge-cli==0.1.7`.
-- Registry publication of `0.1.7` is intentionally not performed in this task.
-- Release documentation states that `0.1.7` is being prepared and the local release check accepts prepared or published status.
+### 14 — Guard contract
 
-## Baseline acceptance gaps to verify
+- [x] Compiled predicate JSON schema checked into `spec/`.
+- [x] Python compiler and Node runtime agree on call shape, ordering, and
+      taint-lite semantics.
+- [x] Canonical tool-name normalization documented.
 
-1. Real packed npm tarball installation must be exercised in a clean scratch project.
-2. Claude Code must be tested end to end for instruction loading, hook registration, blocking, safe allow, status-line coexistence, and duplicate scopes.
-3. Existing third-party status lines and hooks must be proven unchanged by setup, repair, and uninstall.
-4. Doctor must cover broken paths, missing instructions, duplicate scopes, status-line conflicts, malformed state, and actionable repair guidance.
-5. Python/Node quality gates and package checks must be rerun from the current checkout.
-6. Windows is the available host; Linux/WSL and macOS remain unverified until executed.
+### 15 — Node Guard commands
 
-## Remediation completed in this pass
+- [x] `setup`, `doctor`, `uninstall`, `hook`, `propose`, `accept`, `scars`,
+      `stats`, `report`, `statusline` are implemented and tested.
+- [x] Every command supports structured text output and `--json` where it
+      applies; hook stdout stays machine JSON.
+- [x] The bundled runtime has no npm runtime dependencies.
 
-- Fixed selective uninstall cleanup so an existing `CLAUDE.md` or `AGENTS.md` is restored byte-for-byte, including its original trailing-newline shape.
-- Added npm repository/homepage/issue metadata and Python classifiers, keywords, and project URLs.
-- Added `scripts/release_check.py`, its test, and `make release-check`; `make all` now includes the local release check.
-- Updated release, integration, token-budget, walkthrough, and package documentation for the current `0.1.5` state.
-- Added a shared Node CLI renderer, structured default output, stable pretty JSON mode, error fixes, not-installed doctor output, and CLI output documentation.
-- Changed unmarked setup to default to repository scope and preselect Claude Code with Guard/Advisory tier labels.
+### 16 — Trust model
 
-## Evidence from current checkout
+- [x] Local-only state under `.grudge/`; no telemetry or hosted service.
+- [x] Captured content is redacted before persistence.
+- [x] Hook failures fail open with a visible warning.
 
-- Node suite passes **60/60** tests after the uninstall fix.
-- `python -m pytest -q` passes the Python suite with **one skip**. The bare `pytest -q` console entry point is not usable in this shell because it omits the repository import path; this is an invocation-environment issue, not a test failure.
-- `ruff check scripts tests` passes.
-- `mypy grudge scripts` passes with no issues across 82 source files.
-- `python -m scripts.docs_check` passes: 30 indexed, non-empty, linked documentation files.
-- `python -m scripts.release_check` passes: local npm/PyPI metadata and published-version documentation agree.
-- `npm pack --dry-run --json` reports a self-contained `grudge-cli-0.1.5.tgz` with the bundled runtime.
-- A fresh Python sdist and wheel build for `0.1.5` succeeds, and `twine check` passes for both artifacts.
-- `git diff --check` reports no whitespace errors.
-- Broad Ruff and mypy checks have known pre-existing failures under `examples/leaky_agent` and duplicate test-module discovery.
-- Current registry status was queried directly on 2026-10-23; no registry mutation was performed in this audit.
+### 17 — Hooks
 
-## Remaining release evidence
+- [x] Five hook events registered: `SessionStart`, `UserPromptSubmit`,
+      `PreToolUse`, `PostToolUse`, `Stop`.
+- [x] Deny payloads match the host contract; malformed input exits 0.
+- [x] Result payloads are capped; timings recorded as environment measurements.
 
-- Full Claude Code UI/model verification remains unavailable because the earlier API attempt ended with `ECONNREFUSED`.
-- Linux/WSL and macOS compatibility remain unverified.
-- A clean scratch-project run using the freshly packed npm tarball and the complete Claude hook/status-line flow still needs to be recorded.
-- `AGENTS.md` and `CLAUDE.md` retain unrelated newline-only worktree changes and
-  are excluded from the 0.1.7 commit.
+### 18 — Managed instruction block
 
-## 0.1.7 output work
+- [x] Versioned block with stable begin/end markers.
+- [x] Block is line-budgeted and re-installed idempotently.
+- [x] Uninstall removes only the managed block and restores the original bytes.
 
-- Added the shared Node renderer in `packages/grudge/src/output.js`.
-- Default Node CLI output is structured text; `--json` is pretty-printed and
-  preserves the result object; hook stdout remains machine JSON.
-- Added not-installed doctor output, strict-mode handling, error/fix messages,
-  ASCII marks, TTY-aware color behavior, setup scope correction, and Guard /
-  Advisory picker labels.
-- Added `docs/cli-output.md` and renderer regression tests.
-- Current Node verification: **65/65 tests passed** and `npm pack --dry-run`
-  reports `grudge-cli@0.1.7`.
-- Python test, Ruff, mypy, build, and Twine commands were not runnable in the
-  current Linux shell because the required Python tooling is unavailable;
-  documentation and release checks did run successfully.
-- Local commit `6262404` was created. `git push origin master` was attempted
-  once and failed because GitHub HTTPS credentials are unavailable in this
-  shell; no retry was made.
-- Verified global npm installation on Windows: `grudge` and `grudge-node` now
-  resolve from `C:\Users\kotes\AppData\Roaming\npm` and report `0.1.7`.
+### 19 — Integrations
+
+- [x] Claude Code verified for hook enforcement and instruction loading.
+- [x] Codex, Gemini CLI, GitHub Copilot, OpenCode, and Windsurf documented as
+      advisory (instruction files only).
+- [x] Cursor documented as unverified; the installer writes no Cursor files.
+
+### 20 — Token budgets
+
+- [x] Managed block, hook payloads, and status line have enforced caps.
+- [x] Token savings are labelled estimated, never measured claims.
+- [x] `doctor` reports budget usage.
+
+### 21 — Shared conformance
+
+- [x] Python and Node suites both run in CI on Linux, macOS, and Windows.
+- [x] Fixture conformance is covered by both languages.
+- [x] `ruff check .` and `mypy .` pass on the whole tree.
+- [x] `npm pack --dry-run` runs in CI.
+
+## Known issues
+
+1. **`0.1.7` is unpublished.** Both registries serve `0.1.6`; publishing needs
+   the owner's credentials and was intentionally not run.
+2. **CI has not executed yet.** `.github/workflows/grudge-guard.yml` is
+   committed but its first green run can only happen after a push.
+3. **No live Claude Code run in this pass.** The real hook/status-line block
+   test needs an interactive Claude session; steps and expected output are in
+   [`scripts/live-check.md`](scripts/live-check.md). The historical attempt in
+   [`docs/FINAL-REPORT.md`](docs/FINAL-REPORT.md) ended with provider
+   `ECONNREFUSED` after hooks loaded successfully.
+4. **Taint matching is substring-based.** `tainted_by` looks for the source
+   value inside later arguments; it does not track structured data flow.
+5. **The Node runtime is a subset of the Python engine.** Node evaluates call
+   shape, ordering, and taint-lite predicates only; shrinking, admission,
+   statistics, and the demo live in Python.
+6. **The gate is offline and deterministic.** It replays recorded cassettes; it
+   does not call a model provider and cannot detect drift in live model output.
+7. **Advisory agents are not enforced.** Codex, Gemini CLI, Copilot, OpenCode,
+   and Windsurf receive instruction files only; nothing blocks a tool call.
+8. **Cursor writes nothing.** The adapter is unverified by design.
+9. **Phase 13 stretch work is deferred:** registry and retirement, fault
+   locator, variant fuzzer, changed-Scar selector, pytest/GitHub integrations,
+   outcome predicates, MCP/LangGraph adapters, and the full Scar browser.
+10. **The benchmark row is one environment.** The README records a Windows 11
+    / Python 3.14.0 run: 71 trace steps, 23 → 23 cassette entries, 1,254 oracle
+    calls, 4.83 s, 11,854 → 2,081 cassette bytes. Entry reduction keeps all 23
+    entries because every recorded call is needed to replay the leak; content
+    reduction does the work here. Wall time is not a cross-platform guarantee.
+
+## Release evidence remaining
+
+- Push the branch, confirm the three-OS CI matrix is green.
+- Run [`scripts/live-check.md`](scripts/live-check.md) in a scratch repository
+  and attach the screenshots.
+- Record a second benchmark run on a different host before quoting timings in
+  public material.
