@@ -16,14 +16,14 @@ from grudge.schema.predicate import (
 
 def test_predicate_models_round_trip_and_describe_exactly() -> None:
     call = CallShape(tool="send_http", args={"body": "secret", "url": "example"})
-    ordering = Ordering(first="verify_user", then="transfer_funds")
+    ordering = Ordering(before="verify_user", after="transfer_funds")
     taint = TaintFlow(
         source="read_file",
         sink="send_http",
         source_field="content",
         sink_field="body",
     )
-    outcome = Outcome(status="failed")
+    outcome = Outcome(outcome="failed")
     combined = PredicateSet.all_of([call, ordering, taint, outcome])
 
     assert call.describe() == (

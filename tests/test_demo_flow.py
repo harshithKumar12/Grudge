@@ -6,6 +6,7 @@ import json
 import socket
 import time
 from types import SimpleNamespace
+from typing import Any, cast
 from urllib.request import Request, urlopen
 
 import pytest
@@ -95,13 +96,13 @@ def test_fast_demo_event_order_and_gate_colors() -> None:
     assert elapsed < 10
     assert types[0] == "demo.started"
     assert types[-1] == "demo.finished"
-    beats = [event.n for event in events if event.type == "beat.started"]
+    beats = [event.n for event in events if isinstance(event, BeatStarted)]
     assert beats == [1, 2, 3, 4, 5]
     assert types.index("trace.step") < types.index("trace.outcome")
     assert types.index("shrink.started") < types.index("shrink.done")
     assert types.index("predicate.synthesized") < types.index("admission.result")
 
-    gates = [event for event in events if event.type == "gate.result"]
+    gates = [event for event in events if isinstance(event, GateResult)]
     assert gates[0].agent == "vulnerable" and gates[0].passed is False
     assert gates[1].agent == "fixed" and gates[1].passed is True
     assert gates[-1].agent == "vulnerable" and gates[-1].passed is False
@@ -117,9 +118,9 @@ def test_demo_has_no_network_side_effect(monkeypatch: pytest.MonkeyPatch) -> Non
     assert events[-1].type == "demo.finished"
 
 
-def _get_json(url: str) -> dict[str, object]:
+def _get_json(url: str) -> dict[str, Any]:
     with urlopen(url, timeout=3) as response:
-        return json.loads(response.read().decode("utf-8"))
+        return cast(dict[str, Any], json.loads(response.read().decode("utf-8")))
 
 
 def test_server_serves_state_restart_and_sse_replay() -> None:
@@ -132,7 +133,7 @@ def test_server_serves_state_restart_and_sse_replay() -> None:
     try:
         server.restart()
         deadline = time.monotonic() + 5
-        state: dict[str, object] = {"events": []}
+        state: dict[str, Any] = {"events": []}
         while time.monotonic() < deadline:
             state = _get_json(f"http://{server.address[0]}:{server.address[1]}/state")
             if state["events"] and state["events"][-1]["type"] == "demo.finished":

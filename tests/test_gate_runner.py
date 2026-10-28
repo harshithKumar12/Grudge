@@ -29,7 +29,9 @@ def test_fixed_agent_passes_and_keeps_per_run_evidence() -> None:
     assert len(result.run_results) == 3
     assert all(run.trace is not None for run in result.run_results)
     assert all(run.predicate_result is not None for run in result.run_results)
-    assert all(not run.predicate_result.violated for run in result.run_results)
+    for run in result.run_results:
+        assert run.predicate_result is not None
+        assert not run.predicate_result.violated
 
 
 def test_vulnerable_agent_is_blocked_with_human_reasons() -> None:
