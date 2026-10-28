@@ -69,3 +69,41 @@ def test_builder_output_and_history_are_deterministic() -> None:
     assert first.minimal.content_hash == second.minimal.content_hash
     assert first.history == second.history
     assert first.stats == second.stats
+
+
+def _reverse_mapping_keys(value: object) -> object:
+    if isinstance(value, dict):
+        return {key: _reverse_mapping_keys(value[key]) for key in reversed(list(value))}
+    if isinstance(value, list):
+        return [_reverse_mapping_keys(item) for item in value]
+    return value
+
+
+def test_shrinking_is_independent_of_mapping_key_order() -> None:
+    cassette = _failing_cassette()
+    reordered = cassette.model_copy(
+        update={
+            "world": [
+                entry.model_copy(
+                    update={"response": _reverse_mapping_keys(entry.response)}
+                )
+                for entry in cassette.world
+            ]
+        }
+    )
+    assert reordered.content_hash == cassette.content_hash
+
+    baseline = build_minimal_cassette(
+        cassette,
+        agent_fn=run_leaky_agent,
+        seed_predicate=_leak,
+    )
+    shuffled = build_minimal_cassette(
+        reordered,
+        agent_fn=run_leaky_agent,
+        seed_predicate=_leak,
+    )
+
+    assert shuffled.minimal.content_hash == baseline.minimal.content_hash
+    assert shuffled.history == baseline.history
+    assert shuffled.stats == baseline.stats
