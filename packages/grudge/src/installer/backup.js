@@ -2,7 +2,7 @@
 import { copyFile, mkdir, readFile, writeFile, access, rm, unlink } from "node:fs/promises";
 import { join, relative, dirname, isAbsolute } from "node:path";
 import { hasManagedBlock, removeManagedBlock } from "./managed-block.js";
-import { parseJson, stripGrudgeSettings } from "./json-merge.js";
+import { parseJson, sameJson, stripGrudgeSettings } from "./json-merge.js";
 
 export async function backup(root, file, { timestamp = new Date().toISOString().replace(/[:.]/g, "-") } = {}) {
   const absolute = file;
@@ -90,7 +90,7 @@ async function removeCreatedManagedFile(file) {
 }
 
 async function cleanManagedFile(entry) {
-  if (isSettingsPath(entry.file)) return cleanSettingsFile(entry.file, entry.existed);
+  if (isSettingsPath(entry.file)) return cleanSettingsFile(entry);
   if (entry.file.endsWith(".gitignore")) return cleanGitignore(entry.file, entry.existed);
   if (!isManagedTextPath(entry.file)) return null;
   const current = await readOptional(entry.file);
@@ -110,13 +110,21 @@ async function restoreOriginalSeparator(entry, clean) {
   return original !== null && clean === `${original}\n` ? original : clean;
 }
 
-async function cleanSettingsFile(file, existed) {
+async function cleanSettingsFile(entry) {
+  const { file, existed, backup } = entry;
   const current = await readOptional(file);
   if (current === null) return null;
   let parsed;
   try { parsed = parseJson(current, file); } catch { return null; }
   const cleaned = stripGrudgeSettings(parsed);
   if (!cleaned.changed) return null;
+  if (existed && backup) {
+    const original = await readOptional(backup);
+    if (original !== null && sameJson(cleaned.value, parseJson(original, file))) {
+      await copyFile(backup, file);
+      return { file, action: "restored" };
+    }
+  }
   if (!existed && !Object.keys(cleaned.value).length) {
     await unlink(file);
     return { file, action: "removed" };

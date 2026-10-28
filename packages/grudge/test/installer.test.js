@@ -166,6 +166,22 @@ test("malformed managed markers fail safely and survive uninstall", async () => 
   assert.equal(await readFile(join(cwd, "CLAUDE.md"), "utf8"), malformed);
 });
 
+test("setup and uninstall leave a third-party settings file byte-identical", async () => {
+  const cwd = await scratch();
+  const runtime = join(cwd, "runtime.mjs");
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  await mkdir(join(cwd, ".claude"), { recursive: true });
+  const settingsPath = join(cwd, ".claude/settings.json");
+  const original = `{\n    "permissions": { "allow": ["Bash(ls)"] },\n    "statusLine": { "type": "command", "command": "other-tool status" },\n    "hooks": { "PreToolUse": [ { "matcher": "*", "hooks": [ { "type": "command", "command": "other-tool hook" } ] } ] }\n}\n`;
+  await writeFile(settingsPath, original);
+  await setup({ cwd, home: cwd, agents: ["claude-code"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
+  const installed = await readFile(settingsPath, "utf8");
+  assert.notEqual(installed, original);
+  assert.ok(installed.includes("grudge.mjs"));
+  await uninstall({ cwd, print: false });
+  assert.equal(await readFile(settingsPath, "utf8"), original);
+});
+
 test("repeated uninstall is idempotent", async () => {
   const cwd = await scratch();
   const runtime = join(cwd, "runtime.mjs");
