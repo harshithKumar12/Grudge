@@ -11,7 +11,12 @@ const packageJson = JSON.parse(await readFile(resolve(root, "package.json"), "ut
 await mkdir(dirname(target), { recursive: true });
 
 const modules = new Map();
+const sources = new Map();
+const moduleExports = new Map();
 const external = (specifier) => !specifier.startsWith(".");
+
+const keyFor = (file) => `./${file.slice(root.length + 5).replaceAll("\\", "/")}`;
+const fileFor = (key) => resolve(root, "src", key.slice(2));
 
 function exportNames(source) {
   const names = [];
@@ -26,10 +31,16 @@ function exportNames(source) {
 }
 
 async function collect(file) {
-  const key = `./${file.slice(root.length + 5).replaceAll("\\", "/")}`;
+  const key = keyFor(file);
   if (modules.has(key)) return key;
-  let source = await readFile(file, "utf8");
+  let source;
+  try {
+    source = await readFile(file, "utf8");
+  } catch (error) {
+    throw new Error(`build: cannot read module ${key} (${error.code ?? error.message})`);
+  }
   modules.set(key, null);
+  sources.set(key, source);
   for (const match of source.matchAll(/from\s+["']([^"']+)["']/g)) {
     const specifier = match[1];
     if (external(specifier)) continue;
@@ -50,6 +61,7 @@ async function collect(file) {
     return "";
   });
   const names = exportNames(source);
+  moduleExports.set(key, new Set(names));
   source = source.replace(/export\s+(?=(?:async\s+)?(?:function|const|let|var|class)\s+)/g, "");
   source = source.replace(/export\s*\{[^}]+\};?/g, "");
   source = source.replaceAll("import.meta.url", "__moduleUrl");
@@ -61,7 +73,40 @@ async function collect(file) {
   return key;
 }
 
-await collect(resolve(root, "src/cli.js"));
+/** Fail the build when a relative import has no module or no matching export. */
+function validateImports() {
+  const problems = [];
+  for (const [key, source] of sources) {
+    for (const match of source.matchAll(/import\s+\{([^}]+)\}\s+from\s+["']([^"']+)["']/g)) {
+      const specifier = match[2];
+      if (external(specifier)) continue;
+      const dependencyKey = keyFor(resolve(dirname(fileFor(key)), specifier));
+      if (!sources.has(dependencyKey)) {
+        problems.push(`${key} imports ${specifier}, but no module ${dependencyKey} was bundled`);
+        continue;
+      }
+      const available = moduleExports.get(dependencyKey) ?? new Set();
+      for (const item of match[1].split(",")) {
+        const original = item.trim().split(/\s+as\s+/)[0];
+        if (!original) continue;
+        if (!available.has(original)) {
+          problems.push(`${key} imports {${original}} from ${specifier}, but that module exports: ${[...available].sort().join(", ") || "nothing"}`);
+        }
+      }
+    }
+  }
+  if (problems.length) {
+    throw new Error(`build: unresolved imports\n  - ${problems.join("\n  - ")}`);
+  }
+}
+
+try {
+  await collect(resolve(root, "src/cli.js"));
+  validateImports();
+} catch (error) {
+  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+  process.exit(1);
+}
 const encoded = [...modules.entries()].map(([key, source]) => `${JSON.stringify(key)}: async (__moduleUrl, __import, __moduleKey) => {\n${source}\n}`).join(",\n");
 const contents = `#!/usr/bin/env node
 // Grudge v${packageJson.version}
