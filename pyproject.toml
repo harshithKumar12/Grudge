@@ -68,6 +68,7 @@ select = ["E", "F", "I", "B", "UP", "RUF"]
 python_version = "3.14"
 strict = true
 files = ["grudge"]
+explicit_package_bases = true
 exclude = ["^build/"]
 
 [tool.pytest.ini_options]
