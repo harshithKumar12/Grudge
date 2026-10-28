@@ -35,6 +35,21 @@ export function mergeJson(text, additions, file = "settings.json") {
   return `${JSON.stringify(merged, null, indent)}\n`;
 }
 
+/** Compare two JSON values while ignoring object key order. */
+export function sameJson(left, right) {
+  if (left === right) return true;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return Array.isArray(left) && Array.isArray(right) && left.length === right.length
+      && left.every((value, index) => sameJson(value, right[index]));
+  }
+  if (isObject(left) && isObject(right)) {
+    const leftKeys = Object.keys(left);
+    return leftKeys.length === Object.keys(right).length
+      && leftKeys.every((key) => Object.hasOwn(right, key) && sameJson(left[key], right[key]));
+  }
+  return false;
+}
+
 export function isGrudgeHookCommand(command) {
   return typeof command === "string" && /grudge(?:\.mjs)?[^\n]*\s+hook\s+(?:SessionStart|UserPromptSubmit|PreToolUse|PostToolUse|Stop)\b/i.test(command);
 }
