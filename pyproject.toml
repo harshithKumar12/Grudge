@@ -51,10 +51,12 @@ grudge = "grudge.cli.main:app"
 grudge-engine = "grudge.cli.main:app"
 
 [tool.setuptools.packages.find]
-include = ["grudge*", "examples*"]
+include = ["grudge*", "examples*", "scars*"]
 
 [tool.setuptools.package-data]
 "grudge.predicates" = ["prompts/*.md"]
+"examples.leaky_agent" = ["*.json", "controls/*", "fake_filestore/*"]
+scars = ["*.json"]
 
 [tool.ruff]
 target-version = "py311"
