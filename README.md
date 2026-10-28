@@ -47,6 +47,8 @@ every failed agent trace is automatically turned into a regression test, so your
 - [Release checklist](#release-checklist)
 - [Security and privacy](#security-and-privacy)
 - [Roadmap](#roadmap)
+- [Benchmark status](#benchmark-status)
+- [Limits](#limits)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -416,8 +418,8 @@ Run the primary checks from the repository root:
 ```bash
 npm test --prefix packages/grudge
 python -m pytest -q
-ruff check scripts tests
-mypy grudge scripts
+ruff check .
+mypy .
 python -m scripts.docs_check
 python -m scripts.release_check
 git diff --check
@@ -431,9 +433,13 @@ python -m build --outdir release-dist
 python -m twine check release-dist/*
 ```
 
-The repository's focused checks are the recommended release gate. Broad lint
-and type commands may inspect example/test modules outside the configured
-package scope; resolve those findings before treating a release as clean.
+The repository's focused checks are the recommended release gate. Whole-tree
+`ruff check .` and `mypy .` pass today, so a finding in either command is a real
+regression rather than expected noise.
+
+The three-OS CI matrix (`.github/workflows/grudge-guard.yml`) runs the Node and
+Python suites plus `npm pack --dry-run` on Ubuntu, macOS, and Windows for Python
+3.11 and 3.14.
 
 ## Troubleshooting
 
@@ -481,8 +487,8 @@ Pass the DSL through stdin:
 Use explicit scope flags:
 
 ```bash
-npx grudge-cli setup --yes --agents claude-code --scope repo
-npx grudge-cli setup --yes --agents claude-code --scope global
+npx grudge-cli@latest setup --yes --agents claude-code --scope repo
+npx grudge-cli@latest setup --yes --agents claude-code --scope global
 ```
 
 Then run `grudge doctor` and inspect the reported settings and instruction
@@ -564,14 +570,49 @@ See [`docs/roadmap.md`](docs/roadmap.md) for the maintained roadmap.
 
 ## Benchmark status
 
-The row below is a measured offline CLI run on WSL Ubuntu-D with Python
-3.11.17 using the checked-in vulnerable agent and the command path documented
-in [`docs/demo-guide.md`](docs/demo-guide.md). Wall time includes capture and
-shrink; repeat on another machine before comparing timings.
+The row below is a measured offline CLI run. The command path is documented in
+[`docs/demo-guide.md`](docs/demo-guide.md):
 
-| Workload | Original steps | Minimal steps / entries | Oracle calls | Wall time | Cassette bytes |
+```bash
+python -m grudge capture examples.leaky_agent.agent --out failure.jsonl
+python -m grudge shrink failure.jsonl \
+  --failure 'never flow read_file to send_http field body' \
+  --agent examples.leaky_agent.agent --out cassette.json --json
+```
+
+Wall time includes capture and shrink, measured over three consecutive runs
+(4.68 s, 4.83 s, 5.31 s). Repeat on another machine before comparing timings.
+
+| Workload | Trace steps captured | Cassette entries | Oracle calls | Wall time | Cassette bytes |
 |---|---:|---:|---:|---:|---:|
-| Demo leak (offline, deterministic; WSL Ubuntu-D / Python 3.11.17) | 71 | 23 | 1,254 | 46.357 s | 3,756 |
+| Demo leak (offline, deterministic; Windows 11 / Python 3.14.0) | 71 | 23 → 23 | 1,254 | 4.83 s | 11,854 → 2,081 |
+
+Entry reduction kept all 23 entries here because every recorded tool call is
+needed to replay the leak; shrinking removed content instead, cutting the
+cassette from 11,854 to 2,081 bytes (82%). The visual demo starts from the
+checked-in compact Scar and shrinks its world from 4 entries to 3.
+
+## Limits
+
+These are deliberate boundaries, not unfinished work:
+
+- **Taint matching is substring-based.** `tainted_by` looks for the source value
+  inside later tool arguments. It does not build a structured data-flow graph,
+  so encoded or reformatted copies of a secret can evade it.
+- **The Node runtime is a subset of the Python engine.** The Node Guard
+  evaluates call-shape, ordering, and taint-lite predicates. Shrinking,
+  admission, statistics, and the demo run only in Python. A DSL predicate that
+  needs the full Python compiler is not enforced by the Node hook.
+- **The gate is offline and deterministic.** It replays recorded cassettes and
+  never calls a model provider. It catches regressions in policy code and tool
+  arguments; it cannot detect drift caused only by a model change.
+- **Advisory agents are not enforced.** Codex, Gemini CLI, GitHub Copilot,
+  OpenCode, and Windsurf receive an instruction file. Nothing blocks their tool
+  calls, so compliance depends on the model reading the instructions.
+- **Cursor writes nothing.** The adapter is unverified and intentionally
+  no-write.
+- **Measurements are per environment.** The benchmark row and hook timings were
+  measured on one host; re-measure before quoting them elsewhere.
 
 ## Contributing
 
