@@ -12,9 +12,10 @@
   `Next:` command.
 - `--json` prints the existing JSON object with two-space indentation. The
   object shape is unchanged.
-- `--ascii` uses `[ok]`, `[fail]`, `[warn]`, and `[skip]` instead of Unicode
-  marks. `NO_COLOR=1` also disables ANSI colors.
-- Colors are emitted only when stdout is a TTY. Piped output is never colored.
+- Human-readable output is ASCII-only: `[ok]`, `[fail]`, `[warn]`, and
+  `[skip]`. It never emits ANSI color codes, so piped output, CI logs, and
+  legacy Windows consoles render identically. `--ascii` and `NO_COLOR=1` are
+  accepted for compatibility and change nothing.
 - Hook stdout is an exception: Claude Code hook responses remain machine JSON.
 - Errors use `Error: ...` and `Fix: ...`; stack traces require `--debug`.
 

@@ -36,6 +36,12 @@ test("non-TTY and ASCII output has no ANSI color codes", () => {
   assert.match(output, /\[ok\]/);
 });
 
+test("human-readable output never emits ANSI color codes", () => {
+  const output = renderCommand("stats", fixtures.stats);
+  assert.doesNotMatch(output, /\x1b\[/);
+  assert.match(output, /\[ok\]/);
+});
+
 test("doctor renders the not-installed state without treating it as a failure", () => {
   const output = renderCommand("doctor", { ok: false, checks: [
     { name: "config", ok: false, detail: "missing or invalid" },

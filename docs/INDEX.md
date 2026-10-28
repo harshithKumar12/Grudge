@@ -37,7 +37,7 @@
 | [`docs/trust-model.md`](trust-model.md) | Stored session data, redaction, retention, and local trust boundaries. | 16 | final |
 | [`docs/integrations.md`](integrations.md) | Per-agent installer verification status and safe no-write policy. | 19 | final |
 | [`docs/hooks.md`](hooks.md) | Hook event contracts, fail-open behavior, output caps, and measured timings. | 17 | final |
-| [`docs/cli-output.md`](cli-output.md) | Human-readable default output, stable JSON mode, marks, colors, errors, and command matrix. | 0.1.7 | final |
+| [`docs/cli-output.md`](cli-output.md) | Human-readable default output, stable JSON mode, marks, errors, and command matrix. | 0.1.7 | final |
 | [`docs/instruction-block.md`](instruction-block.md) | The compact managed model instruction block and its rationale. | 18 | final |
 | [`docs/token-budgets.md`](token-budgets.md) | Enforced output caps, token estimates, stats, and status-line discipline. | 20 | final |
 | [`docs/FINAL-REPORT.md`](FINAL-REPORT.md) | Final parallel-mode Definition of Done evidence, limitations, and release commands. | 21 | final |
