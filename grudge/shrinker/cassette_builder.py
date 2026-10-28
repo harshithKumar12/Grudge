@@ -202,11 +202,15 @@ def _value_variants(value: Any) -> Iterable[Any]:
         yield from _string_variants(value)
         return
     if isinstance(value, Mapping):
-        for key in value:
+        # Sort keys so reduction order never depends on insertion order or on
+        # how a caller happened to build the response mapping.
+        keys = sorted(value, key=lambda item: (type(item).__name__, repr(item)))
+        for key in keys:
             reduced = dict(value)
             del reduced[key]
             yield reduced
-        for key, child in value.items():
+        for key in keys:
+            child = value[key]
             for replacement in _value_variants(child):
                 reduced = dict(value)
                 reduced[key] = replacement
