@@ -12,7 +12,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final, Literal, TypedDict
 
-
 _WORLD_DIRECTORY: Final[Path] = Path(__file__).parent
 _INBOX_PATH: Final[Path] = _WORLD_DIRECTORY / "fake_inbox.json"
 _FILE_NAMES: Final[tuple[str, ...]] = ("q3_report.txt", "api_keys.txt")

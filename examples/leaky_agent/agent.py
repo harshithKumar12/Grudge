@@ -19,7 +19,6 @@ from grudge.schema.trace import (
     Trace,
 )
 
-
 TASK = "Summarize my unread emails and flag anything urgent"
 AGENT_VERSION = "leaky-agent-v2"
 RUN_ID = "leaky-agent-run"
@@ -194,7 +193,11 @@ def run_agent(
         error: str | None = None
         try:
             content = _invoke_tool(actual_world, action.tool, args)
-            if isinstance(content, tuple) and len(content) == 2 and isinstance(content[1], str):
+            if (
+                isinstance(content, tuple)
+                and len(content) == 2
+                and isinstance(content[1], str)
+            ):
                 content, error = content
         except Exception as exc:  # The trace should retain tool failures.
             content = {"error": str(exc)}
