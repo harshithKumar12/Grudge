@@ -130,7 +130,10 @@ def test_reproducible_audit_claims_are_present() -> None:
 def test_readme_contains_a_measured_benchmark_row() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
-    assert "46.357 s" in readme
+    # Re-measuring the benchmark also updates this assertion. The check exists to
+    # reject placeholder rows, not to freeze one host's timings.
+    assert "Trace steps captured" in readme
     assert "1,254" in readme
-    assert "3,756" in readme
+    assert "11,854" in readme
+    assert "2,081" in readme
     assert "not measured" not in readme
