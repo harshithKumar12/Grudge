@@ -1,13 +1,5 @@
 import { VERSION } from "./version.js";
 
-const ANSI = {
-  reset: "\x1b[0m",
-  red: "\x1b[31m",
-  yellow: "\x1b[33m",
-  green: "\x1b[32m",
-  cyan: "\x1b[36m",
-};
-
 export function jsonOutput(value) {
   return `${JSON.stringify(value ?? null, null, 2)}\n`;
 }
@@ -46,7 +38,7 @@ function renderDoctor(result, options) {
   }
   const checks = (result?.checks ?? []).filter((check) => !check.ok || check.warning);
   const lines = [`Grudge doctor v${VERSION}`];
-  if (!checks.length) lines.push("✓ Healthy");
+  if (!checks.length) lines.push("[ok] Healthy");
   else {
     for (const check of checks) {
       const item = { status: check.warning ? "warning" : "failed", label: check.name, detail: check.detail };
@@ -107,13 +99,9 @@ function groupItems(command, items) {
 }
 
 function formatItem(item, options) {
-  const ascii = options.ascii || options.noColor || !process.stdout.isTTY;
-  const marks = ascii ? { ok: "[ok]", failed: "[fail]", warning: "[warn]", skipped: "[skip]" } : { ok: "✓", failed: "✗", warning: "!", skipped: "-" };
+  const marks = { ok: "[ok]", failed: "[fail]", warning: "[warn]", skipped: "[skip]" };
   const mark = marks[item.status] ?? marks.ok;
-  const text = `${mark} ${item.label}: ${item.detail}`;
-  if (ascii || options.noColor || process.env.NO_COLOR) return text;
-  const color = item.status === "failed" ? ANSI.red : item.status === "warning" ? ANSI.yellow : item.status === "ok" ? ANSI.green : ANSI.cyan;
-  return `${color}${text}${ANSI.reset}`;
+  return `${mark} ${item.label}: ${item.detail}`;
 }
 
 function countItems(items) {

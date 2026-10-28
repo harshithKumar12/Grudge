@@ -355,11 +355,12 @@ grudge statusline
 Expected input and engine failures use exit code `2`. A passing gate returns
 `0`; a blocked gate returns `1`.
 
-By default, commands print structured human-readable output with grouped
+By default, commands print structured human-readable ASCII output with grouped
 checks, status marks, a summary, and a suggested next command. Use `--json`
-for stable machine-readable output, `--ascii` for terminals without Unicode,
-and `--debug` when a stack trace is needed. Claude Code hook stdout remains
-machine-readable JSON because the host consumes it directly. See
+for stable machine-readable output and `--debug` when a stack trace is needed;
+`--ascii` and `NO_COLOR=1` are accepted and change nothing because output
+never emits ANSI color. Claude Code hook stdout remains machine-readable JSON
+because the host consumes it directly. See
 [`docs/cli-output.md`](docs/cli-output.md) for the complete command matrix.
 
 ## Integrations
