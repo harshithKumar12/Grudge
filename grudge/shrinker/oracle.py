@@ -14,10 +14,12 @@ from dataclasses import dataclass
 from typing import Any, Protocol, runtime_checkable
 
 from grudge.errors import OracleError
+from grudge.predicates.compiler import compile_predicate
 from grudge.replay.sandbox import run_agent
 from grudge.schema.cassette import Cassette
 from grudge.schema.predicate import (
     CallShape,
+    FilteredTaintFlow,
     Outcome,
     PredicateSet,
     TaintFlow,
@@ -45,7 +47,14 @@ class Oracle(Protocol):
         """Return whether ``cassette`` still reproduces the seed failure."""
 
 
-SeedPredicate = Callable[[Trace], bool] | CallShape | TaintFlow | Outcome | PredicateSet
+SeedPredicate = (
+    Callable[[Trace], bool]
+    | CallShape
+    | TaintFlow
+    | FilteredTaintFlow
+    | Outcome
+    | PredicateSet
+)
 
 
 def _value_contains(value: Any, needle: Any) -> bool:
@@ -75,6 +84,10 @@ def _field(value: Any, name: str | None) -> Any:
 def _schema_predicate(predicate: Any, trace: Trace) -> bool:
     """Evaluate the Phase 1 predicate shapes used by the seed detectors."""
 
+    if isinstance(predicate, FilteredTaintFlow):
+        # Source filters live in the shared compiler; reuse it rather than
+        # duplicating the taint rules here.
+        return bool(compile_predicate(predicate).check(trace).violated)
     if isinstance(predicate, CallShape):
         return any(
             step.tool == predicate.tool
@@ -117,7 +130,8 @@ def _schema_predicate(predicate: Any, trace: Trace) -> bool:
 def _evaluate(predicate: Any, trace: Trace, cassette: Cassette) -> bool:
     """Evaluate a callable, schema predicate, or small checker-like object."""
 
-    if isinstance(predicate, CallShape | TaintFlow | Outcome | PredicateSet):
+    schema_shapes = (CallShape, TaintFlow, FilteredTaintFlow, Outcome, PredicateSet)
+    if isinstance(predicate, schema_shapes):
         return _schema_predicate(predicate, trace)
     checker = getattr(predicate, "check", None)
     if callable(checker):
