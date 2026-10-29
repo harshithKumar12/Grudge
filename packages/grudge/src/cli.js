@@ -16,12 +16,21 @@ const SHORT_FLAGS = {
   "-c": ["cwd", true],
 };
 
+// Every option the Node CLI understands. Anything else is an error, because a
+// silently ignored flag is how a model concludes a rule is active when it is not.
+const KNOWN_FLAGS = [
+  "help", "version", "json", "yes", "agents", "scope", "cwd",
+  "rule", "rulestdin", "why", "preventive", "accept", "session", "lifetime",
+  "strict", "dryrun", "keep", "ascii", "debug",
+];
+
 const USAGE = `Grudge v${VERSION} - local guards for recurring agent mistakes
 
 Usage: grudge <command> [options]
 
 Commands:
   (none)          Show status for the current directory
+  verify          Prove the installed guard blocks a real call
   doctor          Check this install and report problems
   setup           Install the guard into this repo (alias: init)
   statusline      One-line status for your prompt
@@ -41,6 +50,14 @@ Options:
   -a, --agents    Comma-separated agent list (setup)
   -s, --scope     repo or user (setup)
   -c, --cwd       Run against another directory
+  --keep          Keep the temporary project (verify)
+
+Propose options:
+  --rule <dsl>    Rule text, for example: never call shell where command ~ "rm -rf"
+  --rule-stdin    Read the rule from stdin (avoids shell quoting)
+  --why <text>    One sentence explaining the mistake
+  --preventive    Allow a rule that has not fired in the recorded session yet
+  --accept        Accept immediately instead of waiting for review
 
 Python engine (pip install grudge-cli): capture, compile, shrink, admit, run, demo
 `;
@@ -49,6 +66,7 @@ Python engine (pip install grudge-cli): capture, compile, shrink, admit, run, de
 export function parseArgs(argv) {
   const positional = [];
   const options = {};
+  const flags = [];
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
     const short = SHORT_FLAGS[value];
@@ -57,19 +75,32 @@ export function parseArgs(argv) {
       const next = argv[index + 1];
       if (takesValue && next && !next.startsWith("-")) options[name] = argv[++index];
       else options[name] = true;
+      flags.push(name);
       continue;
     }
     if (!value.startsWith("--")) {
-      positional.push(value);
+      if (value.startsWith("-") && value.length > 1) flags.push(value.replace(/^-+/, ""));
+      else positional.push(value);
       continue;
     }
     const equals = value.indexOf("=");
     const name = (equals === -1 ? value.slice(2) : value.slice(2, equals)).replaceAll("-", "");
+    flags.push(name);
     if (equals !== -1) options[name] = value.slice(equals + 1);
     else if (argv[index + 1] && !argv[index + 1].startsWith("--")) options[name] = argv[++index];
     else options[name] = true;
   }
-  return { command: positional[0] ?? "", positional: positional.slice(1), options };
+  return { command: positional[0] ?? "", positional: positional.slice(1), options, flags };
+}
+
+/** Reject unknown options with the full list of valid ones. */
+function unknownOptionError(flags = []) {
+  const unknown = flags.filter((name) => !KNOWN_FLAGS.includes(name));
+  if (!unknown.length) return null;
+  return Object.assign(
+    new Error(`unknown option ${unknown.map((name) => `--${name}`).join(", ")}. Valid options: ${KNOWN_FLAGS.map((name) => `--${name}`).join(", ")}`),
+    { exitCode: 2 },
+  );
 }
 
 async function readStdin() {
@@ -85,6 +116,8 @@ function rootOptions(options) {
 /** Execute parsed arguments and return the process exit code. */
 export async function dispatch(parsed, { stdin = readStdin } = {}) {
   const { command, positional, options } = parsed;
+  const unknown = unknownOptionError(parsed.flags);
+  if (unknown) throw unknown;
   const root = rootOptions(options);
   if (options.help) {
     process.stdout.write(USAGE);
@@ -107,7 +140,7 @@ export async function dispatch(parsed, { stdin = readStdin } = {}) {
   if (command === "propose") {
     if ((!options.rule && !options.rulestdin) || !options.why) throw Object.assign(new Error("usage: grudge propose --rule <dsl> --why <sentence>"), { exitCode: 2 });
     const rule = options.rulestdin ? await stdin() : options.rule;
-    result = await commands.propose({ ...root, rule, why: options.why, preventive: Boolean(options.preventive), session: options.session });
+    result = await commands.propose({ ...root, rule, why: options.why, preventive: Boolean(options.preventive), accept: Boolean(options.accept), session: options.session });
   } else if (command === "accept") {
     if (!positional[0]) throw Object.assign(new Error("usage: grudge accept <id>"), { exitCode: 2 });
     result = await commands.accept(positional[0], { root: root.root });
@@ -125,6 +158,10 @@ export async function dispatch(parsed, { stdin = readStdin } = {}) {
     result = await commands.setup({ ...root, yes: Boolean(options.yes), dryRun: Boolean(options.dryrun), scope: options.scope, agents: options.agents ? String(options.agents).split(",").filter(Boolean) : [], print: false });
   } else if (command === "doctor") {
     result = await commands.doctor({ ...root, print: false });
+  } else if (command === "verify") {
+    const verified = await commands.verify({ keep: Boolean(options.keep), print: !options.json });
+    if (options.json) process.stdout.write(jsonOutput(verified));
+    return verified.ok ? 0 : 1;
   } else if (command === "uninstall") {
     result = await commands.uninstall({ ...root, print: false });
   } else if (["capture", "demo", "shrink", "admit", "run"].includes(command)) {
@@ -136,7 +173,8 @@ export async function dispatch(parsed, { stdin = readStdin } = {}) {
   if (options.json) process.stdout.write(jsonOutput(result));
   else process.stdout.write(renderCommand(command, result, options));
   if (command === "scars" && positional[0] === "show" && !result?.pending && !result?.scar) return 1;
-  if (command === "propose" && result?.accepted === false) return 1;
+  if (command === "propose" && result?.error) return 1;
+  if (command === "accept" && result?.error) return 1;
   if (command === "doctor" && result?.ok === false) {
     const notInstalled = !result.checks?.find((check) => check.name === "config")?.ok
       && !result.checks?.find((check) => check.name === "runtime")?.ok;

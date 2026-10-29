@@ -7,7 +7,7 @@ This guide walks you through Grudge the way a new developer would meet it. By th
 2. A **hook** checks every action Claude Code is about to take against your scars, and stops a match before it runs.
 3. Grudge counts what it caught and stopped, so you can see whether it earns its place.
 
-**You need:** Node 18 or newer, Claude Code installed, and a terminal. Step 10 also needs Python 3.11 or newer (WSL is fine).
+**You need:** Node 18 or newer and a terminal. Step 7 also needs Claude Code, and Step 10 needs Python 3.11 or newer (WSL is fine).
 
 > **Never test inside your home folder** (for example `C:\Users\you`). A repo-level install there acts like a global one and affects every project. Use the scratch folder in Step 1.
 
@@ -112,9 +112,38 @@ bash/WSL: `alias grudge='node .grudge/bin/grudge.mjs'`
 
 ---
 
-## Step 5: Create a harmless test rule
+## Step 5: Prove the guard blocks (one command)
 
-We will ban one harmless command, `echo GRUDGE_TEST`, so nothing real is at risk.
+This is the real proof, and it takes a few seconds. It uses a temporary
+project, so it does not touch this folder or your home directory:
+
+```powershell
+npx grudge-cli@latest verify
+```
+
+Pass: every line starts with `[ok]`, and the last two lines are:
+
+```text
+Result: PASS (10/10 checks)
+Temp project removed (use --keep to inspect it)
+```
+
+The block line must read `block: Bash "echo GRUDGE_TEST" exited 2` with a
+reason. If anything fails, the command exits non-zero, keeps the temporary
+project, and prints its path so you can inspect what went wrong. Add `--keep`
+to keep it after a pass.
+
+What it checks: install, installed runtime, event capture, propose, accept, the
+block, a benign call, fail-open on malformed input, the stats log, and
+`grudge report`.
+
+---
+
+## Step 6: Create your own rule
+
+`verify` used a temporary project. In your scratch project you can write a rule
+the same way. We will ban one harmless command, `echo GRUDGE_TEST`, so nothing
+real is at risk.
 
 ```powershell
 grudge propose --rule 'never call shell where command ~ \"GRUDGE_TEST\"' --why "harmless test rule" --preventive
@@ -125,9 +154,13 @@ bash/WSL (quotes are simpler there):
 grudge propose --rule 'never call shell where command ~ "GRUDGE_TEST"' --why "harmless test rule" --preventive
 ```
 
-If PowerShell complains about quotes, run this one command from Git Bash or WSL in the same folder.
+If PowerShell complains about quotes, run this one command from Git Bash, WSL,
+or use `--rule-stdin` with a here-string in the same folder.
 
-The rule is **pending**. A person has to approve it. That is on purpose, so a model can never add rules that block itself without you knowing.
+The rule is **pending**, and the output says so: `PENDING. Not enforced until
+you run: grudge accept <id>`. A person has to approve it. That is on purpose, so
+a model can never add rules that block itself without you knowing. If you want
+the shortcut, `--accept` skips the review and enforces immediately.
 
 ```powershell
 grudge scars list
@@ -137,27 +170,27 @@ grudge scars list
 
 Pass: the scar moves from pending to accepted.
 
----
+Optional: feed Grudge the same messages `verify` sends, by hand. An **allowed**
+command:
 
-## Step 6: Test the guard without Claude Code
-
-Feed Grudge a fake "Claude is about to run this command" message, exactly as Claude Code would.
-
-An **allowed** command:
 ```powershell
 '{"session_id":"t1","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"echo hello"}}' | node .grudge/bin/grudge.mjs hook pre-tool-use
 ```
-Pass: no deny decision.
 
-A **blocked** command:
+Pass: no deny decision. A **blocked** command:
+
 ```powershell
 '{"session_id":"t1","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"echo GRUDGE_TEST"}}' | node .grudge/bin/grudge.mjs hook pre-tool-use
 ```
-Pass: a deny decision that names the scar and gives a short reason.
+
+Pass: a deny decision that names the scar, gives a short reason, and exits `2`.
 
 ---
 
-## Step 7: Test it inside Claude Code (the real proof)
+## Step 7: Test it inside Claude Code (the real proof for your own install)
+
+`grudge verify` proves the shipped runtime. This step proves *your* install
+inside a live session.
 
 1. Start Claude Code inside `grudge-test`:
    ```powershell
@@ -175,6 +208,12 @@ Pass: a deny decision that names the scar and gives a short reason.
    Pass: it runs normally. Grudge only stops what a rule matches.
 
 If step 4 runs the command anyway, the hook is not wired up. Go back to Step 3.
+
+> **Do not trust the model's summary.** Weak or proxy models sometimes say they
+> ran a command, or that a rule is active, without running anything. Check the
+> transcript for the command output, or run `grudge verify` yourself. A rule is
+> only enforced when the output says accepted and the tool call was actually
+> blocked.
 
 ---
 
@@ -246,12 +285,15 @@ Then check `.claude\settings.json` has no `.grudge` entries and that the managed
 | `Cannot find module ... commands\index.js` | The installed script is the old unbundled one. Update to `0.1.9` or later and run setup again. |
 | Setup prints a wall of JSON | You are on an old version. `0.1.9` prints a structured summary by default; use `--json` for scripts. |
 | You chose scope "local" but the result says "repo" | Old scope bug. Update and retry. |
-| `doctor` is green but Claude runs the blocked command | Settings file not loaded. Restart Claude Code and check `/hooks`. |
-| Quote errors in `propose` on PowerShell | Use Git Bash or WSL for that one command, or the stdin option if your version has it. |
+| `doctor` is green but Claude runs the blocked command | Expected. `doctor` only reads files. Run `grudge verify`, then check `/hooks` and restart Claude Code. |
+| `grudge verify` reports FAIL | Real problem in the shipped runtime or this machine. The kept temp project and the failing line show where. |
+| Quote errors in `propose` on PowerShell | Use Git Bash or WSL for that one command, or `--rule-stdin`. |
 | Hook error on every session in every project | The install went into your home folder. Do Step 0. |
+| A hook error naming some other plugin | Another tool's hook, not Grudge's. Grudge never edits hook entries it did not create. |
 
 ## You are done when
 
+- [ ] `grudge verify` prints `Result: PASS (10/10 checks)`.
 - [ ] `doctor` is clean and Step 4 runs without errors.
 - [ ] The blocked command is stopped in Claude Code and the harmless one runs.
 - [ ] `stats` shows at least one block, with figures labeled **est.**

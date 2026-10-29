@@ -3,7 +3,7 @@
 **Purpose:** Document the default human-readable output and the stable JSON mode.
 **Audience:** Users, scripts, integration authors, and release reviewers.
 **Status:** final for 0.1.7
-**Last updated (phase):** 0.1.7 · 2026-10-23
+**Last updated (phase):** 25 - 2026-10-29
 
 ## Output rules
 
@@ -24,13 +24,14 @@
 | Command | Before 0.1.7 default | 0.1.7 default | JSON mode |
 |---|---|---|---|
 | `setup` / `init` | File changes and warnings, with inconsistent summaries | Header, scope/agent/files groups, warnings, summary, next command | Existing setup result, pretty-printed |
-| `doctor` | One raw JSON line or individual check lines | Grouped checks, collapsed Budgets group, Healthy/Needs attention verdict, fixes | Existing doctor object, including measurements |
+| `doctor` | One raw JSON line or individual check lines | Grouped checks, collapsed Budgets group, Healthy/Needs attention verdict, fixes, and a line that file checks cannot prove blocking | Existing doctor object, including measurements |
+| `verify` | Did not exist | One `[ok]`/`[fail]` line per check, then `Result: PASS/FAIL (n/10 checks)` and cleanup note; non-zero exit on failure | `{ok, checks, root, kept}` |
 | `uninstall` | Removed paths or a compact summary | Restored/removed groups, summary, next setup command | Existing uninstall result |
 | `stats` | Raw JSON through the top-level CLI | Counters, scars, estimated savings, summary | Existing stats object |
 | `report` | Raw JSON through the top-level CLI | Session/lifetime savings groups and summary | Existing report object |
 | `status` | Five ad-hoc lines | Standard status header, checks, summary, next command | Doctor object when explicitly requested |
 | `statusline` | Compact status line | Compact one-line status contract for host-agent polling | Not intended for scripts; use `stats --json` |
-| `propose` | Raw result object | Proposal/status marks, summary, next acceptance command | Existing proposal object |
+| `propose` | Raw result object | Proposal mark and a status line that says `PENDING` (or `accepted and enforced`), summary, next acceptance command | Existing proposal object, now with `accepted: false` while pending |
 | `accept` | Raw result object | Scar acceptance mark and next compile command | Existing acceptance object |
 | `reject` / `scars` actions | Raw result or ad-hoc lines | Action result or grouped Scar list | Existing result object |
 | `compile` | Compact sentence in Python CLI | Header, compiled rules, output path, summary | Existing compile object |

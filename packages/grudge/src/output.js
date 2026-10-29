@@ -55,8 +55,11 @@ function renderDoctor(result, options) {
   const passed = (result?.checks ?? []).filter((check) => check.ok && !check.warning).length;
   const failed = (result?.checks ?? []).filter((check) => !check.ok).length;
   const warnings = (result?.checks ?? []).filter((check) => check.warning).length;
+  // File checks cannot prove that a hook actually stops a call. Say so, and
+  // point at the only command that can.
+  if (!failed) lines.push("Enforcement: not proven by file checks. Run `grudge verify` to prove blocking works.");
   lines.push(`${passed} passed, ${failed} failed, ${warnings} warnings`);
-  lines.push(`Next: ${failed ? "grudge setup --scope repo --agents claude-code" : "grudge statusline"}`);
+  lines.push(`Next: ${failed ? "grudge setup --scope repo --agents claude-code" : "grudge verify"}`);
   return `${lines.join("\n")}\n`;
 }
 
@@ -82,9 +85,11 @@ function commandItems(command, result) {
     { status: "ok", label: "Estimated savings", detail: `~${result.estimatedTokensSaved ?? 0} tokens` },
   ];
   if (command === "report") return Object.entries(result).filter(([key]) => key !== "estimated").map(([key, value]) => ({ status: "ok", label: key, detail: `${value.caught} caught, ${value.blocked} blocked, ${value.warned} warned` }));
-  if (command === "propose") return result.accepted === false
+  if (command === "propose") return result.accepted === false && result.error
     ? [{ status: "failed", label: "Proposal", detail: result.error }]
-    : [{ status: "ok", label: "Proposal", detail: result.id || "created" }, { status: result.pending ? "warning" : "ok", label: "Status", detail: result.pending ? "pending acceptance" : "accepted" }];
+    : [{ status: "ok", label: "Proposal", detail: result.id || "created" }, result.pending
+      ? { status: "warning", label: "Status", detail: `PENDING. Not enforced until you run: grudge accept ${result.id}` }
+      : { status: "ok", label: "Status", detail: "accepted and enforced" }];
   if (command === "accept") return [{ status: result.accepted ? "ok" : "failed", label: "Scar", detail: result.id }];
   if (command === "scars") {
     // `list` returns arrays, `show` returns one pending and one admitted record.
@@ -121,7 +126,7 @@ function countItems(items) {
 
 function nextCommand(command, result) {
   if (command === "setup" || command === "init") return "grudge doctor";
-  if (command === "doctor") return result?.ok ? "grudge statusline" : "grudge setup --scope repo";
+  if (command === "doctor") return result?.ok ? "grudge verify" : "grudge setup --scope repo";
   if (command === "uninstall") return "grudge setup --scope repo";
   if (command === "propose") return result?.pending ? result.run : "grudge scars list";
   if (command === "accept") return "grudge doctor";

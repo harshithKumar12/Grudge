@@ -24,9 +24,7 @@ every failed agent trace is automatically turned into a regression test, so your
 
 </div>
 
-> **Release status:** source version `0.1.9` is being prepared. `0.1.8` is
-> published; verify the registries and complete the release checklist before
-> publishing `0.1.9`.
+> **Release status:** Grudge CLI `0.1.9` is published in both public package registries (`grudge-cli` on npm and on PyPI). Phase 25 changes on `master` are unreleased. The unrelated `grudge` npm package is a different project, so install `grudge-cli`.
 
 ## Table of contents
 
@@ -36,6 +34,7 @@ every failed agent trace is automatically turned into a regression test, so your
 - [How it works](#how-it-works)
 - [Architecture](#architecture)
 - [Quick start](#quick-start)
+- [Verify it works](#verify-it-works)
 - [Install the packages](#install-the-packages)
 - [Docker](#docker)
 - [CLI reference](#cli-reference)
@@ -103,6 +102,7 @@ provider credentials or network access.
 - Claude Code hook registration for `SessionStart`, `UserPromptSubmit`,
   `PreToolUse`, `PostToolUse`, and `Stop`.
 - Deterministic blocking of admitted mistakes before a tool runs.
+- `verify` proves the installed guard really blocks a call, offline, in one command.
 - Duplicate hook accounting protection across overlapping scopes.
 - Status-line reporting with estimated savings.
 - `doctor` diagnostics, dry-run setup, timestamped backups, and safe uninstall.
@@ -304,6 +304,37 @@ grudge-engine demo --guard --json
 The demo uses checked-in fake tools and scripted policies. It does not call a
 model provider or require public-network access.
 
+## Verify it works
+
+One command proves the installed Guard blocks a real tool call. It needs no
+model, no network, and no Python:
+
+```bash
+npx grudge-cli@latest verify
+```
+
+It creates a temporary project, installs the guard there, proposes and accepts
+a harmless rule, then feeds the installed hook runner real Claude Code
+`PreToolUse` payloads over stdin. Expected last two lines:
+
+```text
+Result: PASS (10/10 checks)
+Temp project removed (use --keep to inspect it)
+```
+
+The checklist covers the install, the installed runtime, event capture,
+propose, accept, the block (`Bash "echo GRUDGE_TEST"` exits `2` with a reason),
+a benign call (`echo hello` exits `0`), fail-open on malformed input, the stats
+log, and `grudge report`. A failure keeps the temp project and prints its path;
+`--keep` keeps it after a pass too. `grudge verify --json` is machine-readable.
+
+**Scope of the claim:** Guard enforcement is verified for **Claude Code only**,
+because only Claude Code exposes blocking command hooks. Codex, Gemini CLI,
+GitHub Copilot, OpenCode, and Windsurf receive an instruction file and are
+advisory: nothing stops their tool calls. `grudge doctor` checks files and
+configuration; it never claims that blocking works. Only `grudge verify` (or a
+live Claude Code run) does that.
+
 ## Install the packages
 
 Grudge has two complementary packages with the same user-facing command name:
@@ -384,16 +415,27 @@ The Node Guard runtime provides:
 
 ```text
 grudge setup [--yes] [--dry-run] [--scope repo|global|all] [--agents LIST]
+grudge verify [--keep] [--json]
 grudge doctor
 grudge uninstall [--json]
 grudge hook SessionStart|UserPromptSubmit|PreToolUse|PostToolUse|Stop
-grudge propose --rule RULE --why EXPLANATION [--preventive]
+grudge propose --rule RULE --why EXPLANATION [--preventive] [--accept]
+grudge propose --rule-stdin --why EXPLANATION [--preventive] [--accept]
 grudge accept SCAR_ID
 grudge scars list|show
 grudge stats
 grudge report
 grudge statusline
 ```
+
+`propose` records a **pending** scar by default and prints the exact command
+that enforces it. `--accept` skips that review step and enforces the rule
+immediately, which is convenient and riskier: a bad rule blocks work until you
+remove it with `grudge scars remove`. Unknown options fail with exit code `2`
+and list the valid flags instead of being ignored.
+
+A PreToolUse deny exits `2` and prints the deny JSON, so Claude Code blocks the
+call even if it cannot parse stdout.
 
 Expected input and engine failures use exit code `2`. A passing gate returns
 `0`; a blocked gate returns `1`.
@@ -864,8 +906,16 @@ See [`docs/roadmap.md`](docs/roadmap.md) for the maintained roadmap.
 
 ## Benchmark status
 
-The row below is a measured offline CLI run. The command path is documented in
-[`docs/demo-guide.md`](docs/demo-guide.md):
+Two things are measured today. Neither is a general benchmark, and this section
+does not claim one.
+
+**1. Guard blocking.** `grudge verify` runs the full chain in a temporary
+project on Windows, macOS, and Linux, and prints `Result: PASS (10/10 checks)`
+when a matching `Bash` call exits `2` and a benign one exits `0`. That is the
+only proof of enforcement in the product.
+
+**2. Shrinking.** The row below is a measured offline CLI run. The command path
+is documented in [`docs/demo-guide.md`](docs/demo-guide.md):
 
 ```bash
 python -m grudge capture examples.leaky_agent.agent --out failure.jsonl
@@ -884,7 +934,13 @@ Wall time includes capture and shrink, measured over three consecutive runs
 Entry reduction kept all 23 entries here because every recorded tool call is
 needed to replay the leak; shrinking removed content instead, cutting the
 cassette from 11,854 to 2,081 bytes (82%). The visual demo starts from the
-checked-in compact Scar and shrinks its world from 4 entries to 3.
+checked-in compact Scar and shrinks its world from 4 entries to 3. Entry counts
+do not fall dramatically on a leak that genuinely needs every step, so treat
+"fewer steps" as workload-dependent and this table as the one measured example.
+
+The savings shown by `grudge stats`, `statusline`, and `report` are labelled
+`estimated`: they value a blocked call at a fixed token estimate rather than
+measuring a real retry.
 
 ## Limits
 

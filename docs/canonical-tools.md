@@ -3,7 +3,7 @@
 **Purpose:** Normalize host-agent tool names before guard predicates evaluate them.
 **Audience:** Adapter and hook implementers.
 **Status:** final
-**Last updated (phase):** 14
+**Last updated (phase):** 25
 
 ## Contract
 
@@ -19,16 +19,21 @@ are:
 | `mcp` | `{server, tool, args}` |
 | `other` | `{name, args}` |
 
-For Claude Code, the Phase 14 mapping is:
+For Claude Code, the mapping is (case-insensitive; re-verified 2026-10-29):
 
 | Host name | Canonical name |
 |---|---|
-| `Read` | `read_file` |
-| `Write`, `Edit`, `MultiEdit` | `write_file` |
-| `Bash` | `shell` |
-| `WebFetch` | `http` |
+| `Read`, `NotebookRead` | `read_file` |
+| `Write`, `Edit`, `MultiEdit`, `NotebookEdit` | `write_file` |
+| `Bash`, `PowerShell` | `shell` |
+| `WebFetch`, `WebSearch` | `http` |
 | `mcp__<server>__<tool>` | `mcp` |
-| anything else | `other` |
+| anything else (`Glob`, `Grep`, ...) | the host name, unchanged |
+
+Unmapped host tools keep their own name instead of being coerced to `other`.
+That is deliberate: a rule written for `read_file` must not fire on `Glob`, and
+a rule written for `Glob` (if someone writes one) still matches. `test/phase25-mapping.test.js`
+asserts every row above, and blocks a real payload per row.
 
 The adapter preserves the original name in event metadata when available, but
 predicates never depend on it. Argument values remain JSON and are not coerced
