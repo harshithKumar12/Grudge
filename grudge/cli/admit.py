@@ -12,6 +12,7 @@ import typer
 
 from grudge.admission import admit
 from grudge.cli._common import command, finish, load_callable, read_text
+from grudge.config import PROJECT_ROOT
 from grudge.errors import GrudgeError
 from grudge.predicates.dsl import parse
 from grudge.predicates.fallback_rules import demo_rule
@@ -22,9 +23,9 @@ from grudge.schema.trace import Trace
 
 def admit_cassette(
     cassette: Path,
-    bad: str = typer.Option(..., "--bad", help="Failing agent module."),
-    good: str = typer.Option(..., "--good", help="Fixed agent module."),
-    out: Path = typer.Option(..., "--out", help="Directory for admitted Scars."),
+    bad: str = typer.Option(..., "--bad", "-b", help="Failing agent module."),
+    good: str = typer.Option(..., "--good", "-g", help="Fixed agent module."),
+    out: Path = typer.Option(..., "--out", "-o", help="Directory for admitted Scars."),
     scar_id: str | None = typer.Option(None, "--id", help="Scar filename/id."),
     predicate: str = typer.Option(
         "demo",
@@ -32,12 +33,13 @@ def admit_cassette(
         help="Predicate DSL, or 'demo' for the hand-verified rule.",
     ),
     controls: Path = typer.Option(
-        Path("examples/leaky_agent/controls"),
+        PROJECT_ROOT / "examples" / "leaky_agent" / "controls",
         "--controls",
+        "-c",
         help="Directory containing benign control JSONL traces.",
     ),
-    runs: int = typer.Option(3, "--runs", min=1, help="Proof runs per agent."),
-    json_output: bool = typer.Option(False, "--json", help="Emit JSON output."),
+    runs: int = typer.Option(3, "--runs", "-r", min=1, help="Proof runs per agent."),
+    json_output: bool = typer.Option(False, "--json", "-j", help="Emit JSON output."),
     debug: bool = typer.Option(False, "--debug", help="Show a traceback on errors."),
 ) -> None:
     """Prove a cassette red on the bad agent and green on the good agent."""
