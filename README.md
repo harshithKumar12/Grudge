@@ -212,6 +212,13 @@ grudge-node doctor       # npm Node Guard
 grudge-engine --help     # Python engine
 ```
 
+Every command also has a short form, so the common setup can be written
+`grudge setup -y -a claude-code -s repo` instead of
+`grudge setup --yes --agents claude-code --scope repo`, and
+`grudge-engine run -s scars -a examples.leaky_agent.agent_fixed -j` instead of
+`grudge-engine run --scars scars --agent examples.leaky_agent.agent_fixed --json`.
+Long forms always work too; `grudge --help` and `grudge-engine --help` list both.
+
 For a non-interactive Claude Code repository setup:
 
 ```bash
