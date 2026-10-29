@@ -501,6 +501,23 @@ npx grudge-cli@latest setup --yes --agents claude-code --scope global
 Then run `grudge doctor` and inspect the reported settings and instruction
 files.
 
+### Install once, guard every project
+
+A user-scope install is enough for normal use. The hooks live in
+`~/.claude/settings.json`, run `~/.grudge/bin/grudge.mjs`, and read the project
+directory from the hook payload, so they act on whichever project Claude Code
+is open in. Do not run `setup` again inside each repository:
+
+```powershell
+npx grudge-cli@latest setup --scope global --yes --agents claude-code
+```
+
+Each project only needs its own `.grudge/` state (compiled scars, session log,
+stats). That state appears the first time you run a Grudge command in the
+project, and nothing is written there before that. From inside a project with
+no local install, `grudge doctor` reports the user-scope install as
+`install scope: user (...)` instead of calling Grudge missing.
+
 ### A third-party status line already exists
 
 Grudge preserves an existing third-party status line and reports a warning. It

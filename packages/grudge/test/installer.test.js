@@ -249,6 +249,19 @@ test("doctor and setup warn when a preserved status line points at a missing scr
   assert.equal(JSON.parse(await readFile(settingsPath, "utf8")).statusLine.command, command);
 });
 
+test("doctor finds a user-scope install from inside a project", async () => {
+  const cwd = await scratch();
+  const home = await scratch();
+  const runtime = join(cwd, "runtime.mjs");
+  await writeFile(runtime, "#!/usr/bin/env node\nconsole.log('stub');\n");
+  await setup({ cwd, home, agents: ["claude-code"], scope: "global", yes: true, runtimeScript: runtime, print: false });
+  const result = await doctor({ cwd, home, print: false });
+  assert.equal(result.ok, true);
+  assert.match(result.checks.find(({ name }) => name === "install scope").detail, /^user /);
+  assert.equal(result.checks.find(({ name }) => name === ".gitignore").ok, true);
+  assert.ok(result.checks.find(({ name }) => name === "config").detail.includes(join(home, ".grudge/config.json")));
+});
+
 test("interactive setup applies the selected scope", async () => {
   const cwd = await scratch();
   const runtime = join(cwd, "runtime.mjs");
