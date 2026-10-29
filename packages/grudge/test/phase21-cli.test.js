@@ -15,6 +15,35 @@ test("fail-open handler warnings are surfaced on stderr with code zero", () => {
   assert.equal(result.stderr, "guard unavailable\n");
 });
 
+test("help, short flags, and a missing scar id behave from a cold start", async () => {
+  const root = await mkdtemp(join(tmpdir(), "grudge-cli-"));
+  try {
+    const help = spawnSync(process.execPath, [cli, "--help"], { cwd: root, encoding: "utf8" });
+    assert.equal(help.status, 0);
+    assert.match(help.stdout, /Usage: grudge <command> \[options\]/);
+    assert.match(help.stdout, /-j, --json/);
+    assert.doesNotMatch(help.stdout, /Grudge status/);
+
+    const shortHelp = spawnSync(process.execPath, [cli, "-h"], { cwd: root, encoding: "utf8" });
+    assert.equal(shortHelp.status, 0);
+    assert.match(shortHelp.stdout, /Usage: grudge/);
+
+    const version = spawnSync(process.execPath, [cli, "-v"], { cwd: root, encoding: "utf8" });
+    assert.equal(version.status, 0);
+    assert.match(version.stdout, /^grudge \d+\.\d+\.\d+/);
+
+    const stats = spawnSync(process.execPath, [cli, "stats", "-j"], { cwd: root, encoding: "utf8" });
+    assert.equal(stats.status, 0);
+    assert.equal(JSON.parse(stats.stdout).estimated, true);
+
+    const missing = spawnSync(process.execPath, [cli, "scars", "show", "scar-missing", "-j"], { cwd: root, encoding: "utf8" });
+    assert.equal(missing.status, 1);
+    assert.deepEqual(JSON.parse(missing.stdout), { pending: null, scar: null });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("runtime CLI dispatches JSON commands and preserves fail-open hook exit", async () => {
   const root = await mkdtemp(join(tmpdir(), "grudge-cli-"));
   try {
