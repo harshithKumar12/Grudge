@@ -41,3 +41,5 @@ def test_terminal_report_is_rich_renderable() -> None:
     assert "Grudge gate" in text
     assert "PASS" in text
     assert "offline/deterministic" in text
+    # Legacy Windows consoles render U+2022 as a box, so the report is ASCII-safe.
+    assert "\u2022" not in text
