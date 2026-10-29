@@ -26,12 +26,12 @@ def run_demo(
     no_browser: bool = typer.Option(
         False, "--no-browser", help="Do not open a browser."
     ),
-    runs: int = typer.Option(DEFAULTS.n_runs, "--runs", min=1),
-    fast: bool = typer.Option(False, "--fast", help="Disable presenter pacing."),
+    runs: int = typer.Option(DEFAULTS.n_runs, "--runs", "-r", min=1),
+    fast: bool = typer.Option(False, "--fast", "-f", help="Disable presenter pacing."),
     guard: bool = typer.Option(
         False, "--guard", help="Run the offline two-session hook proof."
     ),
-    json_output: bool = typer.Option(False, "--json", help="Emit JSON output."),
+    json_output: bool = typer.Option(False, "--json", "-j", help="Emit JSON output."),
     debug: bool = typer.Option(False, "--debug", help="Show a traceback on errors."),
 ) -> None:
     """Play the offline proof against the fixed and vulnerable demo agents."""

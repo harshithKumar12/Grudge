@@ -19,8 +19,8 @@ scars_app = typer.Typer(help="Browse saved regression Scars.")
 
 @scars_app.command("list")
 def list_scars(
-    scars_dir: Path = typer.Option(SCARS_DIR, "--scars", "--scars-dir"),
-    json_output: bool = typer.Option(False, "--json"),
+    scars_dir: Path = typer.Option(SCARS_DIR, "--scars", "--scars-dir", "-s"),
+    json_output: bool = typer.Option(False, "--json", "-j"),
     debug: bool = typer.Option(False, "--debug"),
 ) -> None:
     """List saved Scar summaries."""
@@ -51,8 +51,8 @@ def list_scars(
 @scars_app.command("show")
 def show_scar(
     scar: str,
-    scars_dir: Path = typer.Option(SCARS_DIR, "--scars", "--scars-dir"),
-    json_output: bool = typer.Option(False, "--json"),
+    scars_dir: Path = typer.Option(SCARS_DIR, "--scars", "--scars-dir", "-s"),
+    json_output: bool = typer.Option(False, "--json", "-j"),
     debug: bool = typer.Option(False, "--debug"),
 ) -> None:
     """Show one Scar by path or id."""
@@ -75,7 +75,7 @@ def show_scar(
 @scars_app.command("retire")
 def retire_scar(
     scar: str,
-    json_output: bool = typer.Option(False, "--json"),
+    json_output: bool = typer.Option(False, "--json", "-j"),
     debug: bool = typer.Option(False, "--debug"),
 ) -> None:
     """Retire a Scar (registry support is a later roadmap item)."""

@@ -15,11 +15,14 @@ from grudge.guard.compile import compile_scars, load_scars, write_compiled
 
 
 def compile_command(
-    scars: Path = typer.Option(SCARS_DIR, "--scars", help="Scar directory."),
+    scars: Path = typer.Option(SCARS_DIR, "--scars", "-s", help="Scar directory."),
     out: Path = typer.Option(
-        Path(".grudge/compiled.json"), "--out", help="Compiled rule output."
+        Path(".grudge/compiled.json"),
+        "--out",
+        "-o",
+        help="Compiled rule output.",
     ),
-    json_output: bool = typer.Option(False, "--json", help="Emit JSON output."),
+    json_output: bool = typer.Option(False, "--json", "-j", help="Emit JSON output."),
 ) -> None:
     """Compile admitted Scar files into the flat hook contract."""
 

@@ -15,8 +15,8 @@ from grudge.schema.trace import Trace
 
 def capture_agent(
     agent_module: str,
-    out: Path = typer.Option(..., "--out", help="Destination JSONL trace."),
-    json_output: bool = typer.Option(False, "--json", help="Emit JSON output."),
+    out: Path = typer.Option(..., "--out", "-o", help="Destination JSONL trace."),
+    json_output: bool = typer.Option(False, "--json", "-j", help="Emit JSON output."),
     debug: bool = typer.Option(False, "--debug", help="Show a traceback on errors."),
 ) -> None:
     """Capture an agent run into a trace."""

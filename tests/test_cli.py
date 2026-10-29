@@ -25,6 +25,33 @@ def test_help_lists_phase_zero_commands() -> None:
         assert command in result.stdout
 
 
+def test_version_flag_prints_the_installed_version() -> None:
+    result = CliRunner().invoke(app, ["--version"])
+
+    assert result.exit_code == 0
+    assert result.stdout.startswith("grudge ")
+    assert CliRunner().invoke(app, ["-v"]).stdout == result.stdout
+
+
+def test_short_flags_resolve_like_their_long_forms(tmp_path: Path) -> None:
+    long_form = CliRunner().invoke(
+        app, ["scars", "list", "--scars", str(tmp_path), "--json"]
+    )
+    short_form = CliRunner().invoke(app, ["scars", "list", "-s", str(tmp_path), "-j"])
+
+    assert short_form.exit_code == 0
+    assert short_form.stdout == long_form.stdout
+
+
+def test_admit_controls_default_to_the_packaged_example() -> None:
+    from inspect import signature
+
+    from grudge.cli.admit import admit_cassette
+
+    controls = signature(admit_cassette).parameters["controls"].default
+    assert controls.default.is_dir(), controls.default
+
+
 def _sample_cassette(tmp_path: Path) -> Path:
     """Copy the checked-in demo cassette into a test-local artifact."""
 
