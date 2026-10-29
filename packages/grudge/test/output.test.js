@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { jsonOutput, renderCommand, renderError } from "../src/output.js";
+import { VERSION } from "../src/version.js";
 
 const fixtures = {
   setup: { scope: "repo", selected: ["claude-code"], changes: [{ path: "CLAUDE.md" }], warnings: [], runtimeInstalled: true },
@@ -17,7 +18,7 @@ const fixtures = {
 test("default output snapshots have a structured header, summary, and next command", () => {
   for (const [command, result] of Object.entries(fixtures)) {
     const output = renderCommand(command, result, { ascii: true });
-    assert.match(output, new RegExp(`^Grudge ${command} v0\\.1\\.9`));
+    assert.ok(output.startsWith(`Grudge ${command} v${VERSION}`), output);
     assert.match(output, /\d+ passed, \d+ failed, \d+ warnings/);
     assert.match(output, /Next:/);
   }

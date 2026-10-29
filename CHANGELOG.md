@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 - 2026-10-29
 
 - Add `grudge verify`: one offline command that installs the guard into a temporary project, proposes and accepts a harmless rule, feeds the installed hook runner real Claude Code `PreToolUse` payloads over stdin, and checks that a matching `Bash` call exits `2`, a benign call exits `0`, malformed input fails open, exactly one block is logged, and `grudge report` shows it. Prints one PASS/FAIL line per check, exits non-zero on failure, keeps the temp project on failure (and with `--keep`), and supports `--json`.
 - A PreToolUse deny now exits `2` and also writes `grudge: blocked by <id>: <reason>` to stderr. The deny JSON is still printed, so the reason survives either path.
