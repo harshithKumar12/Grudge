@@ -45,11 +45,11 @@ def render_terminal(result: GateResult, console: Console | None = None) -> str:
     )
     target.print(summary)
     for observation in result.observations:
-        target.print(f"• {observation}")
+        target.print(f"- {observation}")
     if result.reasons:
         target.print("Reasons:")
         for reason in result.reasons:
-            target.print(f"  • {reason}")
+            target.print(f"  - {reason}")
     if owns_console:
         return target.export_text()
     return ""
