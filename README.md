@@ -506,6 +506,23 @@ files.
 Grudge preserves an existing third-party status line and reports a warning. It
 does not silently replace another tool's status-line configuration.
 
+If that preserved command points at a script that is not on disk, `setup` and
+`grudge doctor` also report which path is missing. Claude Code runs the command
+in the project directory, so a relative path such as
+`${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/tool-statusline.cjs` fails in every
+project that does not contain that file and Claude Code then shows no status
+line at all. Grudge reports the problem and leaves the setting untouched; fix
+the command yourself, for example by pointing it at an absolute path:
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "node \"C:/Users/you/.claude/helpers/tool-statusline.cjs\""
+  }
+}
+```
+
 ## Development
 
 Create a virtual environment and install the locked development dependencies:

@@ -9,6 +9,7 @@ import { setup } from "../src/commands/setup.js";
 import { doctor } from "../src/commands/doctor.js";
 import { uninstall } from "../src/commands/uninstall.js";
 import { MANAGED_BEGIN, MANAGED_END } from "../src/installer/managed-block.js";
+import { missingStatusLineScripts, statusLineScripts } from "../src/installer/statusline-paths.js";
 
 async function scratch() {
   return mkdtemp(join(tmpdir(), "grudge-installer-"));
@@ -217,6 +218,35 @@ test("doctor detects a partial Claude hook registration", async () => {
   const result = await doctor({ cwd, home: cwd, print: false });
   assert.equal(result.ok, false);
   assert.match(result.checks.find(({ name }) => name === "hook completeness").detail, /missing Stop/);
+});
+
+test("status line scripts resolve placeholder, home, and relative forms", async () => {
+  const cwd = join(tmpdir(), "grudge-proj");
+  const home = join(tmpdir(), "grudge-home");
+  assert.deepEqual(statusLineScripts('node "${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/a.cjs"', { cwd, home }), [join(cwd, ".claude/helpers/a.cjs")]);
+  assert.deepEqual(statusLineScripts('node "~/.claude/helpers/b.cjs"', { cwd, home }), [join(home, ".claude/helpers/b.cjs")]);
+  assert.deepEqual(statusLineScripts("node .claude/helpers/c.cjs", { cwd, home }), [join(cwd, ".claude/helpers/c.cjs")]);
+  assert.deepEqual(statusLineScripts("other-tool status", { cwd, home }), []);
+  assert.deepEqual(await missingStatusLineScripts("other-tool status", { cwd, home }), []);
+});
+
+test("doctor and setup warn when a preserved status line points at a missing script", async () => {
+  const cwd = await scratch();
+  const home = await scratch();
+  const runtime = join(cwd, "runtime.mjs");
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  await mkdir(join(cwd, ".claude"), { recursive: true });
+  const settingsPath = join(cwd, ".claude/settings.json");
+  const command = 'node "${CLAUDE_PROJECT_DIR:-.}/.claude/helpers/missing-statusline.cjs"';
+  await writeFile(settingsPath, `${JSON.stringify({ statusLine: { type: "command", command } }, null, 2)}\n`);
+  const setupResult = await setup({ cwd, home, agents: ["claude-code"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
+  assert.ok(setupResult.warnings.some((warning) => /missing-statusline\.cjs/.test(warning) && /does not exist/.test(warning)));
+  const result = await doctor({ cwd, home, print: false });
+  const check = result.checks.find(({ name }) => name === "status line target");
+  assert.ok(check?.warning);
+  assert.match(check.detail, /missing-statusline\.cjs/);
+  assert.match(check.detail, /never rewrites an existing status line/);
+  assert.equal(JSON.parse(await readFile(settingsPath, "utf8")).statusLine.command, command);
 });
 
 test("interactive setup applies the selected scope", async () => {
