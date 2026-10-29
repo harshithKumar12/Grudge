@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { detect } from "../installer/detect.js";
 import { prompt } from "../installer/prompt.js";
 import { mergeJson, parseJson, mergeObjects, isGrudgeStatusLine } from "../installer/json-merge.js";
+import { missingStatusLineScripts } from "../installer/statusline-paths.js";
 import { backup, restoreEntries, writeBackupManifest } from "../installer/backup.js";
 import { managedBlock, upsertManagedBlock } from "../installer/managed-block.js";
 import { adapter as claudeCode } from "../installer/adapters/claude-code.js";
@@ -56,7 +57,7 @@ export async function setup(options = {}) {
   }
   const backupEntries = [];
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const context = { cwd, home, root, timestamp, backupEntries, changes, warnings, dryRun: Boolean(options.dryRun), applyPlan: (plan) => applyPlan(plan, { root, backupEntries, changes, warnings, timestamp, dryRun: Boolean(options.dryRun) }), removePlan: () => ({}) };
+  const context = { cwd, home, root, timestamp, backupEntries, changes, warnings, dryRun: Boolean(options.dryRun), applyPlan: (plan) => applyPlan(plan, { cwd, home, root, backupEntries, changes, warnings, timestamp, dryRun: Boolean(options.dryRun) }), removePlan: () => ({}) };
 
   try {
     for (const item of plans) {
@@ -88,7 +89,11 @@ async function applyPlan(plan, context) {
       const hooks = Object.fromEntries((plan.hooks ?? []).map(({ event, command }) => [event, [{ matcher: "*", hooks: [{ type: "command", command }] }]]));
       const addition = { hooks };
       if (!parsed.statusLine || isGrudgeStatusLine(parsed.statusLine)) addition.statusLine = { type: "command", command: plan.statusLine };
-      else context.warnings.push(`preserved existing status line in ${file.path}; Grudge statusline was not installed. Run grudge statusline manually or choose a compatible status-line owner.`);
+      else {
+        context.warnings.push(`preserved existing status line in ${file.path}; Grudge statusline was not installed. Run grudge statusline manually or choose a compatible status-line owner.`);
+        const missing = await missingStatusLineScripts(parsed.statusLine.command, { cwd: context.cwd ?? context.root, home: context.home ?? homedir() });
+        if (missing.length) context.warnings.push(`that status line runs ${missing.join(", ")}, which does not exist, so Claude Code shows no status line. Point the command at an absolute path; Grudge will not rewrite it.`);
+      }
       after = `${JSON.stringify(mergeObjects(parsed, addition), null, detectIndent(before))}\n`;
     } else {
       after = upsertManagedBlock(before ?? "", managedBlock());

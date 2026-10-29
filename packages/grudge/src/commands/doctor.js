@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { join, resolve } from "node:path";
 import { homedir } from "node:os";
 import { grudgeHookEvents, isGrudgeStatusLine, parseJson } from "../installer/json-merge.js";
+import { missingStatusLineScripts } from "../installer/statusline-paths.js";
 import { hasManagedBlock, managedBlock } from "../installer/managed-block.js";
 import { measureOutputs as measureBudgetOutputs } from "../core/budget.js";
 import { execFile } from "node:child_process";
@@ -48,6 +49,7 @@ export async function doctor(options = {}) {
   let sameScopeDuplicates = false;
   let grudgeStatusLine = false;
   const statusLineConflicts = [];
+  const statusLineMissing = [];
   const settingsPaths = [
     { path: join(root, ".claude/settings.json"), scope: "project" },
     { path: join(root, ".claude/settings.local.json"), scope: "project" },
@@ -71,7 +73,11 @@ export async function doctor(options = {}) {
       if (count > events.size) sameScopeDuplicates = true;
       if (settings.statusLine) {
         if (isGrudgeStatusLine(settings.statusLine)) grudgeStatusLine = true;
-        else statusLineConflicts.push(path);
+        else {
+          statusLineConflicts.push(path);
+          const missing = await missingStatusLineScripts(settings.statusLine.command, { cwd: root, home });
+          if (missing.length) statusLineMissing.push({ path, missing });
+        }
       }
       checks.push({ name: `settings ${path}`, ok: true, detail: "parse OK" });
     } catch (error) { checks.push({ name: `settings ${path}`, ok: false, detail: error.message }); }
@@ -102,6 +108,11 @@ export async function doctor(options = {}) {
       warnings.push(`existing status line preserved in ${statusLineConflicts.join(", ")}; Grudge statusline was not installed there`);
       checks.push({ name: "status line", ok: true, warning: true, detail: warnings.at(-1) });
     } else checks.push({ name: "status line", ok: grudgeStatusLine, detail: grudgeStatusLine ? "Grudge statusline registered" : "not registered; run setup or choose a compatible status-line owner" });
+    for (const { path, missing } of statusLineMissing) {
+      const detail = `${path} runs ${missing.join(", ")}, which does not exist, so Claude Code shows no status line. Point the command at an absolute path or run grudge statusline; Grudge never rewrites an existing status line.`;
+      warnings.push(detail);
+      checks.push({ name: "status line target", ok: true, warning: true, detail });
+    }
   }
   const compiled = await readJson(join(root, ".grudge/compiled.json"));
   checks.push({ name: "compiled.json", ok: compiled === null || (compiled.version === 1 && Array.isArray(compiled.rules)), detail: compiled === null ? "not present" : "valid" });
