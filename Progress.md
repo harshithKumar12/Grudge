@@ -3,7 +3,7 @@
 **Purpose:** Canonical, current state of the repository, the phase board, and
 the known issues that still block a universal production claim.
 **Audience:** Project owner, reviewers, and release operator.
-**Status:** current as of the 0.1.8 release preparation.
+**Status:** current as of the 0.1.9 release preparation.
 **Last updated:** 2026-10-29
 
 ## Current snapshot
@@ -22,13 +22,12 @@ the known issues that still block a universal production claim.
     bases, and tests.
   - `bd65b53` CI matrix: Ubuntu, macOS, Windows × Python 3.11/3.14, Node suite,
     build, and `npm pack --dry-run`.
-- **Published:** `grudge-cli@0.1.8` on npm and PyPI (`npm view grudge-cli
-  version` → `0.1.8`; `pip index versions grudge-cli` → `0.1.8`). The local
-  source is the same version plus the unreleased fixes listed below.
-- **Fixes queued in 0.1.8:** `scars show`, Node `--help` and short flags, wheel
-  data, `admit` controls default, filtered taint seeds, ASCII gate output,
-  engine `--version`. See `CHANGELOG.md`.
-- **Queued after 0.1.8:** a preserved `statusLine` that points at a missing
+- **Published:** `grudge-cli@0.1.8` on npm and PyPI. The local source is
+  `0.1.9`, which carries the two fixes below and is not published yet.
+- **Fixes in 0.1.8 (published):** `scars show`, Node `--help` and short flags,
+  wheel data, `admit` controls default, filtered taint seeds, ASCII gate
+  output, engine `--version`. See `CHANGELOG.md`.
+- **Fixes in 0.1.9 (local):** a preserved `statusLine` that points at a missing
   script is now named by `setup`/`doctor` (never rewritten), and `grudge
   doctor` finds a user-scope install from inside a project.
 - **Verified in this checkout:**
@@ -39,7 +38,7 @@ the known issues that still block a universal production claim.
   - `mypy .` passes: **125 source files**.
   - `python -m scripts.docs_check`: **32** indexed, non-empty, linked files.
   - `python -m scripts.release_check`: local npm/PyPI metadata agree.
-  - `npm run build` and `node dist/grudge.mjs --version` → `grudge 0.1.8`.
+  - `npm run build` and `node dist/grudge.mjs --version` → `grudge 0.1.9`.
   - Benchmark re-measured three times on Windows 11 / Python 3.14.0: capture
     71 steps, cassette 23 → 23 entries and 11,854 → 2,081 bytes, 1,254 oracle
     calls, 4.68/4.83/5.31 s. README now carries only this measured row.
@@ -137,10 +136,11 @@ the known issues that still block a universal production claim.
 
 ## Known issues
 
-1. **`0.1.8` is not published yet.** The `0.1.7` artifacts lack the fixes
-   listed above; publishing `0.1.8` needs the owner's npm and PyPI credentials.
-2. **CI has not executed yet.** `.github/workflows/grudge-guard.yml` is
-   committed but its first green run can only happen after a push.
+1. **`0.1.9` is not published yet.** Both registries serve `0.1.8`;
+   publishing `0.1.9` needs the owner's npm and PyPI credentials.
+2. **Push events still do not start CI on this repository.** The workflow is
+   active and `workflow_dispatch` runs it; manual dispatch was green
+   (run `40818300615`, 6/6 jobs).
 3. **No live Claude Code run in this pass.** The real hook/status-line block
    test needs an interactive Claude session; steps and expected output are in
    [`scripts/live-check.md`](scripts/live-check.md). The historical attempt in
