@@ -86,10 +86,16 @@ function commandItems(command, result) {
     ? [{ status: "failed", label: "Proposal", detail: result.error }]
     : [{ status: "ok", label: "Proposal", detail: result.id || "created" }, { status: result.pending ? "warning" : "ok", label: "Status", detail: result.pending ? "pending acceptance" : "accepted" }];
   if (command === "accept") return [{ status: result.accepted ? "ok" : "failed", label: "Scar", detail: result.id }];
-  if (command === "scars") return [
-    ...(result.pending ?? []).map((scar) => ({ status: "warning", label: scar.id, detail: "pending" })),
-    ...(result.scars ?? []).map((scar) => ({ status: "ok", label: scar.id, detail: scar.mode ?? "admitted" })),
-  ];
+  if (command === "scars") {
+    // `list` returns arrays, `show` returns one pending and one admitted record.
+    const pending = Array.isArray(result.pending) ? result.pending : result.pending ? [result.pending] : [];
+    const admitted = Array.isArray(result.scars) ? result.scars : result.scar ? [result.scar] : [];
+    const items = [
+      ...pending.map((scar) => ({ status: "warning", label: scar.id, detail: "pending" })),
+      ...admitted.map((scar) => ({ status: scar.mode === "off" ? "skipped" : "ok", label: scar.id, detail: scar.english ?? scar.mode ?? "admitted" })),
+    ];
+    return items.length ? items : [{ status: "failed", label: "Scar", detail: "not found" }];
+  }
   return Object.entries(result ?? {}).filter(([key, value]) => !["measurement", "budgetMeasurements", "checks", "warnings"].includes(key) && ["string", "number", "boolean"].includes(typeof value)).map(([label, detail]) => ({ status: "ok", label, detail: String(detail) }));
 }
 

@@ -61,6 +61,18 @@ test("suggested next commands are real commands", () => {
   }
 });
 
+test("scars show renders one stored record instead of assuming a list", () => {
+  const found = renderCommand("scars", { pending: null, scar: { id: "scar-1", mode: "block" } }, { ascii: true });
+  assert.match(found, /\[ok\] scar-1: block/);
+  assert.match(found, /1 passed, 0 failed, 0 warnings/);
+
+  const pending = renderCommand("scars", { pending: { id: "scar-2" }, scar: null }, { ascii: true });
+  assert.match(pending, /\[warn\] scar-2: pending/);
+
+  const missing = renderCommand("scars", { pending: null, scar: null }, { ascii: true });
+  assert.match(missing, /\[fail\] Scar: not found/);
+});
+
 test("errors include a fix without a stack trace by default", () => {
   const output = renderError(new Error("runtime missing"), { command: "doctor", ascii: true });
   assert.match(output, /Error: runtime missing/);

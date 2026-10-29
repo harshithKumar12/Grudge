@@ -6,12 +6,59 @@ import { runHook } from "./commands/hook.js";
 import { VERSION } from "./version.js";
 import { jsonOutput, renderCommand, renderError } from "./output.js";
 
+const SHORT_FLAGS = {
+  "-h": ["help", false],
+  "-v": ["version", false],
+  "-j": ["json", false],
+  "-y": ["yes", false],
+  "-a": ["agents", true],
+  "-s": ["scope", true],
+  "-c": ["cwd", true],
+};
+
+const USAGE = `Grudge v${VERSION} - local guards for recurring agent mistakes
+
+Usage: grudge <command> [options]
+
+Commands:
+  (none)          Show status for the current directory
+  doctor          Check this install and report problems
+  setup           Install the guard into this repo (alias: init)
+  statusline      One-line status for your prompt
+  stats           Show blocked, warned, and token totals
+  report          Show session or lifetime totals
+  propose         Record a mistake as a pending Scar
+  scars           List, show, accept, reject, or disable Scars
+  accept          Accept a pending Scar by id
+  uninstall       Remove the guard from this repo
+  hook <event>    Hook entry point used by Claude Code
+
+Options:
+  -h, --help      Show this help
+  -v, --version   Show the version
+  -j, --json      Machine-readable output
+  -y, --yes       Skip prompts (setup)
+  -a, --agents    Comma-separated agent list (setup)
+  -s, --scope     repo or user (setup)
+  -c, --cwd       Run against another directory
+
+Python engine (pip install grudge-cli): capture, compile, shrink, admit, run, demo
+`;
+
 /** Parse the small, deliberately dependency-free Grudge command line. */
 export function parseArgs(argv) {
   const positional = [];
   const options = {};
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
+    const short = SHORT_FLAGS[value];
+    if (short) {
+      const [name, takesValue] = short;
+      const next = argv[index + 1];
+      if (takesValue && next && !next.startsWith("-")) options[name] = argv[++index];
+      else options[name] = true;
+      continue;
+    }
     if (!value.startsWith("--")) {
       positional.push(value);
       continue;
@@ -39,6 +86,10 @@ function rootOptions(options) {
 export async function dispatch(parsed, { stdin = readStdin } = {}) {
   const { command, positional, options } = parsed;
   const root = rootOptions(options);
+  if (options.help) {
+    process.stdout.write(USAGE);
+    return 0;
+  }
   if (options.version || command === "version") {
     process.stdout.write(`grudge ${VERSION}\n`);
     return 0;
@@ -84,6 +135,7 @@ export async function dispatch(parsed, { stdin = readStdin } = {}) {
   }
   if (options.json) process.stdout.write(jsonOutput(result));
   else process.stdout.write(renderCommand(command, result, options));
+  if (command === "scars" && positional[0] === "show" && !result?.pending && !result?.scar) return 1;
   if (command === "propose" && result?.accepted === false) return 1;
   if (command === "doctor" && result?.ok === false) {
     const notInstalled = !result.checks?.find((check) => check.name === "config")?.ok
