@@ -24,7 +24,7 @@ every failed agent trace is automatically turned into a regression test, so your
 
 </div>
 
-> **Release status:** Grudge CLI `0.1.9` is published in both public package registries (`grudge-cli` on npm and on PyPI). Phase 25 changes on `master` are unreleased. The unrelated `grudge` npm package is a different project, so install `grudge-cli`.
+> **Release status:** Grudge CLI source version `0.2.0` is being prepared; `0.1.9` is the latest published version in both public package registries (`grudge-cli` on npm and on PyPI). The unrelated `grudge` npm package is a different project, so install `grudge-cli`.
 
 ## Table of contents
 
