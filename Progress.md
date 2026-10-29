@@ -22,15 +22,17 @@ the known issues that still block a universal production claim.
     bases, and tests.
   - `bd65b53` CI matrix: Ubuntu, macOS, Windows × Python 3.11/3.14, Node suite,
     build, and `npm pack --dry-run`.
-- **Local versions:** `grudge-cli@0.1.8` (npm) and `grudge-cli==0.1.8` (PyPI
-  metadata). **0.1.7 is published in both registries** but its PyPI wheel omits
-  the demo data and its Node CLI has the `scars show`/`--help` defects; 0.1.8
-  is the fixed build.
+- **Published:** `grudge-cli@0.1.8` on npm and PyPI (`npm view grudge-cli
+  version` → `0.1.8`; `pip index versions grudge-cli` → `0.1.8`). The local
+  source is the same version plus the unreleased fixes listed below.
 - **Fixes queued in 0.1.8:** `scars show`, Node `--help` and short flags, wheel
   data, `admit` controls default, filtered taint seeds, ASCII gate output,
   engine `--version`. See `CHANGELOG.md`.
+- **Queued after 0.1.8:** a preserved `statusLine` that points at a missing
+  script is now named by `setup`/`doctor` (never rewritten), and `grudge
+  doctor` finds a user-scope install from inside a project.
 - **Verified in this checkout:**
-  - Node suite: **74/74 pass** (`npm test --prefix packages/grudge`).
+  - Node suite: **77/77 pass** (`npm test --prefix packages/grudge`).
   - Python suite: **308 passed, 1 skipped**, exit 0 (`python -m pytest -q`).
     The single skip and the `pytest_asyncio` deprecation warning are benign.
   - `ruff check .` passes (whole tree, examples and tests included).

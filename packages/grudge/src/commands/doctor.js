@@ -1,5 +1,5 @@
 // OWNER: lane-c
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { join, resolve } from "node:path";
 import { homedir } from "node:os";
@@ -20,12 +20,15 @@ const EXPECTED_HOOKS = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostT
 export async function doctor(options = {}) {
   const root = resolve(options.cwd ?? process.cwd());
   const home = resolve(options.home ?? homedir());
-  const configPath = join(root, ".grudge/config.json");
-  const runtimePath = join(root, ".grudge/bin/grudge.mjs");
-  const config = await readJson(configPath);
+  const localConfig = await readJson(join(root, ".grudge/config.json"));
+  const config = localConfig ?? (root === home ? null : await readJson(join(home, ".grudge/config.json")));
+  const installRoot = localConfig || root === home ? root : home;
+  const configPath = join(installRoot, ".grudge/config.json");
+  const runtimePath = join(installRoot, ".grudge/bin/grudge.mjs");
   const checks = [];
   checks.push({ name: "node", ok: Number(process.versions.node.split(".")[0]) >= 18, detail: process.version });
-  checks.push({ name: "config", ok: Boolean(config), detail: config ? "parse OK" : "missing or invalid" });
+  checks.push({ name: "install scope", ok: true, detail: installRoot === root ? "project" : `user (${join(home, ".grudge")})` });
+  checks.push({ name: "config", ok: Boolean(config), detail: config ? `parse OK (${configPath})` : "missing or invalid" });
   const runtime = await readOptional(runtimePath);
   checks.push({ name: "runtime", ok: Boolean(runtime), detail: runtime ? "present" : "missing" });
   if (runtime) {
@@ -117,8 +120,11 @@ export async function doctor(options = {}) {
   const compiled = await readJson(join(root, ".grudge/compiled.json"));
   checks.push({ name: "compiled.json", ok: compiled === null || (compiled.version === 1 && Array.isArray(compiled.rules)), detail: compiled === null ? "not present" : "valid" });
   const gitignore = await readOptional(join(root, ".gitignore"));
-  const ignored = [".grudge/session/", ".grudge/stats.json", ".grudge/*.log"].filter((line) => gitignore?.split(/\r?\n/).includes(line));
-  checks.push({ name: ".gitignore", ok: ignored.length === 3, detail: `${ignored.length}/3 entries` });
+  const projectState = await exists(join(root, ".grudge"));
+  if (projectState) {
+    const ignored = [".grudge/session/", ".grudge/stats.json", ".grudge/*.log"].filter((line) => gitignore?.split(/\r?\n/).includes(line));
+    checks.push({ name: ".gitignore", ok: ignored.length === 3, detail: `${ignored.length}/3 entries` });
+  } else checks.push({ name: ".gitignore", ok: true, detail: "no project .grudge state; nothing to ignore" });
   const budgetMeasurements = await measureBudgets({ root, compiled, measureOutputs: options.measureOutputs });
   for (const measurement of budgetMeasurements) {
     const lineStatus = measurement.withinLineCap === undefined || measurement.withinLineCap;
@@ -167,6 +173,10 @@ async function readJson(path) {
 
 async function readOptional(path) {
   try { return await readFile(path, "utf8"); } catch (error) { if (error.code === "ENOENT") return null; throw error; }
+}
+
+async function exists(path) {
+  try { await access(path); return true; } catch { return false; }
 }
 
 function countGrudgeHooks(value) {

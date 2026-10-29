@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Report a preserved `statusLine` whose command points at a script that is not on disk: `setup` and `grudge doctor` now name the missing path instead of only saying the status line was preserved. Grudge still never rewrites an existing status line.
+- `grudge doctor` finds a user-scope install when run inside a project that has no local `.grudge/`, instead of reporting Grudge as not installed, and no longer demands `.gitignore` entries for a project that has no Grudge state.
 
 ## 0.1.8 - 2026-10-29
 
