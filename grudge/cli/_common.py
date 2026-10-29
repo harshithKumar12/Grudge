@@ -82,7 +82,7 @@ def _version() -> str:
 
         return version("grudge-cli")
     except Exception:
-        return "0.1.7"
+        return "0.1.8"
 
 
 def _next_command(command_name: str) -> str:

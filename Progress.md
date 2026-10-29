@@ -3,8 +3,8 @@
 **Purpose:** Canonical, current state of the repository, the phase board, and
 the known issues that still block a universal production claim.
 **Audience:** Project owner, reviewers, and release operator.
-**Status:** current as of the 0.1.7 production-readiness pass.
-**Last updated:** 2026-10-28
+**Status:** current as of the 0.1.8 release preparation.
+**Last updated:** 2026-10-29
 
 ## Current snapshot
 
@@ -22,19 +22,22 @@ the known issues that still block a universal production claim.
     bases, and tests.
   - `bd65b53` CI matrix: Ubuntu, macOS, Windows × Python 3.11/3.14, Node suite,
     build, and `npm pack --dry-run`.
-- **Local versions:** `grudge-cli@0.1.7` (npm) and `grudge-cli==0.1.7` (PyPI
-  metadata). Both registries still serve **0.1.6**: `npm view grudge-cli
-  versions` → `0.1.0` … `0.1.6`; `pip index versions grudge-cli` → `0.1.6`.
-  Publication of `0.1.7` has not been performed.
+- **Local versions:** `grudge-cli@0.1.8` (npm) and `grudge-cli==0.1.8` (PyPI
+  metadata). **0.1.7 is published in both registries** but its PyPI wheel omits
+  the demo data and its Node CLI has the `scars show`/`--help` defects; 0.1.8
+  is the fixed build.
+- **Fixes queued in 0.1.8:** `scars show`, Node `--help` and short flags, wheel
+  data, `admit` controls default, filtered taint seeds, ASCII gate output,
+  engine `--version`. See `CHANGELOG.md`.
 - **Verified in this checkout:**
-  - Node suite: **71/71 pass** (`npm test --prefix packages/grudge`).
-  - Python suite: **304 collected, 1 skipped**, exit 0 (`python -m pytest -q`).
+  - Node suite: **74/74 pass** (`npm test --prefix packages/grudge`).
+  - Python suite: **308 passed, 1 skipped**, exit 0 (`python -m pytest -q`).
     The single skip and the `pytest_asyncio` deprecation warning are benign.
   - `ruff check .` passes (whole tree, examples and tests included).
-  - `mypy .` passes: **123 source files**.
+  - `mypy .` passes: **125 source files**.
   - `python -m scripts.docs_check`: **32** indexed, non-empty, linked files.
   - `python -m scripts.release_check`: local npm/PyPI metadata agree.
-  - `npm run build` and `node dist/grudge.mjs --version` → `grudge 0.1.7`.
+  - `npm run build` and `node dist/grudge.mjs --version` → `grudge 0.1.8`.
   - Benchmark re-measured three times on Windows 11 / Python 3.14.0: capture
     71 steps, cassette 23 → 23 entries and 11,854 → 2,081 bytes, 1,254 oracle
     calls, 4.68/4.83/5.31 s. README now carries only this measured row.
@@ -132,8 +135,8 @@ the known issues that still block a universal production claim.
 
 ## Known issues
 
-1. **`0.1.7` is unpublished.** Both registries serve `0.1.6`; publishing needs
-   the owner's credentials and was intentionally not run.
+1. **`0.1.8` is not published yet.** The `0.1.7` artifacts lack the fixes
+   listed above; publishing `0.1.8` needs the owner's npm and PyPI credentials.
 2. **CI has not executed yet.** `.github/workflows/grudge-guard.yml` is
    committed but its first green run can only happen after a push.
 3. **No live Claude Code run in this pass.** The real hook/status-line block

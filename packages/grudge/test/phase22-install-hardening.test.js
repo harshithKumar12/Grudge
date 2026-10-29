@@ -18,7 +18,7 @@ async function scratch() {
 
 test("built runtime is self-contained, versioned, and runs from an installed copy", async () => {
   const source = await readFile(bundle, "utf8");
-  assert.match(source, /^#!\/usr\/bin\/env node\n\/\/ Grudge v0\.1\.7/m);
+  assert.match(source, /^#!\/usr\/bin\/env node\n\/\/ Grudge v0\.1\.8/m);
   assert.doesNotMatch(source, /(?:from|import)\s*["']\./);
 
   const cwd = await scratch();
@@ -29,8 +29,8 @@ test("built runtime is self-contained, versioned, and runs from an installed cop
   const installed = join(cwd, ".grudge/bin/grudge.mjs");
   const result = spawnSync(process.execPath, [installed, "--version"], { cwd, encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stdout.trim(), "grudge 0.1.7");
-  assert.match(await readFile(installed, "utf8"), /Grudge v0\.1\.7/);
+  assert.equal(result.stdout.trim(), "grudge 0.1.8");
+  assert.match(await readFile(installed, "utf8"), /Grudge v0\.1\.8/);
 });
 
 test("setup smoke failure restores every changed file", async () => {
@@ -73,16 +73,16 @@ test("CLI supports version, five-line no-arg status, init, and rule stdin", asyn
   await mkdir(join(cwd, ".git"), { recursive: true });
   const version = spawnSync(process.execPath, [bundle, "--version"], { cwd, encoding: "utf8" });
   assert.equal(version.status, 0);
-  assert.equal(version.stdout.trim(), "grudge 0.1.7");
+  assert.equal(version.stdout.trim(), "grudge 0.1.8");
   const status = spawnSync(process.execPath, [bundle], { cwd, encoding: "utf8" });
-  assert.match(status.stdout, /Grudge status v0\.1\.7/);
+  assert.match(status.stdout, /Grudge status v0\.1\.8/);
   assert.match(status.stdout, /Next:/);
   const init = spawnSync(process.execPath, [bundle, "init", "--cwd", cwd, "--yes", "--agents", "codex", "--json"], { cwd, encoding: "utf8" });
   assert.equal(init.status, 0, init.stderr);
   assert.equal(JSON.parse(init.stdout).scope, "repo");
   const human = spawnSync(process.execPath, [bundle, "setup", "--cwd", cwd, "--yes", "--agents", "codex"], { cwd, encoding: "utf8" });
   assert.equal(human.status, 0, human.stderr);
-  assert.match(human.stdout, /Grudge setup v0\.1\.7/);
+  assert.match(human.stdout, /Grudge setup v0\.1\.8/);
   assert.match(human.stdout, /passed, .*failed, .*warnings/);
 
   const parsed = parseArgs(["propose", "--rule-stdin", "--why", "test"]);
@@ -123,7 +123,7 @@ test("uninstall has a readable summary and keeps JSON output opt-in", async () =
   await mkdir(join(cwd, ".git"), { recursive: true });
   const human = spawnSync(process.execPath, [bundle, "uninstall", "--cwd", cwd], { cwd, encoding: "utf8" });
   assert.equal(human.status, 0, human.stderr);
-  assert.match(human.stdout, /Grudge uninstall v0\.1\.7/);
+  assert.match(human.stdout, /Grudge uninstall v0\.1\.8/);
   assert.match(human.stdout, new RegExp(`root: ${cwd.replaceAll("\\", "\\\\")}`));
   assert.match(human.stdout, /Restored: 0/);
   assert.match(human.stdout, /Removed: 0/);
