@@ -8,6 +8,7 @@ import pytest
 
 from examples.leaky_agent.agent import run_agent as run_leaky_agent
 from grudge.errors import OracleError
+from grudge.predicates.fallback_rules import demo_rule
 from grudge.replay.sandbox import world_from_trace
 from grudge.schema.cassette import Cassette
 from grudge.schema.predicate import CallShape, Outcome, TaintFlow
@@ -78,6 +79,7 @@ def test_budget_guard_raises_a_clear_oracle_error() -> None:
             True,
         ),
         (TaintFlow(source="read_file", sink="send_http", sink_field="body"), True),
+        (demo_rule(), True),
         (Outcome(outcome="ok"), True),
         (Outcome(outcome="failed"), False),
     ],
