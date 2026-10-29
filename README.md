@@ -40,6 +40,7 @@ every failed agent trace is automatically turned into a regression test, so your
 - [Docker](#docker)
 - [CLI reference](#cli-reference)
 - [Integrations](#integrations)
+- [What Grudge writes into your files](#what-grudge-writes-into-your-files)
 - [Project structure](#project-structure)
 - [Configuration and data](#configuration-and-data)
 - [Testing](#testing)
@@ -220,17 +221,45 @@ Every command also has a short form, so the common setup can be written
 `grudge-engine run --scars scars --agent examples.leaky_agent.agent_fixed --json`.
 Long forms always work too; `grudge --help` and `grudge-engine --help` list both.
 
-For a non-interactive Claude Code repository setup:
+#### Choose which agents to configure
 
-```bash
-npx grudge-cli@latest setup --yes --agents claude-code --scope repo
-npx grudge-cli@latest doctor
+`setup` detects the coding agents on this machine and opens a picker. Space
+toggles an entry, Enter confirms; the first entry is preselected because Claude
+Code is the only Guard-tier integration:
+
+```text
+◆ Which agents should use Grudge?
+❯ ◉ Claude Code Guard — detected
+  ◯ Codex Advisory — detected
+  ◯ Cursor Advisory — not detected
+  ◯ Gemini CLI Advisory — detected
+  ◯ GitHub Copilot CLI Advisory — detected
+  ◯ Windsurf Advisory — not detected
+  ◯ OpenCode Advisory — detected
 ```
 
-Preview changes without writing files:
+Pass `--agents` and `--scope` to skip the picker. `--agents` takes a
+comma-separated list of `claude-code`, `opencode`, `codex`, `gemini-cli`,
+`copilot`, `windsurf`, and `cursor`:
 
 ```bash
-npx grudge-cli@latest setup --dry-run
+# Claude Code only, this repository
+npx grudge-cli@latest setup --yes --agents claude-code --scope repo
+
+# OpenCode only (writes AGENTS.md)
+npx grudge-cli@latest setup --yes --agents opencode --scope repo
+
+# Several at once; Codex and OpenCode share one AGENTS.md block
+npx grudge-cli@latest setup --yes --agents claude-code,opencode,codex --scope repo
+
+# Claude Code for every project on this machine
+npx grudge-cli@latest setup --yes --agents claude-code --scope global
+```
+
+Preview the exact file list without writing anything:
+
+```bash
+npx grudge-cli@latest setup --dry-run --json --yes --agents claude-code,opencode --scope repo
 ```
 
 Remove only Grudge-managed content:
@@ -238,6 +267,10 @@ Remove only Grudge-managed content:
 ```bash
 npx grudge-cli@latest uninstall
 ```
+
+See [Integrations](#integrations) for what each agent gets and
+[What Grudge writes into your files](#what-grudge-writes-into-your-files) for
+the exact block that lands in `AGENTS.md`.
 
 ### 2. Install the Python engine
 
@@ -375,18 +408,229 @@ because the host consumes it directly. See
 
 ## Integrations
 
-| Integration | Tier | Notes |
-|---|---|---|
-| Claude Code | **Guard** | Verified hook enforcement and scope-aware `CLAUDE.md` instructions |
-| Codex | Advisory | Instruction-file integration; enforcement is not guaranteed |
-| Gemini CLI | Advisory | Instruction-file integration; enforcement is not guaranteed |
-| GitHub Copilot | Advisory | Instruction-file integration; enforcement is not guaranteed |
-| OpenCode | Advisory | Instruction-file integration; enforcement is not guaranteed |
-| Windsurf | Advisory | Instruction-file integration; enforcement is not guaranteed |
-| Cursor | Unverified | The installer writes no Cursor files |
+Grudge installs one of two things per agent:
+
+- **Guard** — real hooks. `PreToolUse` can deny a tool call before it runs.
+- **Advisory** — a managed instruction block. The model is told to record and
+  avoid mistakes, but nothing blocks a call, so compliance depends on the model
+  reading the block.
+
+Everything else — capture, shrink, admit, gates, scars, stats — is the same CLI
+no matter which agent you use.
+
+### Where each agent gets configured
+
+| Integration | Tier | Repository scope (`--scope repo` / `local`) | User scope (`--scope global`) |
+|---|---|---|---|
+| Claude Code | **Guard** | `.claude/settings.json` or `.claude/settings.local.json`, plus `CLAUDE.md` | `~/.claude/settings.json` plus `~/.claude/CLAUDE.md` |
+| OpenCode | Advisory | `AGENTS.md` | `~/.config/opencode/AGENTS.md` |
+| Codex | Advisory | `AGENTS.md` | `~/.codex/AGENTS.md` |
+| Gemini CLI | Advisory | `GEMINI.md` | `~/.gemini/GEMINI.md` |
+| GitHub Copilot CLI | Advisory | `.github/copilot-instructions.md` | none; paste the block yourself |
+| Windsurf | Advisory | `.windsurfrules` | `~/.codeium/windsurf/memories/global_rules.md` |
+| Cursor | Unverified | none | none |
+
+`--scope local` is the personal variant of a repository install: Claude Code's
+settings go to `.claude/settings.local.json` while the instruction block still
+goes to the shared `CLAUDE.md`.
+
+Codex and OpenCode both read a repository `AGENTS.md`, so enabling both writes
+that file once and keeps a single managed block.
+
+### Claude Code (Guard)
+
+```bash
+npx grudge-cli@latest setup --yes --agents claude-code --scope repo
+```
+
+Setup registers five hooks and, only when no other tool owns it, a status line:
+
+| Hook | What it does |
+|---|---|
+| `SessionStart` | Injects up to 8 relevant Scar one-liners (capped at 1,200 chars) |
+| `UserPromptSubmit` | Adds a 200-char nudge to record a mistake, only on correction phrases |
+| `PreToolUse` | Denies a call that matches an admitted Scar |
+| `PostToolUse` | Appends the redacted event to `.grudge/session/` |
+| `Stop` | Prints one line only when this turn caught something |
+
+The hook command is always plain Node, never `npx` and never Python:
+
+```text
+node .grudge/bin/grudge.mjs hook PreToolUse                  # repository scope
+node "<home>/.grudge/bin/grudge.mjs" hook PreToolUse          # user scope
+```
+
+An existing third-party `statusLine` is preserved and reported, never
+overwritten. Grudge's own line is short and marked as an estimate:
+
+```text
+grudge: 0 scars, 0 blocked, ~0 tokens saved (est.)
+```
+
+Claude Code reads `CLAUDE.md`, so that is where the instruction block goes. Use
+`grudge doctor` inside the project to confirm the hooks, the block, and the
+status line.
+
+### OpenCode (Advisory)
+
+```bash
+npx grudge-cli@latest setup --yes --agents opencode --scope repo    # AGENTS.md
+npx grudge-cli@latest setup --yes --agents opencode --scope global  # ~/.config/opencode/AGENTS.md
+```
+
+OpenCode exposes no hook surface, so Grudge only adds the managed block to
+`AGENTS.md`. Nothing intercepts a tool call; the block tells the model to record
+a repeatable mistake once and to call `grudge propose` instead of retrying.
+
+### Codex (Advisory)
+
+```bash
+npx grudge-cli@latest setup --yes --agents codex --scope repo    # AGENTS.md
+npx grudge-cli@latest setup --yes --agents codex --scope global  # ~/.codex/AGENTS.md
+```
+
+Codex shares `AGENTS.md` with OpenCode, so enabling both is a single block in
+one file.
+
+### Gemini CLI (Advisory)
+
+```bash
+npx grudge-cli@latest setup --yes --agents gemini-cli --scope repo    # GEMINI.md
+npx grudge-cli@latest setup --yes --agents gemini-cli --scope global  # ~/.gemini/GEMINI.md
+```
+
+### GitHub Copilot CLI (Advisory)
+
+```bash
+npx grudge-cli@latest setup --yes --agents copilot --scope repo
+```
+
+Copilot's documented repository instruction file is
+`.github/copilot-instructions.md`. Copilot has no user-level target, so
+`--scope global` writes no Copilot file at all; paste the block from
+[What Grudge writes into your files](#what-grudge-writes-into-your-files) into
+the instruction file your Copilot CLI build reads.
+
+### Windsurf (Advisory)
+
+```bash
+npx grudge-cli@latest setup --yes --agents windsurf --scope repo    # .windsurfrules
+npx grudge-cli@latest setup --yes --agents windsurf --scope global  # ~/.codeium/windsurf/memories/global_rules.md
+```
+
+### Cursor (Unverified)
+
+The Cursor adapter writes nothing and prints the block instead. Cursor's current
+public rules format was not verified in this project, so Grudge will not guess at
+a filename:
+
+```bash
+npx grudge-cli@latest setup --yes --agents cursor --scope repo
+```
+
+Paste the block from
+[What Grudge writes into your files](#what-grudge-writes-into-your-files) into
+your Cursor rules file (`.cursor/rules/*.mdc`) yourself.
+
+### Several agents in one run
+
+```bash
+npx grudge-cli@latest setup --yes \
+  --agents claude-code,opencode,codex,gemini-cli,copilot,windsurf \
+  --scope repo
+```
+
+That run touches `.claude/settings.json`, `CLAUDE.md`, `AGENTS.md` (once),
+`GEMINI.md`, `.github/copilot-instructions.md`, `.windsurfrules`,
+`.grudge/bin/grudge.mjs`, `.gitignore`, and `.grudge/config.json`. Confirm the
+list before writing with `--dry-run --json`.
 
 See the full [integration matrix](docs/integrations.md) and
 [hook contract](docs/hooks.md).
+
+## What Grudge writes into your files
+
+### The managed instruction block
+
+Every agent receives the same block, delimited by stable markers. This is the
+exact text, and it is the only thing Grudge adds to `AGENTS.md`:
+
+```md
+<!-- grudge:begin v1 -->
+## Grudge (mistake guard)
+- A hook may block a tool call and cite a "scar". Do not retry the same call or work around it. Change approach, or ask the user if you think it is a false positive.
+- When the user corrects a repeatable mistake, or something failed because of an action you should never repeat in this repo, record it once:
+  `node .grudge/bin/grudge.mjs propose --rule '<rule>' --why '<one sentence>'`
+- Rule forms: `never call <tool> where <field> ~ "<text>"`, `must call <tool> before <tool>`, `never call <tool> where <field> tainted_by <tool>`. Tools: read_file, write_file, shell, http. Run `... propose --help` for examples.
+- One rule per correction. Never propose rules that block reading files or running tests. Do not edit `.grudge/`.
+<!-- grudge:end -->
+```
+
+How that block behaves:
+
+- Only the bytes between `<!-- grudge:begin v1 -->` and `<!-- grudge:end -->`
+  belong to Grudge. Your own headings, rules, and notes in `AGENTS.md`,
+  `CLAUDE.md`, `GEMINI.md`, `.windsurfrules`, or
+  `copilot-instructions.md` are left untouched.
+- Running `setup` again replaces the block in place, so setup is idempotent and
+  safe to re-run after a Grudge upgrade.
+- `grudge uninstall` removes only that block, and deletes a file only when
+  Grudge created it and nothing else remains in it.
+- Codex and OpenCode read the same repository `AGENTS.md`, so enabling both
+  produces one block, not two.
+- The block is deliberately small (well under the 12-line / 1,000-character
+  budget) and `grudge doctor` measures it.
+
+### Do you have to edit `AGENTS.md` yourself?
+
+Not when the agent is supported: `setup` writes the block into the right file
+for the scope you chose, and `grudge doctor` reports whether the project and
+user instruction blocks are present.
+
+You do edit it yourself when:
+
+- the agent is not in the [table](#where-each-agent-gets-configured) — for
+  example Cursor, where `setup` prints the block instead of guessing a filename;
+- you want the guard in an agent Grudge has never heard of: paste the block at
+  the end of that agent's instruction file and keep the markers.
+
+One caveat with a user-scope install: the block's command line is
+repository-relative (`node .grudge/bin/grudge.mjs`). That path only exists after
+a repository install. With `--scope global` there is no local runtime, so call
+the global command instead:
+
+```bash
+grudge propose --rule '<rule>' --why '<one sentence>'
+```
+
+### The rest of the files
+
+| Path | Written by | Contents |
+|---|---|---|
+| `.grudge/bin/grudge.mjs` | `setup` | Bundled Node runtime used by the hooks and status line |
+| `.grudge/config.json` | `setup` | `packageVersion`, `scriptHash`, selected `adapters`, `mode`, `autoAccept`, `lastBackup` |
+| `.grudge/compiled.json` | Python engine | Flattened admitted Scars the hook evaluates; absent means nothing to enforce yet |
+| `.grudge/pending/`, `.grudge/scars/` | `grudge propose` / `grudge accept` | Proposals waiting for human approval, and accepted Scars |
+| `.grudge/session/` | `PostToolUse` | Redacted per-session event log (gitignored, 7-day retention) |
+| `.grudge/stats.json`, `.grudge/stats.jsonl` | hooks | Counters and the append-only event log (gitignored) |
+| `.grudge/backups/<timestamp>/` | `setup` | Byte copies of every file it changed, plus `manifest.json` |
+
+`setup` also appends exactly three lines to `.gitignore`:
+
+```text
+.grudge/session/
+.grudge/stats.json
+.grudge/*.log
+```
+
+### Turning it off without uninstalling
+
+```bash
+GRUDGE_DISABLE=1 claude          # PowerShell: $env:GRUDGE_DISABLE = "1"
+```
+
+or set `"mode": "off"` in `.grudge/config.json`. Both leave the files in place;
+`grudge uninstall` is the removal path.
 
 ## Project structure
 
@@ -407,17 +651,25 @@ grudge/
 ## Configuration and data
 
 Grudge stores local runtime state in `.grudge/` when the Node Guard is enabled.
-This includes compiled rules, pending proposals, scars, session events, stats,
-and timestamped setup backups.
+This includes the compiled rules, pending proposals, scars, session events,
+stats, and timestamped setup backups. The
+[file table](#the-rest-of-the-files) lists each one.
 
-The installer may update:
+The installer may update, depending on the agents you select:
 
-- `.claude/settings.json` or `.claude/settings.local.json`;
-- scope-matching `CLAUDE.md` instruction files;
-- `.gitignore` entries for local Grudge state.
+- `.claude/settings.json`, `.claude/settings.local.json`, or
+  `~/.claude/settings.json` for Claude Code hooks and the status line;
+- the scope-matching instruction file: `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`,
+  `.windsurfrules`, `.github/copilot-instructions.md`, `~/.codex/AGENTS.md`,
+  `~/.config/opencode/AGENTS.md`, `~/.gemini/GEMINI.md`, or
+  `~/.codeium/windsurf/memories/global_rules.md`;
+- `.gitignore` entries for local Grudge state;
+- `.grudge/` itself, including the bundled runtime.
 
-Setup is designed to preserve unrelated user content and third-party hooks or
-status lines. Inspect a plan first with `--dry-run`; use `doctor` after setup.
+Setup never overwrites a whole file. It merges settings, replaces only the
+marked instruction block, and preserves unrelated user content plus third-party
+hooks and status lines. Inspect a plan first with `--dry-run`; use `doctor`
+after setup.
 
 ## Testing
 
