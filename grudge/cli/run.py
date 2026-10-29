@@ -16,11 +16,11 @@ from grudge.schema.scar import Scar
 
 
 def run_scars(
-    scars: Path = typer.Option(..., "--scars", help="Scar file or directory."),
-    agent: str = typer.Option(..., "--agent", help="Agent module to gate."),
-    runs: int = typer.Option(DEFAULTS.n_runs, "--runs", min=1),
+    scars: Path = typer.Option(..., "--scars", "-s", help="Scar file or directory."),
+    agent: str = typer.Option(..., "--agent", "-a", help="Agent module to gate."),
+    runs: int = typer.Option(DEFAULTS.n_runs, "--runs", "-r", min=1),
     threshold: float = typer.Option(DEFAULTS.gate_threshold, "--threshold"),
-    json_output: bool = typer.Option(False, "--json", help="Emit JSON output."),
+    json_output: bool = typer.Option(False, "--json", "-j", help="Emit JSON output."),
     debug: bool = typer.Option(False, "--debug", help="Show a traceback on errors."),
 ) -> None:
     """Run all admitted Scars in a directory, or one Scar file."""

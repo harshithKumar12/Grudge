@@ -53,15 +53,16 @@ class _ReplayCompleteOracle:
 def shrink_trace(
     trace: Path,
     failure: str = typer.Option(
-        ..., "--failure", help="Seed failure rule in Grudge DSL."
+        ..., "--failure", "-f", help="Seed failure rule in Grudge DSL."
     ),
-    out: Path = typer.Option(..., "--out", help="Destination cassette JSON."),
+    out: Path = typer.Option(..., "--out", "-o", help="Destination cassette JSON."),
     agent: str = typer.Option(
         "examples.leaky_agent.agent",
         "--agent",
+        "-a",
         help="Agent module used to evaluate candidate cassettes.",
     ),
-    json_output: bool = typer.Option(False, "--json", help="Emit JSON output."),
+    json_output: bool = typer.Option(False, "--json", "-j", help="Emit JSON output."),
     debug: bool = typer.Option(False, "--debug", help="Show a traceback on errors."),
 ) -> None:
     """Shrink a failing trace while retaining the supplied seed failure."""

@@ -5,7 +5,7 @@ from typing import Any, NoReturn
 import typer
 
 from grudge._stubs import roadmap
-from grudge.cli._common import command
+from grudge.cli._common import _version, command
 from grudge.cli.admit import admit_cassette
 from grudge.cli.capture import capture_agent
 from grudge.cli.compile import compile_command
@@ -34,9 +34,22 @@ app.command("run")(run_scars)
 app.command("demo")(run_demo)
 
 
+@app.callback(invoke_without_command=True)
+def main(
+    version: bool = typer.Option(
+        False, "--version", "-v", help="Show the version and exit.", is_eager=True
+    ),
+) -> None:
+    """Compile agent failures into deterministic regression scars."""
+
+    if version:
+        typer.echo(f"grudge {_version()}")
+        raise typer.Exit()
+
+
 @app.command()
 def viewer(
-    json_output: bool = typer.Option(False, "--json", help="Emit JSON output."),
+    json_output: bool = typer.Option(False, "--json", "-j", help="Emit JSON output."),
     debug: bool = typer.Option(False, "--debug", help="Show a traceback on errors."),
 ) -> None:
     """Start the local viewer server."""
