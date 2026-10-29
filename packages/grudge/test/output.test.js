@@ -17,7 +17,7 @@ const fixtures = {
 test("default output snapshots have a structured header, summary, and next command", () => {
   for (const [command, result] of Object.entries(fixtures)) {
     const output = renderCommand(command, result, { ascii: true });
-    assert.match(output, new RegExp(`^Grudge ${command} v0\\.1\\.7`));
+    assert.match(output, new RegExp(`^Grudge ${command} v0\\.1\\.8`));
     assert.match(output, /\d+ passed, \d+ failed, \d+ warnings/);
     assert.match(output, /Next:/);
   }

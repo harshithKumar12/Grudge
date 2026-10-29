@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.8 - 2026-10-29
+
+- Fix `grudge scars show` crashing instead of printing the pending or admitted Scar.
+- Give the Node CLI a real `--help` screen and short flags (`-h`, `-v`, `-j`, `-y`, `-a`, `-s`, `-c`).
+- Ship the demo data inside the Python wheel so `grudge-engine demo` works on a clean install.
+- Default `grudge-engine admit --controls` to the packaged example controls.
+- Evaluate filtered taint seeds so `grudge-engine shrink --failure demo` works.
+- Keep the terminal gate report ASCII-safe on legacy Windows consoles.
+- Add `grudge-engine --version` and short flags (`-j`, `-s`, `-a`, `-o`, `-r`, `-f`, `-c`).
+- Document the short command forms in the README.
+
 ## 0.1.7 - 2026-10-23
 
 - Replace default raw JSON command output with structured human-readable output.

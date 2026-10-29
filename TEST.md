@@ -58,17 +58,17 @@ git init
 ## Step 2: Install Grudge (pinned, so you do not get a cached old version)
 
 ```powershell
-npx grudge-cli@0.1.7 setup
+npx grudge-cli@0.1.8 setup
 ```
 
 What you should see: a list of agents with **arrow keys to move, Space to toggle, Enter to confirm**, then a question about where to install (choose **this repository**).
 
 Pick **Claude Code** only for this test.
 
-**Check the version** printed during setup. It should be `0.1.7`. If the
+**Check the version** printed during setup. It should be `0.1.8`. If the
 version is older, clear the npx cache or install the intended version again.
 For a local unreleased checkout, build the package and install the generated
-`grudge-cli-0.1.7.tgz` into the scratch project; do not substitute the
+`grudge-cli-0.1.8.tgz` into the scratch project; do not substitute the
 repository's `packages/grudge/dist` path for the published package flow.
 
 ---
@@ -233,7 +233,7 @@ python -m grudge demo
 
 From `grudge-test`:
 ```powershell
-npx grudge-cli@0.1.7 uninstall
+npx grudge-cli@0.1.8 uninstall
 ```
 Then check `.claude\settings.json` has no `.grudge` entries and that the managed block is gone from `CLAUDE.md`. Uninstall removes only Grudge-managed content; do not manually delete a file containing user content.
 
@@ -243,8 +243,8 @@ Then check `.claude\settings.json` has no `.grudge` entries and that the managed
 
 | What you see | What it means |
 |---|---|
-| `Cannot find module ... commands\index.js` | The installed script is the old unbundled one. Update to `0.1.7` or later and run setup again. |
-| Setup prints a wall of JSON | You are on an old version. `0.1.7` prints a structured summary by default; use `--json` for scripts. |
+| `Cannot find module ... commands\index.js` | The installed script is the old unbundled one. Update to `0.1.8` or later and run setup again. |
+| Setup prints a wall of JSON | You are on an old version. `0.1.8` prints a structured summary by default; use `--json` for scripts. |
 | You chose scope "local" but the result says "repo" | Old scope bug. Update and retry. |
 | `doctor` is green but Claude runs the blocked command | Settings file not loaded. Restart Claude Code and check `/hooks`. |
 | Quote errors in `propose` on PowerShell | Use Git Bash or WSL for that one command, or the stdin option if your version has it. |

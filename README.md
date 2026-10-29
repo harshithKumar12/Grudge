@@ -24,7 +24,7 @@ every failed agent trace is automatically turned into a regression test, so your
 
 </div>
 
-> **Release status:** source version `0.1.7` is being prepared. Verify the
+> **Release status:** source version `0.1.8` is being prepared. Verify the
 > package registries and complete the release checklist before publishing.
 
 ## Table of contents
@@ -466,7 +466,7 @@ allow-scripts`.
 
 ### Version bump tests still expect the previous version
 
-When moving from `0.1.6` to `0.1.7`, update all version surfaces together:
+When moving from `0.1.7` to `0.1.8`, update all version surfaces together:
 
 - `packages/grudge/package.json`;
 - `packages/grudge/package-lock.json`;

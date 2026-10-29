@@ -4,7 +4,7 @@
 installed Grudge block works end to end. This is the only check that cannot be
 automated: it needs a human in the Claude Code UI.
 **Audience:** Release operator.
-**Status:** not yet recorded for `0.1.7`.
+**Status:** not yet recorded for `0.1.8`.
 **Last updated:** 2026-10-28
 
 Run this in a **scratch repository** (for example `%TEMP%\grudge-live` or
@@ -42,14 +42,14 @@ git init
 ## 2. Install the release candidate
 
 Use the packed tarball for an unreleased build, or the registry package once
-`0.1.7` is published:
+`0.1.8` is published:
 
 ```powershell
 npm pack --pack-destination . ../../Desktop/Grudge/packages/grudge
-npx --yes .\grudge-cli-0.1.7.tgz setup --yes --agents claude-code --scope repo
+npx --yes .\grudge-cli-0.1.8.tgz setup --yes --agents claude-code --scope repo
 ```
 
-Expected: `Grudge setup v0.1.7`, `[ok] Scope: repo`, `[ok] Agents:
+Expected: `Grudge setup v0.1.8`, `[ok] Scope: repo`, `[ok] Agents:
 claude-code`, a `Files: N changed` line, and `Next: grudge doctor`.
 
 Record the setup output here:
