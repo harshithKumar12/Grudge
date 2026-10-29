@@ -26,7 +26,10 @@ test("PreToolUse blocks tainted Windows-path leak with official deny output", as
   try {
     await append(join(root, ".grudge"), "s1", { tool: "read_file", args: { path: "C:\\workspace\\keys.txt" }, result: "FAKE_KEY_123", timestamp: new Date().toISOString() });
     const result = await preToolUse({ cwd: root, session_id: "s1", tool_name: "WebFetch", tool_input: { body: "send FAKE_KEY_123" } });
-    assert.equal(result.code, 0);
+    // Exit 2 is the code Claude Code blocks on, so the guard blocks even if the
+    // host cannot parse the deny JSON.
+    assert.equal(result.code, 2);
+    assert.match(result.stderr, /grudge: blocked by leak-1/);
     assert.equal(result.blocked, true);
     assert.equal(result.scarId, "leak-1");
     assert.ok(result.reason.length <= 400);

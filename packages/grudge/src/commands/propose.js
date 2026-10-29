@@ -63,7 +63,7 @@ function rejection(reason) {
   return { accepted: false, error: String(reason).slice(0, 299) };
 }
 
-/** @param {{rule?: string, why?: string, preventive?: boolean, session?: string, root?: string}} options */
+/** @param {{rule?: string, why?: string, preventive?: boolean, accept?: boolean, session?: string, root?: string}} options */
 export async function propose(options = {}) {
   const source = options.rule;
   const why = options.why;
@@ -111,13 +111,17 @@ export async function propose(options = {}) {
   await mkdir(targetPaths.pending, { recursive: true });
   await writeJsonAtomic(join(targetPaths.pending, `${id}.scar.json`), record);
   try { await appendEvent(root, { type: "proposal", sessionId: target.id, scarId: id }); } catch { /* reporting is advisory */ }
-  if ((await loadConfig(root)).autoAccept === true) {
+  if ((await loadConfig(root)).autoAccept === true || options.accept === true) {
     const promoted = await accept(id, { root });
-    return { ...promoted, pending: false, autoAccepted: true, record };
+    return { ...promoted, pending: false, enforced: true, autoAccepted: true, record };
   }
   return {
-    accepted: true,
+    // A pending scar is not enforced. Never report it as accepted: a model
+    // reading this result must not be able to claim the rule is active.
+    accepted: false,
     pending: true,
+    enforced: false,
+    status: "pending",
     id,
     english: record.english,
     run: `grudge accept ${id}`,

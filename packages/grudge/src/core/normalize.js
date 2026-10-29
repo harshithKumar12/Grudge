@@ -1,8 +1,12 @@
 // OWNER: lane-a
 
-const names = {
-  Read: "read_file", Write: "write_file", Edit: "write_file", MultiEdit: "write_file",
-  Bash: "shell", WebFetch: "http", WebSearch: "http",
+// Claude Code exposes one tool per host action; the DSL keeps four canonical
+// tools. Keep this map lowercase-keyed so casing never decides enforcement.
+export const toolNames = {
+  read: "read_file", notebookread: "read_file",
+  write: "write_file", edit: "write_file", multiedit: "write_file", notebookedit: "write_file",
+  bash: "shell", powershell: "shell",
+  webfetch: "http", websearch: "http",
 };
 
 /** Convert a host hook payload into the canonical runtime event shape. */
@@ -11,7 +15,7 @@ export function normalize(event = {}) {
   const toolName = String(rawTool ?? "other");
   let tool;
   if (toolName.startsWith("mcp__")) tool = "mcp";
-  else tool = names[toolName] ?? (names[toolName.toLowerCase()] ?? (toolName === "http" ? "http" : toolName));
+  else tool = toolNames[toolName.toLowerCase()] ?? (toolName === "http" ? "http" : toolName);
   const rawArgs = event.args ?? event.arguments ?? event.input ?? event.tool_input ?? event.function?.arguments ?? {};
   let args = rawArgs;
   if (typeof rawArgs === "string") {

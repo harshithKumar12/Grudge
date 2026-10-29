@@ -25,8 +25,11 @@ test("valid proposal is pending and accept compiles an idempotent block", async 
     why: "The shell command came from untrusted tool output.",
     session: "latest",
   });
-  assert.equal(proposal.accepted, true);
+  assert.equal(proposal.accepted, false);
   assert.equal(proposal.pending, true);
+  assert.equal(proposal.enforced, false);
+  assert.equal(proposal.status, "pending");
+  assert.match(proposal.run, new RegExp(`^grudge accept ${proposal.id}$`));
   const pending = await scars("list", { root });
   assert.equal(pending.pending.length, 1);
   const first = await accept(proposal.id, { root });
@@ -43,7 +46,8 @@ test("vacuous and over-broad proposals reject, preventive bypasses vacuity", asy
   assert.equal(vacuous.accepted, false);
   assert.match(vacuous.error, /vacuous/);
   const preventive = await propose({ root, rule: 'never call shell where command ~ "bad"', why: "Review this before use.", preventive: true });
-  assert.equal(preventive.accepted, true);
+  assert.equal(preventive.pending, true);
+  assert.equal(preventive.accepted, false);
 });
 
 test("scars disable, reject, and remove are idempotent", async () => {
@@ -65,5 +69,16 @@ test("autoAccept is opt-in and promotes only when explicitly configured", async 
   await writeFile(join(root, ".grudge", "config.json"), JSON.stringify({ autoAccept: true }));
   const proposal = await propose({ root, rule: 'never call shell where command ~ "bad"', why: "Avoid the bad command." });
   assert.equal(proposal.autoAccepted, true);
+  assert.equal((await scars("list", { root })).pending.length, 0);
+});
+
+test("propose --accept enforces immediately without review", async () => {
+  const root = await rootWithSessions([{ tool: "shell", args: { command: "bad" } }]);
+  const proposal = await propose({ root, rule: 'never call shell where command ~ "bad"', why: "Enforce now.", accept: true });
+  assert.equal(proposal.accepted, true);
+  assert.equal(proposal.pending, false);
+  assert.equal(proposal.enforced, true);
+  const compiled = JSON.parse(await readFile(join(root, ".grudge", "compiled.json"), "utf8"));
+  assert.equal(compiled.rules[0].mode, "block");
   assert.equal((await scars("list", { root })).pending.length, 0);
 });

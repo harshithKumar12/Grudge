@@ -3,7 +3,7 @@
 **Purpose:** Map every file currently under `docs/` and show its purpose, owner phase, and status.
 **Audience:** Contributors, reviewers, demo operators, and future implementation agents.
 **Status:** final
-**Last updated (phase):** 0.1.7 · 2026-10-23
+**Last updated (phase):** 25 - 2026-10-29
 
 ## Documents
 
@@ -41,6 +41,7 @@
 | [`docs/instruction-block.md`](instruction-block.md) | The compact managed model instruction block and its rationale. | 18 | final |
 | [`docs/token-budgets.md`](token-budgets.md) | Enforced output caps, token estimates, stats, and status-line discipline. | 20 | final |
 | [`docs/FINAL-REPORT.md`](FINAL-REPORT.md) | Final parallel-mode Definition of Done evidence, limitations, and release commands. | 21 | final |
+| [`docs/phase-25-findings.md`](phase-25-findings.md) | Step 0 investigation of the published CLI: what propose writes, how accept compiles, which tool names map, and whether the hook blocks. | 25 | final |
 | [`../TEST.md`](../TEST.md) | Scratch-directory walkthrough for setup, hooks, stats, savings, and uninstall. | 24 | final |
 
 ## Status vocabulary

@@ -3,7 +3,7 @@
 **Purpose:** Document the local Claude Code command hooks and their fail-open behavior.
 **Audience:** Developers installing Grudge Guard hooks.
 **Status:** final
-**Last updated (phase):** pre-production fixes · 2026-10-23
+**Last updated (phase):** 25 - 2026-10-29
 
 ## Command and official decision mechanism
 
@@ -32,9 +32,12 @@ object on stdin. A PreToolUse deny is returned on stdout as:
 ```
 
 Exit code 0 with no decision means that normal permission handling continues.
-Grudge therefore uses exit code 0 for both allow and deny decisions, as required
-by the current JSON decision mechanism. Unknown events, malformed input, corrupt
-compiled rules, and internal errors emit one short stderr warning and exit 0.
+A PreToolUse **deny exits 2** and still prints the deny JSON. Exit 2 is the code
+Claude Code blocks on even when it cannot parse stdout, and the JSON
+`permissionDecisionReason` is the reason the user sees; Grudge also writes
+`grudge: blocked by <scar id>: <reason>` to stderr. Re-checked against the hooks
+reference on 2026-10-29. Unknown events, malformed input, corrupt compiled
+rules, and internal errors emit one short stderr warning and exit 0 (fail open).
 
 ## Hook behavior
 

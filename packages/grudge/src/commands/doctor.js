@@ -133,7 +133,11 @@ export async function doctor(options = {}) {
     checks.push({ name: `budget ${measurement.name}`, ok, detail: `${measurement.chars}/${measurement.cap} chars${lineDetail}`, measurement });
   }
   const result = { ok: checks.every((check) => check.ok), root, checks, budgetMeasurements, warnings };
-  if (options.print !== false) for (const check of checks) process.stdout.write(`${check.warning ? "⚠" : check.ok ? "✓" : "✗"} ${check.name}: ${check.detail}\n`);
+  if (options.print !== false) {
+    for (const check of checks) process.stdout.write(`${check.warning ? "⚠" : check.ok ? "✓" : "✗"} ${check.name}: ${check.detail}\n`);
+    // File checks prove what is installed, never that a hook stops a call.
+    process.stdout.write("Enforcement: not proven by file checks. Run `grudge verify` to prove blocking works.\n");
+  }
   return result;
 }
 

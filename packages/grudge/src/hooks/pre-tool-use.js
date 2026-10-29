@@ -55,7 +55,9 @@ async function evaluate(payload) {
     await appendEvent(root, { type: "catch", outcome: "blocked", scarId: rule.id, sessionId: payload.session_id ?? payload.sessionId, injectedChars: JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: reason }, blocked: true, reason, scarId: rule.id }).length + 1 });
     await incrementStats(root, "blocks", rule.id);
     const output = { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: reason }, blocked: true, reason, scarId: rule.id };
-    return { code: 0, stdout: `${JSON.stringify(output)}\n`, stderr: "", blocked: true, reason, scarId: rule.id };
+    // Exit 2 blocks even when the host cannot parse the JSON; the JSON still
+    // supplies the reason, which the hooks reference prefers over stderr.
+    return { code: 2, stdout: `${JSON.stringify(output)}\n`, stderr: `grudge: blocked by ${rule.id}: ${reason}\n`, blocked: true, reason, scarId: rule.id };
   }
   return { code: 0, stdout: "", stderr: "" };
 }
