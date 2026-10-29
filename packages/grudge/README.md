@@ -49,6 +49,25 @@ For a non-interactive Claude Code repository setup:
 npx grudge-cli@latest setup --yes --agents claude-code --scope repo
 ```
 
+Claude Code is the only agent with real hook enforcement. The others receive a
+managed instruction block in the file they already read:
+
+```bash
+npx grudge-cli@latest setup --yes --agents opencode,codex --scope repo   # AGENTS.md
+npx grudge-cli@latest setup --yes --agents gemini-cli --scope repo       # GEMINI.md
+npx grudge-cli@latest setup --yes --agents copilot --scope repo          # .github/copilot-instructions.md
+npx grudge-cli@latest setup --yes --agents windsurf --scope repo         # .windsurfrules
+npx grudge-cli@latest setup --yes --agents claude-code --scope global    # every project
+```
+
+`--agents` accepts a comma-separated list, so one run can configure several
+tools. Codex and OpenCode share a repository `AGENTS.md` and get a single block.
+See
+[Integrations](https://github.com/harshithKumar12/Grudge#integrations) for the
+per-agent paths and
+[What Grudge writes into your files](https://github.com/harshithKumar12/Grudge#what-grudge-writes-into-your-files)
+for the exact block and how to edit `AGENTS.md` around it.
+
 Preview changes before writing:
 
 ```bash
@@ -72,10 +91,10 @@ npx grudge-cli@latest uninstall
 - Timestamped backups and selective uninstall cleanup.
 - A self-contained bundled runtime with no npm runtime dependencies.
 
-Claude Code is the verified **Guard** adapter. Codex, Gemini CLI, GitHub
-Copilot, OpenCode, and Windsurf are **Advisory** integrations; enforcement is
-not guaranteed for those tools. Cursor is unverified and the installer writes
-no Cursor files.
+Claude Code is the verified **Guard** adapter. Codex, Gemini CLI, GitHub Copilot
+CLI, OpenCode, and Windsurf are **Advisory** integrations; enforcement is not
+guaranteed for those tools. Cursor is unverified and the installer writes no
+Cursor files.
 
 ## Development checkout
 
