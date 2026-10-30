@@ -26,16 +26,42 @@ class RedactionRule:
 
 
 DEFAULT_REDACTION_RULES: tuple[RedactionRule, ...] = (
-    RedactionRule(r"\bFAKE_KEY_[A-Za-z0-9_-]+\b"),
-    RedactionRule(r"\b(?:sk-ant-|sk-)[A-Za-z0-9_-]{12,}\b"),
-    RedactionRule(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b"),
-    RedactionRule(r"\b(?:ghp|gho|ghs|ghr)_[A-Za-z0-9]{20,}\b"),
-    RedactionRule(r"\bgithub_pat_[A-Za-z0-9_]{20,}\b"),
-    RedactionRule(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b"),
+    # Order mirrors packages/grudge/src/core/redact.js so both runtimes store
+    # the same text for the same input.
     RedactionRule(
-        r"(?i)\b(?:api[_-]?key|access[_-]?token|secret|token|password)"
-        r"(\s*[:=]\s*)['\"]?[A-Za-z0-9_./+=-]{8,}['\"]?",
-        replacement=r"\1[REDACTED]",
+        r"-----BEGIN [^-\n]*PRIVATE KEY-----[\s\S]*?-----END [^-\n]*PRIVATE KEY-----",
+        replacement="[REDACTED PRIVATE KEY]",
+    ),
+    # `Authorization: Bearer <token>` is separated from its label by a scheme
+    # word, so the labelled-value rule below cannot see it.
+    RedactionRule(
+        r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{8,}",
+        replacement="Bearer [REDACTED]",
+    ),
+    RedactionRule(
+        r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b", replacement="[REDACTED KEY]"
+    ),
+    # Keep the label and normalize the separator, so the stored line stays
+    # readable and matches the Node recorder's output exactly. The value may be
+    # quoted, and `&`/`?` end it so a following query parameter is not swallowed
+    # together with the secret (`token=abc&next=1`).
+    RedactionRule(
+        r"(?i)\b((?:api[_ -]?key|access[_ -]?key|access[_ -]?token|secret"
+        r"|token|password|passwd|authorization))\b\s*[:=]\s*(['\"]?)"
+        r"([^\s\"'`,;}?&\]]{8,})\2",
+        replacement=r"\1: [REDACTED]",
+    ),
+    RedactionRule(
+        r"\b(?:sk|pk|rk|ghp|gho|ghs|ghr|github_pat|xox[baprs])"
+        r"[-_][A-Za-z0-9][A-Za-z0-9_.\-]{10,}\b",
+        replacement="[REDACTED KEY]",
+    ),
+    RedactionRule(
+        r"\b([A-Z][A-Z0-9_]{2,})\s*=\s*([^\s,;)}\]]+)", replacement=r"\1=[REDACTED]"
+    ),
+    RedactionRule(
+        r"\b(?:FAKE_)?KEY_[A-Za-z0-9][A-Za-z0-9_.\-]{8,}\b",
+        replacement="[REDACTED KEY]",
     ),
 )
 

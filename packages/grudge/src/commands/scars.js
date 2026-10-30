@@ -62,6 +62,10 @@ export function compiledRule(record, mode = "block") {
     match: rule.match ?? {},
     ordering: rule.ordering ?? { before: "", after: "" },
     taint: rule.taint ?? { source: "", sink: "" },
+    // `polarity` decides whether a call_shape rule forbids a call or requires
+    // one. Dropping it silently inverted `must call ...` into a block of the
+    // required call, so it is always written and defaults to the prohibition.
+    polarity: rule.polarity === "must" ? "must" : "never",
     english: record.english,
     createdFrom: record.createdFrom ?? "propose",
   };

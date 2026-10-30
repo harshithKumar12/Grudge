@@ -3,8 +3,8 @@
 **Purpose:** Canonical, current state of the repository, the phase board, and
 the known issues that still block a universal production claim.
 **Audience:** Project owner, reviewers, and release operator.
-**Status:** current as of Phase 25, after the 0.1.9 release.
-**Last updated:** 2026-10-29
+**Status:** current as of the production-readiness remediation, after the 0.1.9 release.
+**Last updated:** 2026-10-30
 
 ## Current snapshot
 
@@ -43,6 +43,50 @@ the known issues that still block a universal production claim.
   records the published-CLI commands and output that showed propose wrote only
   a pending scar, `--accept` was silently ignored, the tool map lacked
   `PowerShell`, and a deny exited 0.
+
+## Production-readiness remediation (2026-10-30)
+
+- **Branch:** `remediation/production-readiness`, based on `481872e`. All
+  changes are uncommitted; nothing was pushed, tagged, or published.
+- **Source:** [`docs/production-readiness-audit-2026-10-30.md`](docs/production-readiness-audit-2026-10-30.md).
+  The audit called the tree NOT READY; the remediation section at the end of
+  that file records the fix, test, and command result for each finding.
+- **P0-1 — concurrent calls escaped the guard.** The handler wrote stats before
+  deciding, so a stale lock or contention turned a match into an allow.
+  Reproduced: 2/25 concurrent matching calls allowed, 9/10 duplicate deliveries
+  allowed. Fixed by deciding first and making accounting lock-free and bounded.
+  Now 25/25 and 10/10 blocked.
+- **P1-2/P2-1 — hook latency.** A referenced 1,500 ms timer made every call
+  wait out the budget. End-to-end spawn went from p50 ≈1.78 s to ≈0.16 s.
+- **P1-1 — `must` rules were enforced backwards.** The Node compiler emitted
+  `polarity`, but the Python compiler returned `never` for a bare `CallShape`,
+  so a Python-compiled `must call` rule blocked the required call. Fixed in
+  `grudge/guard/compile.py` (`_polarity` now returns `must` for `CallShape` and
+  `Ordering`, `never` for a negated set or a taint flow); `atEvents` stays empty
+  for a missing required call. Pinned by Python polarity tests plus a
+  Python-compile → Node-guard end-to-end test.
+- **P1-3 — demo proof was repo-only.** Script and payloads ship in the wheel;
+  runtime resolution is `--node-runtime` → `GRUDGE_NODE_RUNTIME` → checkout →
+  `node_modules`. Verified from a clean venv + npm tarball outside the checkout.
+- **P1-4/P3-1 — redaction drift.** Node and Python now apply one ordered rule
+  list, including an identical labelled-value pattern (quoted values, trailing
+  punctuation, and query separators), pinned by the 18 cases in
+  `spec/redaction-corpus.json` and asserted by both suites.
+- **P1-5 — path semantics diverged.** Python mirrors Node's canonicalization;
+  Windows casing, `..` escapes, and sibling prefixes are shared fixtures.
+- **P2-2, P2-3, P2-6, P2-7, P3-3, P3-4:** hostile session ids rejected;
+  `doctor --json` states enforcement is unproven; `must` control message added;
+  `propose` rejects shell-splitting values; `uninstall` preserves user files in
+  `.grudge`; release docs stop using `npm pack --prefix`.
+- **Verification:** Python **319 passed, 1 skipped**; Node **104/104**;
+  `ruff`, `mypy`, `docs_check`, `release_check`, `twine check`, `build`,
+  `npm pack`, clean wheel+tarball install, wheel-compiled `must call` → Node
+  guard (`npm test` exit 0, `ls -la` exit 2), and `demo --guard` all exit 0.
+  Redaction parity: 0 divergences over 779 generated inputs plus the 18-case
+  shared corpus.
+- **Not verified locally:** macOS/Linux runners, Python 3.11, Node 18/20/22, and
+  the two new CI jobs. They are declared NOT VERIFIED in the audit until the
+  first CI run; the commands they run were verified on Windows.
 
 ## Phase board
 

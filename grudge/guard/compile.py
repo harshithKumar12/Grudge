@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import tempfile
 from collections.abc import Iterable, Mapping
 from pathlib import Path
@@ -26,6 +27,7 @@ from grudge.schema.predicate import (
 from grudge.schema.scar import Scar
 
 SCHEMA_VERSION = 1
+_DRIVE_RE = re.compile(r"^[A-Za-z]:")
 
 
 def _matches(value: Any, expected: Any) -> bool:
@@ -49,11 +51,43 @@ def _matches(value: Any, expected: Any) -> bool:
     return bool(value == expected)
 
 
-def _under(path: str, root: str) -> bool:
-    """Compare slash and Windows paths without allowing a prefix collision."""
+def _canonical_path(value: str) -> str:
+    """Canonicalize a path lexically, matching the Node runtime exactly.
 
-    left = path.replace("\\", "/").rstrip("/")
-    right = root.replace("\\", "/").rstrip("/")
+    Separators unify, ``.`` and ``..`` collapse without touching the filesystem,
+    and Windows paths (drive letter or UNC) compare case-insensitively while
+    POSIX paths stay case-sensitive.
+    """
+
+    text = str(value).replace("\\", "/")
+    drive_match = bool(_DRIVE_RE.match(text))
+    windows = drive_match or text.startswith("//")
+    drive = text[:2].lower() if drive_match else ""
+    rest = text[2:] if drive_match else text
+    segments: list[str] = []
+    for part in rest.split("/"):
+        if part in ("", "."):
+            continue
+        if part == "..":
+            if segments:
+                segments.pop()
+            continue
+        segments.append(part.lower() if windows else part)
+    body = "/".join(segments)
+    if drive:
+        return f"{drive}/{body}"
+    if rest.startswith("/"):
+        return f"/{body}"
+    return body
+
+
+def _under(path: str, root: str) -> bool:
+    """Compare canonical paths without allowing a prefix collision."""
+
+    left = _canonical_path(path)
+    right = _canonical_path(root).rstrip("/")
+    if not right:
+        return left == ""
     return left == right or left.startswith(right + "/")
 
 
@@ -135,7 +169,27 @@ def evaluate_rule(
     """Evaluate one compiled rule using the shared fixture result shape."""
 
     at_events = _rule_violations(rule, events)
+    # A `must` call shape is a requirement, not a prohibition: it is violated
+    # when no matching call exists. Every other kind keeps the prohibition
+    # meaning, so a missing call is safe.
+    if rule["kind"] == "call_shape" and rule.get("polarity") == "must":
+        return {"violated": not at_events, "atEvents": at_events}
     return {"violated": bool(at_events), "atEvents": at_events}
+
+
+def _polarity(predicate: Predicate) -> str:
+    """Return the compiled polarity for one predicate.
+
+    ``CallShape`` on its own means "this call is required"; the parser wraps
+    ``never call`` in ``PredicateSet(kind="not")``. Taint rules are always
+    prohibitions, and ordering rules are obligations in both compilers.
+    """
+
+    if isinstance(predicate, PredicateSet) and predicate.kind == "not":
+        return "never"
+    if isinstance(predicate, (Ordering, CallShape)):
+        return "must"
+    return "never"
 
 
 def _flatten(predicate: Predicate) -> tuple[str, dict[str, Any]]:
@@ -199,6 +253,7 @@ def compile_scar(scar: Scar, *, created_from: str) -> dict[str, Any]:
         "match": fields.get("match", {}),
         "ordering": fields.get("ordering", {"before": "", "after": ""}),
         "taint": fields.get("taint", {"source": "", "sink": ""}),
+        "polarity": _polarity(scar.predicate),
         "english": scar.predicate.describe(),
         "createdFrom": created_from,
     }

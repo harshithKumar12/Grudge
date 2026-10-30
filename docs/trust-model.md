@@ -23,10 +23,33 @@ partial capture cannot prevent later analysis.
 
 ## Redaction boundary
 
-Redaction runs before a value is written. It masks private-key blocks,
-environment-style assignments, labeled values such as `api_key` and `token`,
-common provider key prefixes, and the clearly fake `FAKE_KEY_` form used by
-the examples. Redaction is always enabled in the runtime recorder; there is
+Redaction runs before a value is written, and both runtimes apply the same
+ordered rule list so the same input stores the same text. The labelled-value
+pattern is written with the same character classes in both implementations, so
+quoted values, trailing punctuation, and query separators such as
+`token=abc&next=1` produce the same result rather than drifting apart:
+
+- whole `-----BEGIN … PRIVATE KEY-----` blocks;
+- `Authorization: Bearer <token>` (the scheme word hides the value from the
+  label rule, so it is matched explicitly);
+- provider keys by shape — AWS `AKIA`/`ASIA`, `sk-`/`pk-`/`rk-`, `ghp_`/`gho_`/
+  `ghs_`/`ghr_`, `github_pat_`, and `xoxb-`-style Slack tokens;
+- labelled values such as `api_key`, `access_token`, `authorization`, `secret`,
+  `token`, `password`, and `passwd`, keeping the label and storing
+  `label: [REDACTED]`;
+- bare `UPPER_CASE=value` environment assignments;
+- the clearly fake `FAKE_KEY_` form used by the examples.
+
+The shared corpus is `spec/redaction-corpus.json` (18 cases):
+`tests/test_shared_corpora.py` and
+`packages/grudge/test/remediation-regressions.test.js` both assert it
+exactly, including entries that must pass through **unchanged** (ordinary prose,
+and the phrase `token bucket algorithm`), so redaction cannot quietly eat
+unrelated text. The two implementations are also compared directly: a generated
+sweep of 779 inputs (every label form × separator × value shape) produced
+identical output with zero divergences, and the only unmasked values were
+ordinary prose, values shorter than eight characters, and values containing a
+space. Redaction is always enabled in the runtime recorder; there is
 no silent opt-out. A redaction marker is not proof that a source value was
 secret, and redaction is intentionally conservative rather than a complete
 secret scanner.

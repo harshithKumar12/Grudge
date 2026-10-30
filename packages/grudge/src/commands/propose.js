@@ -63,12 +63,73 @@ function rejection(reason) {
   return { accepted: false, error: String(reason).slice(0, 299) };
 }
 
+/** Split a rule into whitespace tokens, keeping quoted spans intact. */
+function tokenize(source) {
+  const parts = [];
+  let current = "";
+  let quoted = false;
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === "\\") { current += char + (source[index + 1] ?? ""); index += 1; continue; }
+    if (char === '"') { quoted = !quoted; current += char; continue; }
+    if (!quoted && /\s/.test(char)) {
+      if (current) { parts.push(current); current = ""; }
+      continue;
+    }
+    current += char;
+  }
+  if (current) parts.push(current);
+  return { parts, balanced: !quoted };
+}
+
+/**
+ * Detect a rule whose quoting was eaten before Grudge saw it.
+ *
+ * PowerShell 5.1 strips embedded double quotes when it forwards a native
+ * argument, so `~ "npm test"` arrives as `~ npm` and compiles to the far
+ * broader `$contains: "npm"` with no warning. The documented grammar requires a
+ * JSON string after `~` / `under`, so a bare token there means the value was
+ * mangled; refuse instead of silently widening the rule.
+ */
+function quotingHazard(source) {
+  const { parts, balanced } = tokenize(source);
+  if (!balanced) return "unbalanced";
+  const isQuoted = (token) => typeof token === "string" && token.startsWith('"');
+  for (let index = 0; index < parts.length - 1; index += 1) {
+    const token = parts[index];
+    const next = parts[index + 1];
+    if (token === "~") {
+      if (!isQuoted(next)) return "unquoted";
+      continue;
+    }
+    if (token !== "under") continue;
+    // `under` is a field name only directly after `where`/`and`; anywhere else
+    // it is the path operator and requires a quoted path.
+    const previous = parts[index - 1] ?? "";
+    if (previous === "where" || previous === "and") continue;
+    if (!isQuoted(next)) return "unquoted";
+  }
+  return null;
+}
+
 /** @param {{rule?: string, why?: string, preventive?: boolean, accept?: boolean, session?: string, root?: string}} options */
 export async function propose(options = {}) {
   const source = options.rule;
   const why = options.why;
   const root = options.root ?? process.cwd();
   if (!source || !why) return rejection("rule and why are required");
+  // PowerShell 5.1 drops embedded double quotes when it forwards a native
+  // argument, so `~ "npm test"` silently arrives as `~ npm`. Detect that loss
+  // instead of compiling a rule that is quietly broader than the author meant.
+  if (!options.fromStdin) {
+    const hazard = quotingHazard(source);
+    if (hazard === "unbalanced") {
+      return rejection('unbalanced double quote in --rule: a shell may have stripped it. Pass the rule with --rule-stdin to avoid shell quoting');
+    }
+    if (hazard === "unquoted") {
+      return rejection('unquoted value after "~" or "under": shell quoting may have been stripped. Quote the value, or pass the rule with --rule-stdin');
+    }
+  }
   let rule;
   try {
     rule = parse(source);
@@ -90,6 +151,9 @@ export async function propose(options = {}) {
     if (control.id === target.id) continue;
     const controlResult = check(rule, await read(eventRoot, control.id));
     if (controlResult.violated) {
+      if (rule.kind === "call_shape" && rule.polarity === "must") {
+        return rejection(`over-broad rule: control session ${control.id} never makes the required call, so the rule would block every other tool call; narrow it with arguments or record a session that makes the call`);
+      }
       const event = controlResult.atEvents[0];
       return rejection(`over-broad rule: fires on control session ${control.id} at event ${event}`);
     }

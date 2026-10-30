@@ -31,6 +31,14 @@ def run_demo(
     guard: bool = typer.Option(
         False, "--guard", help="Run the offline two-session hook proof."
     ),
+    node_runtime: str = typer.Option(
+        "",
+        "--node-runtime",
+        help=(
+            "Path to the Guard dist/grudge.mjs "
+            "(defaults to GRUDGE_NODE_RUNTIME or a checkout)."
+        ),
+    ),
     json_output: bool = typer.Option(False, "--json", "-j", help="Emit JSON output."),
     debug: bool = typer.Option(False, "--debug", help="Show a traceback on errors."),
 ) -> None:
@@ -45,10 +53,19 @@ def run_demo(
             node = shutil.which("node")
             if node is None:
                 raise RuntimeError("--guard requires Node.js >= 18 on PATH")
-            script = Path(__file__).resolve().parents[2] / "scripts" / "e2e_guard.mjs"
+            # The proof ships inside the wheel next to its payload fixtures; it
+            # is not a repository-relative script.
+            script = Path(__file__).resolve().parents[1] / "demo" / "e2e_guard.mjs"
+            if not script.is_file():
+                raise RuntimeError(
+                    f"guard demo script is missing from this install: {script}"
+                )
+            command = [node, str(script)]
+            if node_runtime:
+                command += ["--runtime", node_runtime]
             completed = subprocess.run(
-                [node, str(script)],
-                cwd=script.parent.parent,
+                command,
+                cwd=str(Path.cwd()),
                 check=False,
                 capture_output=True,
                 text=True,
