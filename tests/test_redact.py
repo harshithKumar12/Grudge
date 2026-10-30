@@ -13,7 +13,8 @@ def test_default_rules_mask_the_phase_2_fake_key() -> None:
     redacted = redact_text(f"tool output: {FAKE_PHASE_2_KEY}")
 
     assert FAKE_PHASE_2_KEY not in redacted
-    assert "[REDACTED]" in redacted
+    # Same marker as the Node recorder, so both runtimes store one shape.
+    assert redacted == "tool output: [REDACTED KEY]"
 
 
 def test_rules_are_pluggable_and_applied_in_order() -> None:
@@ -50,7 +51,7 @@ def test_trace_values_are_redacted_without_mutating_the_input() -> None:
 
     assert trace["body"] == FAKE_PHASE_2_KEY
     assert redacted == {
-        "body": "[REDACTED]",
-        "steps": ["safe", {"value": "[REDACTED]"}],
-        "metadata": ("[REDACTED]",),
+        "body": "[REDACTED KEY]",
+        "steps": ["safe", {"value": "[REDACTED KEY]"}],
+        "metadata": ("[REDACTED KEY]",),
     }

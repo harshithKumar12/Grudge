@@ -22,6 +22,11 @@
         "mode": {"enum": ["block", "warn", "off", "pending"]},
         "kind": {"enum": ["call_shape", "ordering", "taint_flow"]},
         "tool": {"type": "string", "minLength": 1},
+        "polarity": {
+          "description": "`must` means the call shape is required; absent or `never` means it is forbidden.",
+          "enum": ["never", "must"],
+          "default": "never"
+        },
         "match": {"type": "object"},
         "ordering": {
           "type": "object",

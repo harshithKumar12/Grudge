@@ -36,8 +36,11 @@ test("PreToolUse blocks tainted Windows-path leak with official deny output", as
     const output = JSON.parse(result.stdout);
     assert.equal(output.hookSpecificOutput.permissionDecision, "deny");
     assert.match(output.hookSpecificOutput.permissionDecisionReason, /do not retry/i);
+    // A repeated delivery of the same prohibited call must stay blocked; only
+    // the counter is deduplicated. Enforcement is never gated on the claim.
     const duplicate = await preToolUse({ cwd: root, session_id: "s1", tool_name: "WebFetch", tool_input: { body: "send FAKE_KEY_123" } });
-    assert.equal(duplicate.stdout, "");
+    assert.equal(duplicate.code, 2);
+    assert.equal(JSON.parse(duplicate.stdout).hookSpecificOutput.permissionDecision, "deny");
     assert.equal((await readEvents(root)).filter((event) => event.type === "catch").length, 1);
   } finally { await rm(root, { recursive: true, force: true }); }
 });

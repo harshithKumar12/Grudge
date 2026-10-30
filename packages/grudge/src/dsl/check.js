@@ -1,8 +1,31 @@
 // OWNER: lane-a
 
+// Lexical path canonicalization shared with grudge/guard/compile.py: separators
+// unify, "." and ".." collapse without touching the filesystem, and Windows
+// paths (drive letter or UNC) compare case-insensitively while POSIX paths stay
+// case-sensitive. Trailing slashes never change the answer.
+function canonicalPath(value) {
+  const text = String(value).replaceAll("\\", "/");
+  const driveMatch = /^[A-Za-z]:/.test(text);
+  const windows = driveMatch || text.startsWith("//");
+  const drive = driveMatch ? text.slice(0, 2).toLowerCase() : "";
+  const rest = driveMatch ? text.slice(2) : text;
+  const segments = [];
+  for (const part of rest.split("/")) {
+    if (!part || part === ".") continue;
+    if (part === "..") { if (segments.length) segments.pop(); continue; }
+    segments.push(windows ? part.toLowerCase() : part);
+  }
+  const body = segments.join("/");
+  if (drive) return `${drive}/${body}`;
+  if (rest.startsWith("/")) return `/${body}`;
+  return body;
+}
+
 function under(path, root) {
-  const left = String(path).replaceAll("\\", "/").replace(/\/+$/, "");
-  const right = String(root).replaceAll("\\", "/").replace(/\/+$/, "");
+  const left = canonicalPath(path);
+  const right = canonicalPath(root).replace(/\/+$/, "");
+  if (!right) return left === "";
   return left === right || left.startsWith(`${right}/`);
 }
 

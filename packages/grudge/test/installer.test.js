@@ -76,6 +76,21 @@ test("doctor reports a healthy installed runtime", async () => {
   assert.ok(result.budgetMeasurements.every(({ chars, cap }) => chars <= cap));
 });
 
+test("doctor JSON states that enforcement is not proven (P2-3)", async () => {
+  const cwd = await scratch();
+  const runtime = join(cwd, "runtime.mjs");
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  await setup({ cwd, home: cwd, agents: ["claude-code"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
+  const result = await doctor({ cwd, home: cwd, print: false });
+  // A scripted consumer must not read `ok: true` as "blocking works".
+  assert.deepEqual(result.enforcement, {
+    proven: false,
+    command: "grudge verify",
+    detail: "not proven by file checks; run `grudge verify` to prove blocking works",
+  });
+  assert.equal(JSON.parse(JSON.stringify(result)).enforcement.proven, false);
+});
+
 test("doctor fails when a measured budget exceeds its cap", async () => {
   const cwd = await scratch();
   const result = await doctor({
@@ -287,4 +302,29 @@ test("interactive setup applies the selected scope", async () => {
   assert.equal(result.scope, "local");
   assert.ok(result.selected.includes("claude-code"));
   await access(join(cwd, ".claude/settings.local.json"));
+});
+
+test("uninstall keeps user files inside .grudge and says so (P3-3)", async () => {
+  const cwd = await scratch();
+  const runtime = join(cwd, "runtime.mjs");
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  await setup({ cwd, home: cwd, agents: ["claude-code"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
+  const mine = join(cwd, ".grudge", "notes.md");
+  await writeFile(mine, "keep me\n");
+  const result = await uninstall({ cwd, print: false });
+  assert.equal(await readFile(mine, "utf8"), "keep me\n");
+  assert.ok(result.preserved.includes(mine));
+  // Managed state is still gone.
+  await assert.rejects(access(join(cwd, ".grudge", "config.json")));
+  await assert.rejects(access(join(cwd, ".grudge", "bin")));
+});
+
+test("uninstall removes .grudge entirely when Grudge created everything (P3-3)", async () => {
+  const cwd = await scratch();
+  const runtime = join(cwd, "runtime.mjs");
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  await setup({ cwd, home: cwd, agents: ["claude-code"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
+  const result = await uninstall({ cwd, print: false });
+  assert.deepEqual(result.preserved, []);
+  await assert.rejects(access(join(cwd, ".grudge")));
 });

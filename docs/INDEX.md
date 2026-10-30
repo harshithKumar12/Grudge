@@ -3,7 +3,7 @@
 **Purpose:** Map every file currently under `docs/` and show its purpose, owner phase, and status.
 **Audience:** Contributors, reviewers, demo operators, and future implementation agents.
 **Status:** final
-**Last updated (phase):** 25 - 2026-10-29
+**Last updated (phase):** audit - 2026-10-30
 
 ## Documents
 
@@ -42,6 +42,7 @@
 | [`docs/token-budgets.md`](token-budgets.md) | Enforced output caps, token estimates, stats, and status-line discipline. | 20 | final |
 | [`docs/FINAL-REPORT.md`](FINAL-REPORT.md) | Final parallel-mode Definition of Done evidence, limitations, and release commands. | 21 | final |
 | [`docs/phase-25-findings.md`](phase-25-findings.md) | Step 0 investigation of the published CLI: what propose writes, how accept compiles, which tool names map, and whether the hook blocks. | 25 | final |
+| [`docs/production-readiness-audit-2026-10-30.md`](production-readiness-audit-2026-10-30.md) | Evidence-based production-readiness audit after Phase 25: executed checks, P0-P3 findings, remediation backlog, and release checklist. | audit | final |
 | [`../TEST.md`](../TEST.md) | Scratch-directory walkthrough for setup, hooks, stats, savings, and uninstall. | 24 | final |
 
 ## Status vocabulary

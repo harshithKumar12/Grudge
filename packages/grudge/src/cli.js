@@ -140,7 +140,7 @@ export async function dispatch(parsed, { stdin = readStdin } = {}) {
   if (command === "propose") {
     if ((!options.rule && !options.rulestdin) || !options.why) throw Object.assign(new Error("usage: grudge propose --rule <dsl> --why <sentence>"), { exitCode: 2 });
     const rule = options.rulestdin ? await stdin() : options.rule;
-    result = await commands.propose({ ...root, rule, why: options.why, preventive: Boolean(options.preventive), accept: Boolean(options.accept), session: options.session });
+    result = await commands.propose({ ...root, rule, why: options.why, preventive: Boolean(options.preventive), accept: Boolean(options.accept), session: options.session, fromStdin: Boolean(options.rulestdin) });
   } else if (command === "accept") {
     if (!positional[0]) throw Object.assign(new Error("usage: grudge accept <id>"), { exitCode: 2 });
     result = await commands.accept(positional[0], { root: root.root });

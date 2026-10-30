@@ -11,9 +11,14 @@ function sessionPath(root, id) {
   return join(root, "session", `${id}.jsonl`);
 }
 
+/** One id rule for every reader and writer, so `read` cannot escape the folder. */
+function validId(id) {
+  return typeof id === "string" && id.length > 0 && id !== "." && id !== ".." && !/[\\/]/.test(id);
+}
+
 /** @param {string} root @param {string} id @param {object} event */
 export async function append(root, id, event) {
-  if (!id || /[\\/]/.test(id) || id === "." || id === "..") {
+  if (!validId(id)) {
     throw new Error("invalid session id");
   }
   const path = sessionPath(root, id);
@@ -23,6 +28,9 @@ export async function append(root, id, event) {
 
 /** @param {string} root @param {string} id @returns {Promise<object[]>} */
 export async function read(root, id) {
+  // An id that could escape `.grudge/session` reads nothing rather than
+  // somebody else's JSONL file; `prune` also calls this for on-disk names.
+  if (!validId(id)) return [];
   try {
     const text = await readFile(sessionPath(root, id), "utf8");
     const events = [];

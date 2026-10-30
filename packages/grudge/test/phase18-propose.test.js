@@ -82,3 +82,32 @@ test("propose --accept enforces immediately without review", async () => {
   assert.equal(compiled.rules[0].mode, "block");
   assert.equal((await scars("list", { root })).pending.length, 0);
 });
+
+test("must-call control failures name the requirement, not event undefined (P2-6)", async () => {
+  const root = await rootWithSessions([{ tool: "read_file", args: { path: "notes.txt" } }]);
+  const { append } = await import("../src/core/session.js");
+  await append(root, "control", [{ tool: "read_file", args: { path: "other.txt" } }].at(0));
+  const proposal = await propose({ root, rule: "must call verify_user", why: "Always verify.", preventive: true, session: "latest" });
+  assert.equal(proposal.accepted, false);
+  assert.doesNotMatch(proposal.error, /undefined/);
+  assert.match(proposal.error, /never makes the required call/);
+  assert.match(proposal.error, /control/);
+});
+
+test("stripped shell quoting is refused instead of widening the rule (P2-7)", async () => {
+  const root = await rootWithSessions([{ tool: "shell", args: { command: "npm run build" } }]);
+  const stripped = await propose({ root, rule: "never call shell where command ~ npm test", why: "Only npm test.", preventive: true });
+  assert.equal(stripped.accepted, false);
+  assert.match(stripped.error, /unquoted value/);
+  assert.match(stripped.error, /--rule-stdin/);
+  const unbalanced = await propose({ root, rule: 'never call shell where command ~ "npm test', why: "Only npm test.", preventive: true });
+  assert.equal(unbalanced.accepted, false);
+  assert.match(unbalanced.error, /unbalanced double quote/);
+  // The same text through stdin skips the heuristic: no shell was involved, so
+  // the parser's own error is the only thing reported.
+  const fromStdin = await propose({ root, rule: "never call shell where command ~ npm test", why: "Only npm test.", preventive: true, fromStdin: true });
+  assert.equal(fromStdin.accepted, false);
+  assert.doesNotMatch(fromStdin.error, /shell quoting may have been stripped/);
+  const quotedViaStdin = await propose({ root, rule: 'never call shell where command ~ "npm test"', why: "Only npm test.", preventive: true, fromStdin: true });
+  assert.equal(quotedViaStdin.pending, true);
+});

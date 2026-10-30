@@ -132,7 +132,14 @@ export async function doctor(options = {}) {
     const lineDetail = measurement.lines === undefined ? "" : `, ${measurement.lines}/${measurement.lineCap} lines`;
     checks.push({ name: `budget ${measurement.name}`, ok, detail: `${measurement.chars}/${measurement.cap} chars${lineDetail}`, measurement });
   }
-  const result = { ok: checks.every((check) => check.ok), root, checks, budgetMeasurements, warnings };
+  // Scripted consumers read the JSON, so the one statement file checks cannot
+  // make has to travel in the payload too, not only in human output.
+  const enforcement = {
+    proven: false,
+    command: "grudge verify",
+    detail: "not proven by file checks; run `grudge verify` to prove blocking works",
+  };
+  const result = { ok: checks.every((check) => check.ok), root, checks, budgetMeasurements, warnings, enforcement };
   if (options.print !== false) {
     for (const check of checks) process.stdout.write(`${check.warning ? "⚠" : check.ok ? "✓" : "✗"} ${check.name}: ${check.detail}\n`);
     // File checks prove what is installed, never that a hook stops a call.

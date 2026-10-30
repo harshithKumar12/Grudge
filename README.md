@@ -304,6 +304,13 @@ grudge-engine demo --guard --json
 The demo uses checked-in fake tools and scripted policies. It does not call a
 model provider or require public-network access.
 
+`demo --guard` ships its own script and payloads inside the wheel, so it works
+from an installed package with no checkout. It still needs a Node Guard runtime,
+resolved in this order: `--node-runtime PATH`, then `GRUDGE_NODE_RUNTIME`, then a
+repository checkout, then `packages/grudge/node_modules`. Outside a checkout, set
+one of the first two to the installed `dist/grudge.mjs` (for example
+`node_modules/grudge-cli/dist/grudge.mjs` from the npm package).
+
 ## Verify it works
 
 One command proves the installed Guard blocks a real tool call. It needs no
@@ -617,7 +624,9 @@ How that block behaves:
 - Running `setup` again replaces the block in place, so setup is idempotent and
   safe to re-run after a Grudge upgrade.
 - `grudge uninstall` removes only that block, and deletes a file only when
-  Grudge created it and nothing else remains in it.
+  Grudge created it and nothing else remains in it. Inside `.grudge` it removes
+  Grudge's own names (config, compiled rules, stats, session/scar/pending/bin
+  directories) and leaves anything you put there, printing the preserved paths.
 - Codex and OpenCode read the same repository `AGENTS.md`, so enabling both
   produces one block, not two.
 - The block is deliberately small (well under the 12-line / 1,000-character
@@ -673,6 +682,25 @@ GRUDGE_DISABLE=1 claude          # PowerShell: $env:GRUDGE_DISABLE = "1"
 
 or set `"mode": "off"` in `.grudge/config.json`. Both leave the files in place;
 `grudge uninstall` is the removal path.
+
+### What happens when Grudge cannot decide
+
+A call that matches a rule is always denied, before any bookkeeping runs.
+Grudge fails **open** only when the failure is about infrastructure or input, so
+nothing actually proves the call is prohibited:
+
+| Situation | Behavior |
+|---|---|
+| Rule matches a prohibited call | **Blocked** (exit `2`) with the scar ID and reason |
+| Rule loads slower than `hookBudgetMs` | Allowed, with a stderr warning |
+| `.grudge/compiled.json` missing or corrupt | Allowed; a corrupt file cannot invent a match |
+| Malformed or oversized hook input | Allowed, with an explicit warning |
+| Stats or session log write fails | Decision unchanged; bookkeeping is bounded and dropped |
+| Same hook event delivered twice | **Still blocked**; only the counter is deduplicated |
+
+The time budget covers reading state, not evaluating rules, so a slow disk
+cannot turn a matching call into an allow. Use `grudge verify` when you need to
+prove blocking on the actual installation.
 
 ## Project structure
 
@@ -730,7 +758,9 @@ git diff --check
 Build package artifacts without publishing:
 
 ```bash
-npm pack --prefix packages/grudge
+# `npm pack` and `npm publish` read package.json from the current directory;
+# only commands like `npm test` honour --prefix.
+(cd packages/grudge && npm pack)
 python -m build --outdir release-dist
 python -m twine check release-dist/*
 ```
@@ -740,8 +770,15 @@ The repository's focused checks are the recommended release gate. Whole-tree
 regression rather than expected noise.
 
 The three-OS CI matrix (`.github/workflows/grudge-guard.yml`) runs the Node and
-Python suites plus `npm pack --dry-run` on Ubuntu, macOS, and Windows for Python
-3.11 and 3.14.
+Python suites, lint, types, docs/release checks, and `npm pack --dry-run` on
+Ubuntu, macOS, and Windows for Python 3.11 and 3.14. Two extra jobs cover the
+parts a single local machine cannot: the Node suite on Node 18/20/22, and a
+clean install of both built artifacts outside the checkout followed by
+`grudge-engine demo --guard --json` to prove blocking still works.
+
+> Those CI jobs were added on a Windows-only machine. They are **not** locally
+> verified as runner configuration; the first dispatched run is their first real
+> execution. The commands inside them are the same ones verified locally.
 
 ## Troubleshooting
 

@@ -1,5 +1,62 @@
 # Changelog
 
+## Unreleased - production-readiness remediation
+
+Audit: `docs/production-readiness-audit-2026-10-30.md`. Every item below has a
+regression test named in the audit's remediation section.
+
+**Enforcement correctness (P0/P1)**
+
+- Enforcement is now decided before any bookkeeping. The previous handler wrote
+  stats first and could both pay a stale lock and drop a block under
+  contention: 2 of 25 concurrent matching calls were allowed, and 9 of 10
+  duplicate deliveries were allowed. Now 25/25 and 10/10 are blocked.
+- `stats.jsonl` appends are lock-free, `seq` is derived from the line number,
+  the dedupe scan is bounded to a tail window, and duplicate deliveries are
+  collapsed at read time instead of gating the decision.
+- The `hookBudgetMs` timer no longer covers rule evaluation, and it is unref'd
+  and cleared, so an empty-rule hook call dropped from ~1.78 s to ~0.16 s
+  end-to-end. A stale lock is taken over after 120 s instead of deadlocking.
+- `must call …` rules are enforced in both compilers. `polarity` is emitted by
+  both, and the runtime treats `must` as a requirement (violation = no matching
+  call) rather than as an inverted `never` rule. The Python compiler originally
+  emitted `never` for a bare call shape, which blocked the required call; that
+  is fixed and pinned by Python polarity tests plus a Python-compile →
+  Node-guard end-to-end test. `atEvents` is empty for that violation.
+- `$under`/`$not_under` and `canonicalPath` agree between Python and Node on
+  Windows drive casing, `..` escapes, separator normalization, and sibling
+  prefixes.
+- Invalid or hostile session ids no longer select a file path; `read()` returns
+  no events for them.
+
+**Privacy (P1)**
+
+- Node and Python redaction now apply the same ordered rules, with a
+  character-for-character equivalent labelled-value pattern (quoted values,
+  space-separated labels, trailing punctuation, and query separators), pinned by
+  the shared `spec/redaction-corpus.json` (18 cases, including text that must
+  pass through unchanged). This closes the gap where Node stored AWS keys in the
+  clear, Python missed prefixed keys, and the two disagreed on labelled values.
+
+**Packaging and operator truth (P1/P2/P3)**
+
+- `grudge-engine demo --guard` ships its script and payloads inside the wheel,
+  resolves the runtime via `--node-runtime` → `GRUDGE_NODE_RUNTIME` → checkout →
+  `node_modules`, and is verified from a clean venv plus npm tarball outside the
+  checkout.
+- `doctor --json` reports `enforcement: {proven: false, command: "grudge
+  verify"}` so file checks cannot be mistaken for a blocking proof.
+- `must` rules print the control message the model needs, and `propose` rejects
+  a `~`/`under` value that PowerShell would split on, pointing at
+  `--rule-stdin`.
+- `uninstall` no longer removes a `.grudge` directory that contains your files;
+  it removes only Grudge-managed names and reports what it kept.
+- `rich` is pinned `>=13.9.4,<15` and dev `pytest` `>=9.0.3,<10` so the repo
+  environment also satisfies `twine` and `pytest-asyncio`; `requirements.lock`
+  was regenerated and re-install-verified.
+- README release docs use `(cd packages/grudge && npm pack)`, because
+  `npm pack` ignores `--prefix`.
+
 ## 0.2.0 - 2026-10-29
 
 - Add `grudge verify`: one offline command that installs the guard into a temporary project, proposes and accepts a harmless rule, feeds the installed hook runner real Claude Code `PreToolUse` payloads over stdin, and checks that a matching `Bash` call exits `2`, a benign call exits `0`, malformed input fails open, exactly one block is logged, and `grudge report` shows it. Prints one PASS/FAIL line per check, exits non-zero on failure, keeps the temp project on failure (and with `--keep`), and supports `--json`.
