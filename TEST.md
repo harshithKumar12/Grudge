@@ -58,17 +58,17 @@ git init
 ## Step 2: Install Grudge (pinned, so you do not get a cached old version)
 
 ```powershell
-npx grudge-cli@0.2.0 setup
+npx grudge-cli@0.2.1 setup
 ```
 
 What you should see: a list of agents with **arrow keys to move, Space to toggle, Enter to confirm**, then a question about where to install (choose **this repository**).
 
 Pick **Claude Code** only for this test.
 
-**Check the version** printed during setup. It should be `0.2.0`. If the
+**Check the version** printed during setup. It should be `0.2.1`. If the
 version is older, clear the npx cache or install the intended version again.
 For a local unreleased checkout, build the package and install the generated
-`grudge-cli-0.2.0.tgz` into the scratch project; do not substitute the
+`grudge-cli-0.2.1.tgz` into the scratch project; do not substitute the
 repository's `packages/grudge/dist` path for the published package flow.
 
 ---
@@ -272,7 +272,7 @@ python -m grudge demo
 
 From `grudge-test`:
 ```powershell
-npx grudge-cli@0.2.0 uninstall
+npx grudge-cli@0.2.1 uninstall
 ```
 Then check `.claude\settings.json` has no `.grudge` entries and that the managed block is gone from `CLAUDE.md`. Uninstall removes only Grudge-managed content; do not manually delete a file containing user content.
 
