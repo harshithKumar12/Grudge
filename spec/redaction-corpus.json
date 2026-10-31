@@ -32,7 +32,7 @@
   {
     "name": "labelled-api-key",
     "input": "api_key=sk-demo-1234567890abcdef",
-    "expected": "api_key: [REDACTED]"
+    "expected": "api_key=[REDACTED]"
   },
   {
     "name": "labelled-password",
@@ -43,6 +43,16 @@
     "name": "env-style-value",
     "input": "DATABASE_URL=postgres://user:pw@host/db",
     "expected": "DATABASE_URL=[REDACTED]"
+  },
+  {
+    "name": "aws-env-access-key-id",
+    "input": "AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE",
+    "expected": "AWS_ACCESS_KEY_ID=[REDACTED]"
+  },
+  {
+    "name": "aws-env-secret-access-key",
+    "input": "AWS_SECRET_ACCESS_KEY=abcdefghijklmnop1234",
+    "expected": "AWS_SECRET_ACCESS_KEY=[REDACTED]"
   },
   {
     "name": "fake-key-prefix",
@@ -77,16 +87,31 @@
   {
     "name": "labelled-value-spaced-separator",
     "input": "api_key = abcd1234efgh!!",
-    "expected": "api_key: [REDACTED]"
+    "expected": "api_key = [REDACTED]"
   },
   {
     "name": "labelled-value-query-parameter",
     "input": "token=abcdefgh&next=1",
-    "expected": "token: [REDACTED]&next=1"
+    "expected": "token=[REDACTED]&next=1"
   },
   {
     "name": "labelled-value-query-start",
     "input": "token=abcdefgh?next=1",
-    "expected": "token: [REDACTED]?next=1"
+    "expected": "token=[REDACTED]?next=1"
+  },
+  {
+    "name": "url-query-api-key",
+    "input": "https://x.invalid/?api_key=supersecretvalue123&next=1",
+    "expected": "https://x.invalid/?api_key=[REDACTED]&next=1"
+  },
+  {
+    "name": "cookie-header",
+    "input": "Cookie: session=abc123456789",
+    "expected": "Cookie: [REDACTED]"
+  },
+  {
+    "name": "set-cookie-header",
+    "input": "set-cookie: abcdef1234567890",
+    "expected": "set-cookie: [REDACTED]"
   }
 ]

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 from grudge.guard.compile import _canonical_path, _under, evaluate_rule
 from grudge.recorder.redact import redact_text, redact_trace
@@ -21,12 +22,37 @@ def test_python_redaction_matches_the_shared_corpus() -> None:
     assert len(corpus) >= 10
     for case in corpus:
         assert redact_text(case["input"]) == case["expected"], case["name"]
+        # A redaction marker must survive a second pass unchanged.
+        assert redact_text(case["expected"]) == case["expected"], case["name"]
 
 def test_redaction_runs_before_a_nested_value_is_stored() -> None:
-    """`redact_trace` copies and sanitizes nested strings."""
+    """`redact_trace` copies and sanitizes nested strings and keyed values."""
 
     result = redact_trace({"log": [{"note": "api_key=sk-demo-1234567890abcdef"}]})
-    assert result["log"][0]["note"] == "api_key: [REDACTED]"
+    # The separator is preserved on purpose (P0-4): rewriting `token=value` as
+    # `token: value` corrupts assignments and URL query strings.
+    assert result["log"][0]["note"] == "api_key=[REDACTED]"
+
+    structured_payload: dict[str, Any] = {
+        "password": "hunter2hunter2",
+        "auth": {"token": "abcd1234efgh5678", "secret": "zzzz9999yyyy8888"},
+        "headers": {
+            "Set-Cookie": "session=abcdef123456",
+            "x-api-key": "zzzzzzzzzzzz",
+            "Accept": "text/plain",
+        },
+        "config": {"client_secret": "shhh-secret", "keyboard": "keep me"},
+        "list": [{"refresh_token": "abcd12345678"}],
+    }
+    structured = redact_trace(structured_payload)
+    assert structured["password"] == "[REDACTED]"
+    assert structured["auth"] == {"token": "[REDACTED]", "secret": "[REDACTED]"}
+    assert structured["headers"]["Set-Cookie"] == "[REDACTED]"
+    assert structured["headers"]["x-api-key"] == "[REDACTED]"
+    assert structured["headers"]["Accept"] == "text/plain"
+    assert structured["config"]["client_secret"] == "[REDACTED]"
+    assert structured["config"]["keyboard"] == "keep me"
+    assert structured["list"] == [{"refresh_token": "[REDACTED]"}]
 
 def test_windows_paths_compare_case_insensitively_without_prefix_confusion() -> (
     None

@@ -19,7 +19,9 @@ test("PostToolUse records a real Claude-style payload with redaction and metadat
   const result = await postToolUse(payload, { root, now: "2026-10-20T12:00:00.000Z" });
   assert.equal(result.ok, true);
   assert.equal(result.event.tool, "read_file");
-  assert.equal(result.event.args.note, "token: [REDACTED]");
+  // The separator is preserved on purpose (P0-4): rewriting `token=value` as
+  // `token: value` corrupts assignments and URL query strings.
+  assert.equal(result.event.args.note, "token=[REDACTED]");
   assert.equal(result.event.result.includes("FAKE_KEY_sk_demo"), false);
   assert.equal(result.event.byteSize, Buffer.byteLength(result.event.result));
   assert.equal(

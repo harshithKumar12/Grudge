@@ -3,6 +3,7 @@
 # Typer's declarative Option defaults are intentional here.
 # ruff: noqa: B008
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,7 @@ from grudge.cli._common import command, finish, load_callable, read_text, write_
 from grudge.predicates.compiler import compile_predicate
 from grudge.predicates.dsl import parse
 from grudge.predicates.fallback_rules import demo_rule
+from grudge.recorder.redact import redact_trace
 from grudge.replay.sandbox import world_from_trace
 from grudge.replay.scripted_llm import ScriptedLLM
 from grudge.schema.trace import ToolResult, Trace
@@ -85,7 +87,13 @@ def shrink_trace(
         )
         write_text(
             out,
-            result.minimal.model_dump_json(indent=2) + "\n",
+            json.dumps(
+                redact_trace(result.minimal.model_dump(mode="json")),
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
             label="cassette",
         )
         if not json_output:

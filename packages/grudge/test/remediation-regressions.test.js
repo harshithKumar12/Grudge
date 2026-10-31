@@ -19,12 +19,28 @@ test("redaction masks every corpus secret and preserves ordinary text (P1-4)", a
   assert.ok(corpus.length >= 10);
   for (const item of corpus) {
     assert.equal(redact(item.input), item.expected, item.name);
+    // A redaction marker must survive a second pass unchanged.
+    assert.equal(redact(item.expected), item.expected, `${item.name} is not idempotent`);
   }
 });
 
-test("redaction applies to nested values before they are persisted (P1-4)", () => {
+test("redaction applies to nested values before they are persisted (P0-4)", () => {
   const nested = redactValue({ log: [{ note: "api_key=sk-demo-1234567890abcdef" }] });
-  assert.equal(nested.log[0].note, "api_key: [REDACTED]");
+  assert.equal(nested.log[0].note, "api_key=[REDACTED]");
+
+  const structured = redactValue({
+    password: "hunter2hunter2",
+    auth: { token: "abcd1234efgh5678", secret: "zzzz9999yyyy8888" },
+    headers: { "Set-Cookie": "session=abcdef123456", "x-api-key": "zzzzzzzzzzzz" },
+    config: { client_secret: "shhh-secret", keyboard: "keep me" },
+    list: [{ refresh_token: "abcd12345678" }],
+  });
+  assert.equal(structured.password, "[REDACTED]");
+  assert.deepEqual(structured.auth, { token: "[REDACTED]", secret: "[REDACTED]" });
+  assert.deepEqual(structured.headers, { "Set-Cookie": "[REDACTED]", "x-api-key": "[REDACTED]" });
+  assert.equal(structured.config.client_secret, "[REDACTED]");
+  assert.equal(structured.config.keyboard, "keep me", "an ordinary key is not redacted");
+  assert.deepEqual(structured.list, [{ refresh_token: "[REDACTED]" }]);
 });
 
 test("path casing is ignored on Windows and kept on POSIX (P1-5)", () => {

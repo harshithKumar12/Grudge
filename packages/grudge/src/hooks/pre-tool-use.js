@@ -1,11 +1,11 @@
 // OWNER: lane-a
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
-import { readJson } from "../core/store.js";
-import { loadConfig } from "../core/config.js";
+import { loadConfig, loadEffectiveConfig } from "../core/config.js";
 import { normalize } from "../core/normalize.js";
+import { loadRules } from "../core/rules.js";
 import { check } from "../dsl/check.js";
-import { read as readSession } from "../core/session.js";
+import { readTail } from "../core/session.js";
 import { appendEvent, claimHookEvent } from "../core/stats.js";
 
 const MAX_REASON = 400;
@@ -13,7 +13,6 @@ const MAX_INPUT = 1024 * 1024;
 // Accounting is best effort and bounded: a slow disk may drop a counter, but it
 // can never delay or change an enforcement decision.
 const ACCOUNTING_BUDGET_MS = 1000;
-const TIMEOUT = Symbol("budget-timeout");
 
 function allow(stderr = "") {
   return { code: 0, stdout: "", stderr };
@@ -22,21 +21,6 @@ function allow(stderr = "") {
 function message(rule) {
   const english = String(rule.english || `Rule ${rule.id} matched`);
   return `${english} [scar ${rule.id}]. Do not retry; change approach or ask the user.`.slice(0, MAX_REASON);
-}
-
-/**
- * Race one I/O step against the hook budget.
- *
- * The timer is `unref()`ed and cleared on the winning path, so a settled hook
- * never keeps the process alive for the remainder of the budget.
- */
-function withBudget(promise, ms) {
-  let timer;
-  const timeout = new Promise((resolve) => {
-    timer = setTimeout(() => resolve(TIMEOUT), ms);
-    if (typeof timer.unref === "function") timer.unref();
-  });
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 /** Resolve when `promise` settles or `ms` elapses, whichever happens first. */
@@ -53,12 +37,49 @@ async function settle(promise, ms) {
   }
 }
 
-/** Read the state the decision needs. This is the only part under the budget. */
-async function loadState(root, payload) {
-  const compiled = await readJson(join(root, ".grudge", "compiled.json"), null);
-  if (!compiled || compiled.version !== 1 || !Array.isArray(compiled.rules)) return { rules: [], prior: [] };
-  const prior = payload.session_id ? await readSession(join(root, ".grudge"), payload.session_id) : [];
-  return { rules: compiled.rules, prior };
+/** Print every diagnostic, deduplicated, before whatever the verdict says. */
+function report(result, warnings) {
+  const unique = [...new Set((warnings ?? []).filter(Boolean))];
+  if (!unique.length) return result;
+  const prefix = unique.map((line) => (line.endsWith("\n") ? line : `${line}\n`)).join("");
+  return { ...result, stderr: `${prefix}${result.stderr ?? ""}` };
+}
+
+async function effectiveConfig(roots, root, warnings) {
+  if (roots) return loadEffectiveConfig(roots, warnings);
+  // Direct library call (unit tests, embedders): the payload cwd is the root.
+  const project = await loadConfig(root);
+  const budget = Number(project.hookBudgetMs);
+  return {
+    project,
+    global: null,
+    projectActive: project.mode !== "off",
+    globalActive: false,
+    hookBudgetMs: Number.isFinite(budget) && budget > 0 ? budget : 1500,
+  };
+}
+
+/**
+ * Load the state the decision needs.
+ *
+ * These reads are bounded by fixed byte and event caps and are deliberately
+ * NOT raced against the hook budget: a timeout must never be able to turn a
+ * matching prohibition into an allow. `hookBudgetMs` is an observability
+ * threshold reported on stderr; it does not gate the verdict.
+ */
+async function loadState(roots, root, config, payload, warnings) {
+  const started = performance.now();
+  const loaded = await loadRules(
+    roots ?? { projectRoot: root, globalDir: null },
+    { includeProject: config.projectActive, includeGlobal: config.globalActive },
+  );
+  const prior = payload.session_id ? await readTail(join(root, ".grudge"), payload.session_id) : [];
+  warnings.push(...loaded.warnings);
+  const elapsed = performance.now() - started;
+  if (elapsed > config.hookBudgetMs) {
+    warnings.push(`grudge: state load took ${Math.round(elapsed)}ms, over hookBudgetMs ${config.hookBudgetMs}; enforcement continued (fail-closed)`);
+  }
+  return { rules: loaded.rules, prior };
 }
 
 /**
@@ -117,32 +138,32 @@ async function account(root, payload, hit) {
 }
 
 /**
- * Enforce PreToolUse with a bounded, documented fail-open policy.
+ * Enforce PreToolUse.
  *
- * - A matching `block` rule exits 2 before any accounting work starts.
- * - The budget covers state loading only; the rule check itself always runs.
- * - Timeout, corrupt state, malformed input, and internal errors allow the call
- *   and say so on stderr. None of them can turn a known match into an allow.
+ * - A matching `block` rule always exits 2: the rule check is never raced.
+ * - State reads are bounded (compiled file size, session bytes and events), so
+ *   runtime stays bounded without a timeout that could allow a match.
+ * - Corrupt state, malformed input and internal errors allow the call and say
+ *   so on stderr; a timeout can no longer be one of those paths.
  */
-export async function preToolUse(payload = {}) {
-  const started = performance.now();
-  const root = payload.cwd || process.cwd();
+export async function preToolUse(payload = {}, options = {}) {
+  const runStarted = performance.now();
+  const roots = options.roots ?? null;
+  const root = roots ? roots.projectRoot : (payload.cwd || process.cwd());
+  const warnings = [];
   try {
-    const config = await loadConfig(root);
-    if (process.env.GRUDGE_DISABLE === "1" || config.mode === "off") return allow();
+    const config = await effectiveConfig(roots, root, warnings);
+    if (process.env.GRUDGE_DISABLE === "1") return report(allow(), warnings);
+    if (!config.projectActive && !config.globalActive) return report(allow(), warnings);
     if (JSON.stringify(payload).length > MAX_INPUT) {
-      return allow("grudge: oversized hook input; allowed (fail-open)\n");
+      return report(allow(), [...warnings, "grudge: oversized hook input; allowed (fail-open)"]);
     }
-    const budget = Number(config.hookBudgetMs) || 1500;
-    const state = await withBudget(loadState(root, payload), budget);
-    if (state === TIMEOUT) {
-      return allow("grudge: hook time budget exceeded; allowed (fail-open)\n");
-    }
+    const state = await loadState(roots, root, config, payload, warnings);
     const hit = decide(state.rules, state.prior, payload);
     const result = decision(hit);
     if (state.rules.length) await settle(account(root, payload, hit), ACCOUNTING_BUDGET_MS);
-    return result;
+    return report(result, warnings);
   } catch (error) {
-    return { ...allow("grudge: guard unavailable; allowed (fail-open)\n"), error, elapsedMs: performance.now() - started };
+    return { ...report(allow(), [...warnings, "grudge: guard unavailable; allowed (fail-open)"]), error, elapsedMs: performance.now() - runStarted };
   }
 }

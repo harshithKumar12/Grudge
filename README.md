@@ -502,12 +502,26 @@ Setup registers five hooks and, only when no other tool owns it, a status line:
 | `PostToolUse` | Appends the redacted event to `.grudge/session/` |
 | `Stop` | Prints one line only when this turn caught something |
 
-The hook command is always plain Node, never `npx` and never Python:
+The hook command is always plain Node with absolute paths, never `npx` and
+never Python:
 
 ```text
-node .grudge/bin/grudge.mjs hook PreToolUse                  # repository scope
-node "<home>/.grudge/bin/grudge.mjs" hook PreToolUse          # user scope
+"<node>" "<repo>/.grudge/bin/grudge.mjs" hook PreToolUse      # repository scope
+"<node>" "<home>/.grudge/bin/grudge.mjs" hook PreToolUse      # user scope
 ```
+
+Absolute paths matter: Claude Code runs the hook from the session's current
+directory, so a relative `.grudge/bin/grudge.mjs` stops resolving after a `cd`
+and the host treats the failure as "allowed". `grudge doctor` fails its
+`hook paths` check if a registered command is relative or missing.
+
+A user-scope install keeps its rules in `~/.grudge/compiled.json` and those
+rules apply inside every project. Precedence is deterministic: global rules are
+loaded first and are authoritative, project rules add protections, and a
+project rule with the same `id` as a global rule is ignored with a warning so a
+repository can never weaken the machine-wide set. `mode: "off"` applies to one
+installation only, so switching a project off does not disable global
+protection.
 
 An existing third-party `statusLine` is preserved and reported, never
 overwritten. Grudge's own line is short and marked as an estimate:

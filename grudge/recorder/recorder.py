@@ -18,6 +18,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import Any, Literal, TypeVar, cast
 
+from grudge.recorder.redact import redact_trace
 from grudge.schema.trace import (
     FinalAnswer,
     ModelCall,
@@ -295,7 +296,7 @@ class Recorder:
         writer = JsonlWriter(self.output)
         try:
             for line in trace.to_jsonl().splitlines():
-                writer.append(json.loads(line))
+                writer.append(redact_trace(json.loads(line)))
         finally:
             writer.close()
         self._writer = writer
