@@ -54,7 +54,7 @@ export async function postToolUse(payload = {}, options = {}) {
       byteSize: Buffer.byteLength(boundedResult, "utf8"),
       timestamp: (options.now instanceof Date ? options.now : new Date(options.now ?? Date.now())).toISOString(),
     };
-    const root = options.root ?? payload.cwd ?? process.cwd();
+    const root = options.roots?.projectRoot ?? options.root ?? payload.cwd ?? process.cwd();
     if ((await claimHookEvent(root, "PostToolUse", payload)).duplicate) return { ok: true, duplicate: true, event };
     await append(join(root, ".grudge"), sessionId, event);
     return { ok: true, event };

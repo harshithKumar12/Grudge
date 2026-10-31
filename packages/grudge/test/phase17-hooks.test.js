@@ -1,11 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { append } from "../src/core/session.js";
 import { readEvents } from "../src/core/stats.js";
-import { writeJsonAtomic, readJson } from "../src/core/store.js";
+import { writeJsonAtomic } from "../src/core/store.js";
 import { preToolUse } from "../src/hooks/pre-tool-use.js";
 import { sessionStart } from "../src/hooks/session-start.js";
 import { userPromptSubmit } from "../src/hooks/user-prompt-submit.js";
@@ -77,7 +77,10 @@ test("Stop is silent and records stats; command wrapper fails open on bad input"
   const root = await fixtureRoot([]);
   try {
     assert.deepEqual(await stop({ cwd: root }), { code: 0, stdout: "", stderr: "" });
-    assert.equal((await readJson(join(root, ".grudge", "stats.json"), {})).stops, 1);
+    const events = await readEvents(root);
+    assert.equal(events.filter((event) => event.type === "stop").length, 1);
+    // P1-1: Stop writes the append-only event log, never the legacy stats.json.
+    await assert.rejects(readFile(join(root, ".grudge", "stats.json"), "utf8"), { code: "ENOENT" });
     assert.equal((await runHook("pre-tool-use", "not-json")).code, 0);
     assert.match((await runHook("unknown", "{}")).stderr, /unknown hook/);
   } finally { await rm(root, { recursive: true, force: true }); }

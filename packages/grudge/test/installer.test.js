@@ -23,8 +23,12 @@ test("setup creates a guarded Claude project and preserves unrelated settings", 
   await writeFile(join(cwd, ".claude/settings.json"), '{"permissions":{"allow":["Bash(test)"]}}\n');
   await setup({ cwd, home: cwd, agents: ["claude-code"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
   const settings = JSON.parse(await readFile(join(cwd, ".claude/settings.json"), "utf8"));
-  assert.equal(settings.hooks.PreToolUse[0].hooks[0].command, "node .grudge/bin/grudge.mjs hook PreToolUse");
-  assert.equal(settings.statusLine.command, "node .grudge/bin/grudge.mjs statusline");
+  const installedRuntime = join(cwd, ".grudge/bin/grudge.mjs");
+  // P0-1: the registered command must be absolute, so a hook still resolves
+  // when Claude Code starts in (or changes to) a nested directory.
+  const runtimeCommand = `"${process.execPath}" "${installedRuntime}"`;
+  assert.equal(settings.hooks.PreToolUse[0].hooks[0].command, `${runtimeCommand} hook PreToolUse`);
+  assert.equal(settings.statusLine.command, `${runtimeCommand} statusline`);
   assert.deepEqual(settings.permissions.allow, ["Bash(test)"]);
   const claude = await readFile(join(cwd, "CLAUDE.md"), "utf8");
   assert.ok(claude.includes(MANAGED_BEGIN) && claude.includes(MANAGED_END));
