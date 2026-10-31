@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased - production-readiness remediation
+## 0.2.1 - 2026-10-31
 
 Audit: `docs/production-readiness-audit-2026-10-30.md`. Every item below has a
 regression test named in the audit's remediation section.
