@@ -12,6 +12,54 @@ from grudge.recorder.recorder import Recorder, record
 from grudge.schema.trace import Trace
 
 
+def test_recorder_redacts_secrets_before_writing_the_trace(tmp_path: Path) -> None:
+    """P0-4: structured secrets never reach the JSONL artifact."""
+
+    output = tmp_path / "secrets.jsonl"
+    with Recorder(
+        output,
+        run_id="run-secret",
+        agent_version="agent-1",
+        task="call a tool",
+    ) as recorder:
+        recorder.record_tool_call(
+            "http",
+            {
+                "url": "https://x.invalid/?api_key=supersecretvalue123&next=1",
+                "headers": {
+                    "Authorization": "Bearer abcdefghijklmnop",
+                    "Cookie": "session=abc123456789",
+                    "Accept": "text/plain",
+                },
+                "body": {
+                    "password": "hunter2hunter2",
+                    "nested": {"client_secret": "shhh-secret"},
+                },
+            },
+        )
+        recorder.record_final_answer("done")
+
+    text = output.read_text(encoding="utf-8")
+    for secret in (
+        "supersecretvalue123",
+        "abcdefghijklmnop",
+        "abc123456789",
+        "hunter2hunter2",
+        "shhh-secret",
+    ):
+        assert secret not in text
+
+    args = Trace.from_jsonl(text).tool_calls()[0].args
+    assert args["url"] == "https://x.invalid/?api_key=[REDACTED]&next=1"
+    assert args["headers"]["Authorization"] == "[REDACTED]"
+    assert args["headers"]["Cookie"] == "[REDACTED]"
+    assert args["headers"]["Accept"] == "text/plain"
+    assert args["body"] == {
+        "password": "[REDACTED]",
+        "nested": {"client_secret": "[REDACTED]"},
+    }
+
+
 def test_recorder_writes_valid_jsonl_in_monotonic_order(tmp_path: Path) -> None:
     """Every recorder API maps to a valid, ordered Phase 1 trace step."""
 

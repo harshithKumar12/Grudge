@@ -52,3 +52,76 @@ jobs:
       - name: Pack contents
         working-directory: packages/grudge
         run: npm pack --dry-run
+
+  # The Node Guard's declared support range is 18+; the matrix above only pins
+  # Node 20, so run the Node-only suite across the full range on one OS.
+  node-matrix:
+    name: Node ${{ matrix.node-version }} / node suites
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ["18", "20", "22"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: packages/grudge/package-lock.json
+      - name: Node install, tests, and build
+        working-directory: packages/grudge
+        run: |
+          npm ci
+          npm test
+          npm run build
+
+  # Install the built artifacts outside the checkout and prove the two-session
+  # guard demo blocks from the installed package, not from the source tree.
+  package:
+    name: Wheel and npm tarball install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: packages/grudge/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build and check the Python distribution
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build twine
+          python -m build --outdir "$RUNNER_TEMP/dist"
+          python -m twine check "$RUNNER_TEMP/dist"/*
+      - name: Install the wheel into a clean venv
+        run: |
+          python -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/python" -m pip install "$RUNNER_TEMP"/dist/*.whl
+          "$RUNNER_TEMP/venv/bin/python" -c "import grudge, pathlib; p = pathlib.Path(grudge.__file__).parent / 'demo' / 'e2e_guard.mjs'; assert p.is_file(), p"
+      - name: Pack and install the npm tarball
+        working-directory: packages/grudge
+        run: |
+          npm ci
+          npm run build
+          npm pack --pack-destination "$RUNNER_TEMP"
+      - name: Prove blocking from the installed packages
+        run: |
+          mkdir -p "$RUNNER_TEMP/demo"
+          cd "$RUNNER_TEMP/demo"
+          npm init -y
+          npm install "$RUNNER_TEMP"/*.tgz
+          GRUDGE_NODE_RUNTIME="$RUNNER_TEMP/demo/node_modules/grudge-cli/dist/grudge.mjs" \
+            "$RUNNER_TEMP/venv/bin/grudge-engine" demo --guard --json > demo.json
+          cat demo.json
+          python - <<'PY'
+          import json, os
+          result = json.load(open("demo.json", encoding="utf-8"))
+          assert result["ok"] is True, result
+          assert result["session1"] == "leaked and proposed", result
+          assert result["session2"] == "blocked", result
+          assert os.path.abspath(result["runtime"]).startswith(os.environ["RUNNER_TEMP"]), result
+          PY

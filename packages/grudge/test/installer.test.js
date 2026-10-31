@@ -23,8 +23,12 @@ test("setup creates a guarded Claude project and preserves unrelated settings", 
   await writeFile(join(cwd, ".claude/settings.json"), '{"permissions":{"allow":["Bash(test)"]}}\n');
   await setup({ cwd, home: cwd, agents: ["claude-code"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
   const settings = JSON.parse(await readFile(join(cwd, ".claude/settings.json"), "utf8"));
-  assert.equal(settings.hooks.PreToolUse[0].hooks[0].command, "node .grudge/bin/grudge.mjs hook PreToolUse");
-  assert.equal(settings.statusLine.command, "node .grudge/bin/grudge.mjs statusline");
+  const installedRuntime = join(cwd, ".grudge/bin/grudge.mjs");
+  // P0-1: the registered command must be absolute, so a hook still resolves
+  // when Claude Code starts in (or changes to) a nested directory.
+  const runtimeCommand = `"${process.execPath}" "${installedRuntime}"`;
+  assert.equal(settings.hooks.PreToolUse[0].hooks[0].command, `${runtimeCommand} hook PreToolUse`);
+  assert.equal(settings.statusLine.command, `${runtimeCommand} statusline`);
   assert.deepEqual(settings.permissions.allow, ["Bash(test)"]);
   const claude = await readFile(join(cwd, "CLAUDE.md"), "utf8");
   assert.ok(claude.includes(MANAGED_BEGIN) && claude.includes(MANAGED_END));
@@ -74,6 +78,21 @@ test("doctor reports a healthy installed runtime", async () => {
   assert.equal(result.warnings.length, 0);
   assert.deepEqual(result.budgetMeasurements.map(({ name }) => name), ["SessionStart injection", "Block reason", "Prompt nudge", "instruction block"]);
   assert.ok(result.budgetMeasurements.every(({ chars, cap }) => chars <= cap));
+});
+
+test("doctor JSON states that enforcement is not proven (P2-3)", async () => {
+  const cwd = await scratch();
+  const runtime = join(cwd, "runtime.mjs");
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  await setup({ cwd, home: cwd, agents: ["claude-code"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
+  const result = await doctor({ cwd, home: cwd, print: false });
+  // A scripted consumer must not read `ok: true` as "blocking works".
+  assert.deepEqual(result.enforcement, {
+    proven: false,
+    command: "grudge verify",
+    detail: "not proven by file checks; run `grudge verify` to prove blocking works",
+  });
+  assert.equal(JSON.parse(JSON.stringify(result)).enforcement.proven, false);
 });
 
 test("doctor fails when a measured budget exceeds its cap", async () => {
@@ -287,4 +306,29 @@ test("interactive setup applies the selected scope", async () => {
   assert.equal(result.scope, "local");
   assert.ok(result.selected.includes("claude-code"));
   await access(join(cwd, ".claude/settings.local.json"));
+});
+
+test("uninstall keeps user files inside .grudge and says so (P3-3)", async () => {
+  const cwd = await scratch();
+  const runtime = join(cwd, "runtime.mjs");
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  await setup({ cwd, home: cwd, agents: ["claude-code"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
+  const mine = join(cwd, ".grudge", "notes.md");
+  await writeFile(mine, "keep me\n");
+  const result = await uninstall({ cwd, print: false });
+  assert.equal(await readFile(mine, "utf8"), "keep me\n");
+  assert.ok(result.preserved.includes(mine));
+  // Managed state is still gone.
+  await assert.rejects(access(join(cwd, ".grudge", "config.json")));
+  await assert.rejects(access(join(cwd, ".grudge", "bin")));
+});
+
+test("uninstall removes .grudge entirely when Grudge created everything (P3-3)", async () => {
+  const cwd = await scratch();
+  const runtime = join(cwd, "runtime.mjs");
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  await setup({ cwd, home: cwd, agents: ["claude-code"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
+  const result = await uninstall({ cwd, print: false });
+  assert.deepEqual(result.preserved, []);
+  await assert.rejects(access(join(cwd, ".grudge")));
 });

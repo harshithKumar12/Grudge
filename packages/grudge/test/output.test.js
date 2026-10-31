@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { jsonOutput, renderCommand, renderError } from "../src/output.js";
+import { VERSION } from "../src/version.js";
 
 const fixtures = {
   setup: { scope: "repo", selected: ["claude-code"], changes: [{ path: "CLAUDE.md" }], warnings: [], runtimeInstalled: true },
@@ -8,7 +9,7 @@ const fixtures = {
   uninstall: { root: ".", removed: [".grudge"], restored: [] },
   stats: { blocks: 1, warnings: 0, scars: 1, estimatedTokensSaved: 20 },
   report: { lifetime: { caught: 1, blocked: 1, warned: 0 } },
-  propose: { accepted: true, pending: true, id: "scar-test", run: "grudge accept scar-test" },
+  propose: { accepted: false, pending: true, enforced: false, status: "pending", id: "scar-test", run: "grudge accept scar-test" },
   accept: { accepted: true, id: "scar-test" },
   scars: { pending: [], scars: [{ id: "scar-test", mode: "block" }] },
   status: { ok: true, checks: [{ name: "runtime", ok: true, detail: "present" }] },
@@ -17,7 +18,7 @@ const fixtures = {
 test("default output snapshots have a structured header, summary, and next command", () => {
   for (const [command, result] of Object.entries(fixtures)) {
     const output = renderCommand(command, result, { ascii: true });
-    assert.match(output, new RegExp(`^Grudge ${command} v0\\.1\\.9`));
+    assert.ok(output.startsWith(`Grudge ${command} v${VERSION}`), output);
     assert.match(output, /\d+ passed, \d+ failed, \d+ warnings/);
     assert.match(output, /Next:/);
   }
@@ -53,7 +54,7 @@ test("doctor renders the not-installed state without treating it as a failure", 
 });
 
 test("suggested next commands are real commands", () => {
-  const known = new Set(["accept", "doctor", "hook", "propose", "report", "scars", "setup", "stats", "statusline", "uninstall"]);
+  const known = new Set(["accept", "doctor", "hook", "propose", "report", "scars", "setup", "stats", "statusline", "uninstall", "verify"]);
   for (const [command, result] of Object.entries(fixtures)) {
     const next = renderCommand(command, result, { ascii: true }).match(/Next: grudge (\w+)/);
     assert.ok(next, `${command} should suggest a next command`);
@@ -71,6 +72,22 @@ test("scars show renders one stored record instead of assuming a list", () => {
 
   const missing = renderCommand("scars", { pending: null, scar: null }, { ascii: true });
   assert.match(missing, /\[fail\] Scar: not found/);
+});
+
+test("propose says PENDING out loud and never implies a pending rule is active", () => {
+  const output = renderCommand("propose", fixtures.propose, { ascii: true });
+  assert.match(output, /\[warn\] Status: PENDING\. Not enforced until you run: grudge accept scar-test/);
+  assert.doesNotMatch(output, /accepted/);
+
+  const accepted = renderCommand("propose", { accepted: true, pending: false, enforced: true, id: "scar-test" }, { ascii: true });
+  assert.match(accepted, /\[ok\] Status: accepted and enforced/);
+});
+
+test("doctor never claims blocking works and points at grudge verify", () => {
+  const installed = { ok: true, checks: [{ name: "config", ok: true, detail: "parse OK" }, { name: "runtime", ok: true, detail: "present" }], budgetMeasurements: [], warnings: [] };
+  const output = renderCommand("doctor", installed, { ascii: true });
+  assert.match(output, /Run `grudge verify` to prove blocking works/);
+  assert.match(output, /Next: grudge verify/);
 });
 
 test("errors include a fix without a stack trace by default", () => {

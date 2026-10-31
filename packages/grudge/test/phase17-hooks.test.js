@@ -1,11 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { append } from "../src/core/session.js";
 import { readEvents } from "../src/core/stats.js";
-import { writeJsonAtomic, readJson } from "../src/core/store.js";
+import { writeJsonAtomic } from "../src/core/store.js";
 import { preToolUse } from "../src/hooks/pre-tool-use.js";
 import { sessionStart } from "../src/hooks/session-start.js";
 import { userPromptSubmit } from "../src/hooks/user-prompt-submit.js";
@@ -26,15 +26,21 @@ test("PreToolUse blocks tainted Windows-path leak with official deny output", as
   try {
     await append(join(root, ".grudge"), "s1", { tool: "read_file", args: { path: "C:\\workspace\\keys.txt" }, result: "FAKE_KEY_123", timestamp: new Date().toISOString() });
     const result = await preToolUse({ cwd: root, session_id: "s1", tool_name: "WebFetch", tool_input: { body: "send FAKE_KEY_123" } });
-    assert.equal(result.code, 0);
+    // Exit 2 is the code Claude Code blocks on, so the guard blocks even if the
+    // host cannot parse the deny JSON.
+    assert.equal(result.code, 2);
+    assert.match(result.stderr, /grudge: blocked by leak-1/);
     assert.equal(result.blocked, true);
     assert.equal(result.scarId, "leak-1");
     assert.ok(result.reason.length <= 400);
     const output = JSON.parse(result.stdout);
     assert.equal(output.hookSpecificOutput.permissionDecision, "deny");
     assert.match(output.hookSpecificOutput.permissionDecisionReason, /do not retry/i);
+    // A repeated delivery of the same prohibited call must stay blocked; only
+    // the counter is deduplicated. Enforcement is never gated on the claim.
     const duplicate = await preToolUse({ cwd: root, session_id: "s1", tool_name: "WebFetch", tool_input: { body: "send FAKE_KEY_123" } });
-    assert.equal(duplicate.stdout, "");
+    assert.equal(duplicate.code, 2);
+    assert.equal(JSON.parse(duplicate.stdout).hookSpecificOutput.permissionDecision, "deny");
     assert.equal((await readEvents(root)).filter((event) => event.type === "catch").length, 1);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
@@ -71,7 +77,10 @@ test("Stop is silent and records stats; command wrapper fails open on bad input"
   const root = await fixtureRoot([]);
   try {
     assert.deepEqual(await stop({ cwd: root }), { code: 0, stdout: "", stderr: "" });
-    assert.equal((await readJson(join(root, ".grudge", "stats.json"), {})).stops, 1);
+    const events = await readEvents(root);
+    assert.equal(events.filter((event) => event.type === "stop").length, 1);
+    // P1-1: Stop writes the append-only event log, never the legacy stats.json.
+    await assert.rejects(readFile(join(root, ".grudge", "stats.json"), "utf8"), { code: "ENOENT" });
     assert.equal((await runHook("pre-tool-use", "not-json")).code, 0);
     assert.match((await runHook("unknown", "{}")).stderr, /unknown hook/);
   } finally { await rm(root, { recursive: true, force: true }); }

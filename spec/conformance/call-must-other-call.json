@@ -1,0 +1,1 @@
+{"name":"call-must-other-call","rule":{"id":"r-must","mode":"block","kind":"call_shape","tool":"verify_user","match":{},"ordering":{"before":"","after":""},"taint":{"source":"","sink":""},"polarity":"must","english":"Must call verify_user.","createdFrom":"fixture"},"events":[{"tool":"read_file","args":{"path":"notes.txt"}}],"expect":{"violated":true,"atEvents":[]}}

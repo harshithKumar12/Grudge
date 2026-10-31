@@ -9,6 +9,7 @@ export const INSTRUCTION_BLOCK = `${MANAGED_BEGIN}
 - When the user corrects a repeatable mistake, or something failed because of an action you should never repeat in this repo, record it once:
   \`node .grudge/bin/grudge.mjs propose --rule '<rule>' --why '<one sentence>'\`
 - Rule forms: \`never call <tool> where <field> ~ "<text>"\`, \`must call <tool> before <tool>\`, \`never call <tool> where <field> tainted_by <tool>\`. Tools: read_file, write_file, shell, http. Run \`... propose --help\` for examples.
+- After proposing, show the exact command output. Never claim a rule is active unless that output says accepted; pending is not enforced. Add \`--accept\` to enforce immediately.
 - One rule per correction. Never propose rules that block reading files or running tests. Do not edit \`.grudge/\`.
 ${MANAGED_END}`;
 

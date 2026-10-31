@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "grudge-cli"
-version = "0.1.9"
+version = "0.2.1"
 description = "Deterministic regression scars for agent mistakes."
 readme = "README.md"
 requires-python = ">=3.11,<3.15"
@@ -28,7 +28,9 @@ dependencies = [
     "pydantic==2.12.5",
     "typer==0.15.1",
     "click==8.1.8",
-    "rich==13.9.4",
+    # Bounded, not exact: an exact pin here forces every user who also installs
+    # twine (rich>=14.3.3) into an unsatisfiable resolution.
+    "rich>=13.9.4,<15",
     "httpx==0.28.1",
 ]
 
@@ -39,7 +41,9 @@ Issues = "https://github.com/harshithKumar12/Grudge/issues"
 
 [project.optional-dependencies]
 dev = [
-    "pytest==8.3.4",
+    # 9.0.3+ clears PYSEC-2026-1845; still <10 for pytest-asyncio (<10) and
+    # pytest-cov, and the whole suite passes on 9.2.0.
+    "pytest>=9.0.3,<10",
     "pytest-cov==6.0.0",
     "hypothesis==6.123.10",
     "ruff==0.14.14",
@@ -55,6 +59,7 @@ include = ["grudge*", "examples*", "scars*"]
 
 [tool.setuptools.package-data]
 "grudge.predicates" = ["prompts/*.md"]
+"grudge.demo" = ["*.mjs", "payloads/*/*.json"]
 "examples.leaky_agent" = ["*.json", "controls/*", "fake_filestore/*"]
 scars = ["*.json"]
 

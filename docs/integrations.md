@@ -3,7 +3,7 @@
 **Purpose:** Explain where Grudge writes agent instructions and hooks.
 **Audience:** Developers installing the npm package.
 **Status:** final
-**Last updated (phase):** pre-production fixes · 2026-10-23
+**Last updated (phase):** 25 - 2026-10-29
 
 `grudge setup` is local and offline. It parses before merging, backs up changed
 files under `.grudge/backups/<timestamp>/`, preserves unrelated JSON keys, and
@@ -51,3 +51,19 @@ and `demo`).
 
 Hooks call `node .grudge/bin/grudge.mjs` directly; they never invoke `npx`,
 Python, a server, or a network.
+
+## Third-party hooks and plugins
+
+Other tools install their own hooks and status lines into the same Claude Code
+settings files (for example a memory or indexer plugin). Their failures appear
+in the transcript as `<name> hook error` and are **not** Grudge's: Grudge only
+runs the `node .grudge/bin/grudge.mjs hook <event>` commands it wrote, and it
+never edits a hook entry, plugin, or status line that it did not create.
+
+`grudge doctor` inspects only Grudge-managed entries and reports anything it
+deliberately preserved (such as another tool's `statusLine`) informationally.
+It does not validate other tools' hooks, and it never claims that blocking
+works — that requires `grudge verify` or a live Claude Code run. If you need to
+tell whose hook failed, read the command in the error message or open
+`.claude/settings.json` and compare it with the command shape in
+[`hooks.md`](hooks.md).

@@ -7,7 +7,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const repo = join(fileURLToPath(new URL("..", import.meta.url)));
-const script = join(repo, "scripts/e2e_guard.mjs");
+const script = join(repo, "grudge/demo/e2e_guard.mjs");
 
 test("two offline sessions propose, accept, and block the leak", async () => {
   const root = await mkdtemp(join(tmpdir(), "grudge-e2e-test-"));

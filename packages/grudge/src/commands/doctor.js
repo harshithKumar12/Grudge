@@ -1,9 +1,9 @@
 // OWNER: lane-c
 import { access, readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
-import { join, resolve } from "node:path";
+import { join, resolve, isAbsolute } from "node:path";
 import { homedir } from "node:os";
-import { grudgeHookEvents, isGrudgeStatusLine, parseJson } from "../installer/json-merge.js";
+import { grudgeHookEvents, isGrudgeHookCommand, isGrudgeStatusLine, parseJson } from "../installer/json-merge.js";
 import { missingStatusLineScripts } from "../installer/statusline-paths.js";
 import { hasManagedBlock, managedBlock } from "../installer/managed-block.js";
 import { measureOutputs as measureBudgetOutputs } from "../core/budget.js";
@@ -26,8 +26,13 @@ export async function doctor(options = {}) {
   const configPath = join(installRoot, ".grudge/config.json");
   const runtimePath = join(installRoot, ".grudge/bin/grudge.mjs");
   const checks = [];
+  const declaredScope = config?.scope ?? (installRoot === home ? "global" : "repo");
   checks.push({ name: "node", ok: Number(process.versions.node.split(".")[0]) >= 18, detail: process.version });
-  checks.push({ name: "install scope", ok: true, detail: installRoot === root ? "project" : `user (${join(home, ".grudge")})` });
+  checks.push({
+    name: "install scope",
+    ok: true,
+    detail: `${declaredScope === "global" ? "user" : "project"} (${declaredScope}; state: ${join(installRoot, ".grudge")})`,
+  });
   checks.push({ name: "config", ok: Boolean(config), detail: config ? `parse OK (${configPath})` : "missing or invalid" });
   const runtime = await readOptional(runtimePath);
   checks.push({ name: "runtime", ok: Boolean(runtime), detail: runtime ? "present" : "missing" });
@@ -51,6 +56,7 @@ export async function doctor(options = {}) {
   let userEvents = new Set();
   let sameScopeDuplicates = false;
   let grudgeStatusLine = false;
+  const hookCommands = [];
   const statusLineConflicts = [];
   const statusLineMissing = [];
   const settingsPaths = [
@@ -64,6 +70,7 @@ export async function doctor(options = {}) {
     try {
       const settings = parseJson(text, path);
       const count = countGrudgeHooks(settings.hooks);
+      hookCommands.push(...grudgeHookCommands(settings));
       const events = grudgeHookEvents(settings);
       hooksPresent ||= count > 0;
       if (scope === "user") {
@@ -86,6 +93,25 @@ export async function doctor(options = {}) {
     } catch (error) { checks.push({ name: `settings ${path}`, ok: false, detail: error.message }); }
   }
   checks.push({ name: "hooks", ok: hooksPresent || !(config?.adapters ?? []).includes("claude-code"), detail: hooksPresent ? "present" : "not configured" });
+  // A relative hook path is the P0-1 failure: Claude Code runs it from the
+  // session directory, so a subdirectory cannot find the module and the host
+  // treats the error as "allowed". Say it loudly instead of trusting the file.
+  const badHookPaths = [];
+  for (const command of hookCommands) {
+    const script = grudgeCommandScript(command);
+    if (!script) continue;
+    if (!isAbsolute(script)) badHookPaths.push(`${command} (relative path)`);
+    else if (!(await fileExists(script))) badHookPaths.push(`${command} (script missing)`);
+  }
+  checks.push({
+    name: "hook paths",
+    ok: badHookPaths.length === 0,
+    detail: badHookPaths.length
+      ? `re-run grudge setup: ${badHookPaths[0]}`
+      : hookCommands.length
+        ? "absolute and present"
+        : "not configured",
+  });
   const warnings = [];
   if (userHookCount > 0 && projectHookCount > 0) {
     warnings.push("Grudge hooks are installed at both user and project scope; duplicate invocations are deduplicated by session and event.");
@@ -132,8 +158,19 @@ export async function doctor(options = {}) {
     const lineDetail = measurement.lines === undefined ? "" : `, ${measurement.lines}/${measurement.lineCap} lines`;
     checks.push({ name: `budget ${measurement.name}`, ok, detail: `${measurement.chars}/${measurement.cap} chars${lineDetail}`, measurement });
   }
-  const result = { ok: checks.every((check) => check.ok), root, checks, budgetMeasurements, warnings };
-  if (options.print !== false) for (const check of checks) process.stdout.write(`${check.warning ? "⚠" : check.ok ? "✓" : "✗"} ${check.name}: ${check.detail}\n`);
+  // Scripted consumers read the JSON, so the one statement file checks cannot
+  // make has to travel in the payload too, not only in human output.
+  const enforcement = {
+    proven: false,
+    command: "grudge verify",
+    detail: "not proven by file checks; run `grudge verify` to prove blocking works",
+  };
+  const result = { ok: checks.every((check) => check.ok), root, checks, budgetMeasurements, warnings, enforcement };
+  if (options.print !== false) {
+    for (const check of checks) process.stdout.write(`${check.warning ? "⚠" : check.ok ? "✓" : "✗"} ${check.name}: ${check.detail}\n`);
+    // File checks prove what is installed, never that a hook stops a call.
+    process.stdout.write("Enforcement: not proven by file checks. Run `grudge verify` to prove blocking works.\n");
+  }
   return result;
 }
 
@@ -191,6 +228,56 @@ function countGrudgeHooks(value) {
   };
   visit(value);
   return count;
+}
+
+/** Split a shell command line into tokens, honouring double quotes. */
+function splitCommand(command) {
+  const tokens = [];
+  let current = "";
+  let quoted = false;
+  let started = false;
+  for (const character of String(command)) {
+    if (character === '"') { quoted = !quoted; started = true; continue; }
+    if (!quoted && /\s/.test(character)) {
+      if (started) { tokens.push(current); current = ""; started = false; }
+      continue;
+    }
+    current += character;
+    started = true;
+  }
+  if (started) tokens.push(current);
+  return tokens;
+}
+
+/** Collect every Grudge command string registered under `hooks`. */
+function grudgeHookCommands(settings) {
+  const commands = [];
+  const visit = (value) => {
+    if (!value || typeof value !== "object") return;
+    if (typeof value.command === "string" && isGrudgeHookCommand(value.command)) {
+      commands.push(value.command);
+    }
+    for (const child of Object.values(value)) {
+      if (Array.isArray(child)) for (const item of child) visit(item);
+      else if (child && typeof child === "object") visit(child);
+    }
+  };
+  visit(settings?.hooks);
+  return [...new Set(commands)];
+}
+
+/** Extract the runtime script path from a registered Grudge hook command. */
+function grudgeCommandScript(command) {
+  for (const token of splitCommand(command)) {
+    if (token.endsWith("grudge.mjs")) return token;
+  }
+  return null;
+}
+
+/** True when `path` exists (file or directory). */
+async function fileExists(path) {
+  if (!path) return false;
+  try { await access(path); return true; } catch { return false; }
 }
 
 function projectOrUserEvents(target, events) {

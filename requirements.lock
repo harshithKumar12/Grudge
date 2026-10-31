@@ -1,11 +1,18 @@
 # Generated with uv from pyproject.toml and the dev extra.
-setuptools==75.8.0
+#   uv pip compile pyproject.toml --extra dev --universal --python-version 3.11
+#
+# `rich` and `pytest` are range-pinned in pyproject.toml so a shared environment
+# can also satisfy twine (rich>=14.3.3) and pytest-asyncio (pytest>=8.4,<10);
+# this lock then records the exact versions CI installs. `setuptools` is the
+# build toolchain pin and is kept at a release without known advisories.
+setuptools==84.2.1
 annotated-types==0.8.0
 anyio==4.15.1
 attrs==26.1.0
-certifi==2026.10.19
+certifi==2026.10.23
 click==8.1.8
-coverage==7.16.2
+colorama==0.4.6 ; sys_platform == 'win32'
+coverage==7.17.0
 h11==0.16.0
 httpcore==1.0.9
 httpx==0.28.1
@@ -22,13 +29,12 @@ pluggy==1.7.0
 pydantic==2.12.5
 pydantic-core==2.41.5
 pygments==2.21.0
-pytest==8.3.4
+pytest==9.2.0
 pytest-cov==6.0.0
-rich==13.9.4
+rich==14.3.4
 ruff==0.14.14
 shellingham==1.5.4
 sortedcontainers==2.4.0
-tomli==2.5.0
 typer==0.15.1
 typing-extensions==4.16.0
 typing-inspection==0.4.4

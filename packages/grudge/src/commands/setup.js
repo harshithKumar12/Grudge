@@ -41,7 +41,11 @@ export async function setup(options = {}) {
   const unknown = requested.filter((id) => !adapters[id]);
   if (unknown.length) throw new Error(`unknown agent adapter(s): ${unknown.join(", ")}`);
   const root = selectedScope === "global" ? home : cwd;
-  const runtimeCommand = selectedScope === "global" ? `node ${JSON.stringify(join(home, ".grudge/bin/grudge.mjs"))}` : "node .grudge/bin/grudge.mjs";
+  // Register the absolute path of the installed runtime. A relative path like
+  // `.grudge/bin/grudge.mjs` breaks the moment Claude Code runs a hook from a
+  // subdirectory or after `cd`, and the host treats the failure as "allowed".
+  const runtimeTarget = join(root, ".grudge/bin/grudge.mjs");
+  const runtimeCommand = `${shellQuote(process.execPath)} ${shellQuote(runtimeTarget)}`;
   const plans = selected.map((item) => ({ adapter: item, plan: item.plan({ cwd, home, scope: selectedScope, runtimeCommand }) }));
   const unverified = plans.filter(({ plan }) => !plan.verified).map(({ adapter, plan }) => ({ id: adapter.id, docsUrl: adapter.docsUrl, snippet: plan.snippet ?? managedBlock() }));
   const runtimeSource = options.runtimeScript
@@ -49,7 +53,6 @@ export async function setup(options = {}) {
     : process.argv[1]?.endsWith("grudge.mjs")
       ? resolve(process.argv[1])
       : resolve(options.packageRoot ?? fileURLToPath(new URL("../..", import.meta.url)), "dist/grudge.mjs");
-  const runtimeTarget = join(root, ".grudge/bin/grudge.mjs");
   const changes = [];
   const warnings = [];
   if (unmarkedDirectory && selectedScope === "global") {
@@ -67,7 +70,7 @@ export async function setup(options = {}) {
     const runtimeExists = await fileExists(runtimeSource);
     if (runtimeExists) await planRuntime(runtimeSource, runtimeTarget, context);
     await planGitignore(context);
-    const config = await planConfig(root, runtimeTarget, selected.map((adapter) => adapter.id), context, runtimeExists, runtimeSource);
+    const config = await planConfig(root, runtimeTarget, selected.map((adapter) => adapter.id), context, runtimeExists, runtimeSource, { scope: selectedScope, runtimeCommand });
     if (!context.dryRun && runtimeExists) await smokeTest(runtimeTarget, root);
     const result = { scope: selectedScope, cwd, root, selected: selected.map((item) => item.id), unverified, detected, dryRun: Boolean(options.dryRun), changes, warnings: [...new Set(warnings)], config, runtimeInstalled: runtimeExists, version: VERSION };
     if (!options.dryRun && backupEntries.length) await writeBackupManifest(root, timestamp, backupEntries);
@@ -121,12 +124,12 @@ async function planGitignore(context) {
   await writeIfChanged(path, before, `${prefix}${missing.join("\n")}\n`, context, "gitignore");
 }
 
-async function planConfig(root, runtimeTarget, selected, context, runtimeInstalled, runtimeSource) {
+async function planConfig(root, runtimeTarget, selected, context, runtimeInstalled, runtimeSource, options = {}) {
   const path = join(root, ".grudge/config.json");
   const before = await readOptional(path);
   const old = before ? parseJson(before, path) : {};
   const hash = runtimeInstalled ? createHash("sha256").update(await readFile(context.dryRun ? runtimeSource : runtimeTarget)).digest("hex") : old.scriptHash ?? null;
-  const after = `${JSON.stringify({ ...old, version: 1, packageVersion: VERSION, scriptHash: hash, adapters: [...new Set([...(old.adapters ?? []), ...selected])].sort(), mode: old.mode ?? "on", autoAccept: old.autoAccept ?? false, lastBackup: old.lastBackup ?? context.timestamp }, null, 2)}\n`;
+  const after = `${JSON.stringify({ ...old, version: 1, packageVersion: VERSION, scope: options.scope ?? old.scope ?? "repo", runtimeCommand: options.runtimeCommand ?? old.runtimeCommand ?? null, scriptHash: hash, adapters: [...new Set([...(old.adapters ?? []), ...selected])].sort(), mode: old.mode ?? "on", autoAccept: old.autoAccept ?? false, lastBackup: old.lastBackup ?? context.timestamp }, null, 2)}\n`;
   await writeIfChanged(path, before, after, context, "config");
   return JSON.parse(after);
 }
@@ -178,6 +181,16 @@ async function smokeTest(runtimePath, cwd) {
     });
     child.stdin.end(JSON.stringify({ session_id: "grudge-install-smoke", hook_event_name: "SessionStart", cwd }));
   });
+}
+
+/**
+ * Quote one token for a shell command line. Backslashes are literal inside
+ * double quotes on both cmd.exe and POSIX shells, so a Windows path survives
+ * unchanged. Quoting unconditionally keeps a registered hook command valid for
+ * every install path, including home directories with spaces.
+ */
+function shellQuote(value) {
+  return `"${String(value).replaceAll('"', '\\"')}"`;
 }
 
 async function hasProjectMarker(path) {
