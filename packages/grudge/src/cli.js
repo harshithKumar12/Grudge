@@ -48,7 +48,7 @@ Options:
   -j, --json      Machine-readable output
   -y, --yes       Skip prompts (setup)
   -a, --agents    Comma-separated agent list (setup)
-  -s, --scope     repo or user (setup)
+  -s, --scope     repo, local, or global (setup)
   -c, --cwd       Run against another directory
   --keep          Keep the temporary project (verify)
 

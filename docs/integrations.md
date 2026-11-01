@@ -24,6 +24,20 @@ Cursor's current public page did not expose a stable exact filename/config
 contract during verification. Its adapter prints the snippet and URL but
 deliberately writes no Cursor files.
 
+### Claude Code launch directory
+
+A Claude Code guard is only active in sessions that load the settings file it
+was written to. Claude Code reads `.claude/settings.json` from the directory the
+session starts in; starting in a subdirectory of the installed project loads no
+Grudge hooks, and the guard is silently absent. Starting at the project root, or
+passing `--settings <project>/.claude/settings.json`, restores enforcement.
+`--scope local` writes `.claude/settings.local.json` instead, which Claude Code
+reads from the git repository root — so on Linux and macOS a subdirectory of the
+same repository still loads it, while on Windows it does not. A user-scope
+install (`--scope global`) is loaded in every project and is the supported
+alternative for sessions that start elsewhere. See
+[`hooks.md`](hooks.md#claude-code-settings-discovery) for the measured table.
+
 ```bash
 # from the repository root
 npm --prefix packages/grudge run setup:repo

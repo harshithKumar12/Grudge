@@ -62,6 +62,26 @@ test("suggested next commands are real commands", () => {
   }
 });
 
+test("a nested launch suggests the user-scope fix, not another repo setup", () => {
+  const output = renderCommand("doctor", {
+    ok: false,
+    checks: [
+      { name: "config", ok: true, detail: "parse OK" },
+      {
+        name: "launch directory",
+        ok: false,
+        detail: 'session starts at C:\\proj\\nested, not the installed root C:\\proj; Claude Code loads C:\\proj\\.claude\\settings.json only from the start directory, so the hooks do not load here. Start the session in C:\\proj or run claude --settings "C:\\proj\\.claude\\settings.json"',
+      },
+    ],
+    budgetMeasurements: [],
+    warnings: [],
+  }, { ascii: true });
+  // Re-installing the repo scope would not change where the session starts.
+  assert.match(output, /Next: grudge setup --scope global/);
+  assert.match(output, /Fix: start the session in the installed root/);
+  assert.match(output, /claude --settings/);
+});
+
 test("scars show renders one stored record instead of assuming a list", () => {
   const found = renderCommand("scars", { pending: null, scar: { id: "scar-1", mode: "block" } }, { ascii: true });
   assert.match(found, /\[ok\] scar-1: block/);

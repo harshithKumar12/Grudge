@@ -513,7 +513,27 @@ never Python:
 Absolute paths matter: Claude Code runs the hook from the session's current
 directory, so a relative `.grudge/bin/grudge.mjs` stops resolving after a `cd`
 and the host treats the failure as "allowed". `grudge doctor` fails its
-`hook paths` check if a registered command is relative or missing.
+`hook paths` check if a registered `grudge.mjs` command is relative or missing.
+
+Absolute paths are necessary but **not sufficient**. Claude Code loads a
+project's `.claude/settings.json` from the directory the session starts in; it
+does not walk up to the repository root. A session started in `docs/` therefore
+runs with no Grudge hooks at all, however the command is registered. Start
+Claude Code at the repository root, or point it at the file explicitly:
+
+```bash
+cd <repo> && claude
+claude --settings <repo>/.claude/settings.json   # session started elsewhere
+```
+
+`--scope local` is the exception: Claude Code reads `.claude/settings.local.json`
+from the git repository root, so on Linux and macOS it still loads from a
+subdirectory of the same repository (on Windows it does not). A user-scope
+install (`--scope global`) writes `~/.claude/settings.json`, which
+Claude Code loads in every project. Grudge never changes user-level settings on
+its own; that remains an explicit choice. See
+[`docs/hooks.md`](docs/hooks.md#claude-code-settings-discovery) for the measured
+behaviour.
 
 A user-scope install keeps its rules in `~/.grudge/compiled.json` and those
 rules apply inside every project. Precedence is deterministic: global rules are
