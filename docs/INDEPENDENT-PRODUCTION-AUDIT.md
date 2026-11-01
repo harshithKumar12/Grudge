@@ -426,3 +426,19 @@ until P0-3 and P0-4 are fixed, "deterministic enforcement" and "redaction before
 persistence" are both false in measurable ways. A CONDITIONALLY READY verdict
 would require at minimum a working live-integration proof, which this audit
 could not perform because the host was not logged in.
+
+---
+
+## 17. Remediation status (2026-11-01)
+
+This is an addendum: the findings and the NOT READY verdict above remain the
+record of what this audit observed. Each row uses one of FIXED, ACCEPTED,
+DEFERRED, OPEN, INVALID, and every FIXED row names the check that proves it.
+
+| Finding | Disposition | Evidence |
+|---|---|---|
+| P2-1 - `grudge-engine doctor` / `verify` implied by Quick start | **FIXED** | `README.md` Quick start installs and runs the Node CLI (`npx grudge-cli@latest setup`, then `doctor`), and "Verify it works" runs `npx grudge-cli@latest verify`. `Select-String README.md -Pattern 'grudge-engine (doctor\|verify)'` returns no matches. The command split is unchanged and now explicit: the Node CLI owns hooks, `doctor` and `verify`; the Python wheel owns the engine and `demo`. |
+| P2-2 - `demo --guard` needs a Node runtime outside a checkout | **FIXED** | `README.md` "Run the offline demo" states the resolution order (`--node-runtime`, `GRUDGE_NODE_RUNTIME`, a checkout, `packages/grudge/node_modules`) and what to point it at. `grudge/demo/e2e_guard.mjs` fails with the same actionable message instead of a bare error. Verified from an installed wheel in a clean venv: `grudge-engine demo --no-browser --fast --json` exits 0. |
+| P2-3 - corrupt or wrong-version rules silently disable enforcement | **FIXED** | `packages/grudge/src/core/rules.js` warns `not a version 1 compiled file; ignored (fail-open)` and `rule "..." is invalid and was skipped`. Measured with the installed runtime: `compiled.json` with `version: 99` exits 0 with the first warning; a rule with `kind: "bogus_kind"` exits 0 with the second. `grudge doctor` fails `compiled.json` with `invalid or unsupported version; enforcement is skipped` (regression test `doctor reports an unreadable rule file instead of calling it valid (P2-3)`). |
+| P2-4 - `must call <tool> before <tool>` rejected by the parser | **FIXED** | Both parsers accept the optional `call`: `packages/grudge/src/dsl/parse.js` and `grudge/predicates/dsl.py`, so `before <tool>` and `before call <tool>` produce the same `Ordering` node; `docs/predicate-dsl.md` states the equivalence. Regression assertions in `packages/grudge/test/phase15-core.test.js` and `tests/test_predicates_dsl.py`. End-to-end: `propose --rule-stdin` with `must call verify_user before transfer_funds` and with `must call read_audit before call purge_records` both compile to `kind: "ordering"` rules and appear in `grudge scars list`. |
+| P3-1 - redaction replacement injects `: ` into query strings | **FIXED** | `spec/redaction-corpus.json` case `url-query-api-key` expects `https://x.invalid/?api_key=[REDACTED]&next=1`, and the shared-corpus tests pass for both runtimes (`tests/test_shared_corpora.py`, `packages/grudge/test/remediation-regressions.test.js`). End-to-end: a stored session event captured from a `WebFetch` result keeps `?api_key=[REDACTED]&next=1`, leaves no ` KEY]` residue, and stores neither the query value nor the AWS key. |

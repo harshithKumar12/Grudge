@@ -760,3 +760,19 @@ reproduced here on 41 inputs):
 `npm pack --dry-run --prefix packages/grudge` still fails (npm ignores
 `--prefix` for `pack`); `(cd packages/grudge && npm pack --dry-run)` exits 0
 with 48 files, as documented in P2-5.
+
+---
+
+## 17. Remediation status (2026-11-01)
+
+This is an addendum; section 7 keeps the findings as they were recorded.
+
+| Finding | Disposition | Evidence |
+|---|---|---|
+| P2-4 - exact-version dependency pins conflict with common tooling | **FIXED** | The two conflicts named by `pip check` are gone: `rich>=13.9.4,<15` and `pytest>=9.0.3,<10` replace the exact pins, and `requirements.lock` records the resolved set (`rich==14.3.4`, `pytest==9.2.0`). A clean venv now reports `pip check` -> `No broken requirements found.` Exact pins remain for `pydantic`, `typer`, `click`, and `httpx`; they do not conflict with the tools named in the finding, and widening them is a follow-up rather than a blocker. |
+| P2-5 - documented hook timing does not describe the shipped process | **FIXED** | `docs/hooks.md` "Timing evidence" now separates in-process handler work (p50 1.80 ms) from end-to-end spawned-hook cost (0.2.1: p50 157-187 ms, p95 218-299 ms) and states that the 1,500 ms fail-open timer was removed from the enforcement path. `packages/grudge/test/concurrency-enforcement.test.js` asserts a real spawned hook stays under 1,000 ms. |
+| P3-2 - unlocked legacy `stats.json` increment | **FIXED** | Enforcement writes only `.grudge/stats.jsonl`; `stats.json` is read (`statsPath`/`readStats`) for legacy fallback and is never written by a hook. Measured: after a blocked call the directory holds `stats.jsonl` with `hook` and `catch` events and no `stats.json`; `packages/grudge/test/stats-consistency.test.js` covers the event model that replaced the counter. |
+| P3-3 - `uninstall` removes `.grudge` wholesale | **FIXED** | `uninstall` preserves user content and reports it, and removes `.grudge` only when Grudge created everything. Tests `uninstall keeps user files inside .grudge and says so (P3-3)` and `uninstall removes .grudge entirely when Grudge created everything (P3-3)`. |
+| P3-4 - release docs use `npm pack`/`publish --prefix` | **FIXED** | `README.md` uses `(cd packages/grudge && npm pack)` and states that npm ignores `--prefix` for `pack` and `publish`. |
+| P3-5 - no live Claude Code session was exercised | **FIXED** | A live Claude Code 2.1.283 session on Windows 11 was run against a repository install. `docs/hooks.md` "Claude Code settings discovery" records the measured table (root: blocked; nested: hooks not loaded; nested plus `--settings`: blocked) and "Manual acceptance test" makes the check repeatable on any host. |
+| P3-6 - doctor reports a missing status-line helper | **ACCEPTED** | By design: `doctor` reports the missing target as a warning and never rewrites an existing status line. Measured on this machine: the warning is present and `~/.claude/settings.json` is byte-identical before and after (SHA-256 unchanged). |
