@@ -8,7 +8,7 @@ validation run, and the resulting verdict.
 checking the remediation claims, and future agents picking up the remaining
 release actions.
 **Status:** final
-**Last updated (phase):** 5 - full validation - 2026-11-01
+**Last updated (phase):** 6 - independent review closure - 2026-11-01
 
 ## 1. Bottom line
 
@@ -37,9 +37,13 @@ unconditional PRODUCTION READY:
    repository `.gitignore`, so it was excluded by staging explicit paths only
    (see §9).
 
-Five commits now carry this work locally (§13). Nothing was pushed, tagged,
-published, or merged. The version was not bumped beyond `0.2.1`, whose metadata
-`6047112` already synchronised.
+Five commits carried the work to Phase 5. **Phase 6 (§14) then closed the seven
+findings §7 had deferred and thirteen findings from a second review**, including
+one regression this remediation had introduced in `doctor`. Seven commits now
+carry the tree locally (§13). Nothing was pushed, tagged, published, or merged.
+The version was not bumped beyond `0.2.1`, whose metadata `6047112` already
+synchronised, and the three conditions above are unchanged: they are about CI and
+the registry, not about code.
 
 ## 2. Method
 
@@ -53,6 +57,7 @@ The remediation ran in a fixed phase order and no phase was skipped:
 | 3 | Claude Code nested settings | Host behaviour measured; limitation surfaced by the product |
 | 4 | Audit closure | Every finding gets FIXED, ACCEPTED, DEFERRED, OPEN, or INVALID |
 | 5 | Full validation | Every gate re-run on the final tree, then this report |
+| 6 | Independent review closure | Every finding either fixed with a test that fails without the fix, or documented as a limitation (§14) |
 
 Three rules shaped the work:
 
@@ -288,7 +293,11 @@ Two non-blocking follow-ups are recorded rather than hidden:
 
 ### Deferred findings from the independent review
 
-These were confirmed as real but are not fixed in this change set; each is
+**All seven of these are fixed in Phase 6** — §14.2 records each fix and the
+check that proves it. The paragraphs below are the state at the time of the
+first review and are kept as the record of what was deferred.
+
+These were confirmed as real but were not fixed in this change set; each is
 recorded here rather than silently dropped:
 
 - **`doctor` has no repository boundary when resolving the install upward.**
@@ -338,6 +347,10 @@ produces, not the earlier phase runs.
 | 10 | Wheel gate re-runnability | same command, second run into the now non-empty `--outdir` | `PASS (8/8 checks)` | 0 |
 | 11 | DSL ordering parity | `pytest tests/test_predicates_dsl.py` (6) and `node --test test/phase15-core.test.js` (4) | both pass; shorthand and canonical forms produce the same rule | 0 |
 
+**§14.5 supersedes this table.** The Phase 6 changes added tests and two gates'
+worth of findings, so the totals above are the Phase 5 snapshot, not the final
+tree.
+
 Gates 1–6 are the Python source surface; 7–8 build and drive the packed npm
 tarball; 9–10 build and drive the packed wheel. Together they cover the two
 artifacts plus the source surface, which is the combination the earlier audits
@@ -362,18 +375,19 @@ Four observations about this run:
 ## 9. Environment notes (not product defects)
 
 - **This checkout's `.claude/` is untracked and was excluded from every
-  commit.** It is not listed in the repository `.gitignore`; only
-  `.claude/settings.local.json` is ignored, and by the workstation's global git
-  ignore, not by the repo. The hooks in `.claude/settings.json` use relative
-  commands (`node .grudge/bin/grudge.mjs hook ...`), so `grudge doctor` at the
-  repository root correctly reports `[fail] hook paths ... (relative path)` with
-  the remedy `re-run grudge setup`. That is the guard doing its job on an
-  environment that predates the absolute-path install; nothing under `.claude/`
-  was modified. Because the file is not gitignored, a future `git add -A` would
-  sweep it in; staging explicit paths only is what kept it out.
+  commit.** The repository now ignores `.claude/settings.local.json` and keeps
+  `.claude/settings.json` trackable (finding E, §14.2); this checkout's
+  `settings.json` is machine-local anyway, so it was staged by explicit path
+  never, and with it the whole directory. The hooks in it use relative commands
+  (`node .grudge/bin/grudge.mjs hook ...`), so `grudge doctor` at the repository
+  root correctly reports `[fail] hook paths ... (relative path)` with the remedy
+  `re-run grudge setup`. That is the guard doing its job on an environment that
+  predates the absolute-path install; nothing under `.claude/` was modified.
 - **`.gitignore` and `CLAUDE.md` carry `grudge setup` side effects** — three
-  `.grudge/` ignore lines and a managed instruction block. They remain modified
-  and uncommitted, flagged rather than silently folded into a workstream.
+  `.grudge/` ignore lines and a managed instruction block. The `.gitignore` line
+  that matters (the personal Claude settings) is committed; the rest stays
+  modified and uncommitted, flagged rather than silently folded into a
+  workstream.
 - **The registry still serves the stale `grudge-cli@0.2.1`.** The version was
   deliberately not bumped: the release action is publish, not re-version.
 - **One transient flake was observed once**:
@@ -387,20 +401,20 @@ Four observations about this run:
 
 | # | Action | Owner | Why it is not done here |
 |---|---|---|---|
-| 1 | Push the five local commits | Maintainer | Pushing and opening the PR are out of scope |
+| 1 | Push commits 1–7 (phases 1–5 and 6) | Maintainer | Pushing and opening the PR are out of scope |
 | 2 | Confirm CI is green on those commits | Maintainer | CI cannot run on unpushed commits |
-| 3 | Publish `0.2.1` (or bump and publish) | Maintainer | Publishing is out of scope and irreversible |
+| 3 | Publish the corrected tree as a new version (`0.2.2`) | Maintainer | `0.2.1` is already immutable in both registries — npm `grudge-cli@0.2.1` (shasum `bb2e7f9930d6333c7d3d76bbe7a3888fcda749d2`) and PyPI 0.2.1 — and a version bump is a release decision, not a remediation step |
 | 4 | Widen the remaining exact pins | Follow-up | Non-blocking; `pip check` is clean in the lock environment |
 | 5 | Run the manual Claude Code acceptance test on a release machine | Follow-up | It is a host-level check, documented in `docs/hooks.md` |
 
 ## 11. Working tree and excluded files
 
-Five local commits carry the work (§13). After the last commit the working tree
+Seven local commits carry the work (§13). After the last commit the working tree
 retains only these intentionally excluded residual changes:
 
 | Path | State | Why it is excluded |
 |---|---|---|
-| `.gitignore` | modified | `grudge setup` appended three `.grudge/` lines already covered by the existing `.grudge/` entry; not a deliberate repo fix |
+| `.gitignore` | committed in part | Commit 6 adds the `.claude/settings.local.json` line (finding E). The three `.grudge/` lines `grudge setup` appended stay uncommitted: the existing `.grudge/` entry already covers them, so they are workstation noise, not a repo fix |
 | `CLAUDE.md` | modified | `grudge setup` wrote a machine-managed instruction block; not a repo-wide documentation change |
 | `.claude/` | untracked | Machine-local agent configuration; contains this workstation's hooks and must never be committed |
 
@@ -445,13 +459,111 @@ tagged, published, or merged.
 | 2 | `a533b26` | `feat(release): enforce distributable artifact verification` | 9 |
 | 3 | `bc0e9a8` | `fix(claude): clarify nested settings and hook discovery` | 9 |
 | 4 | `9083b79` | `fix(audit): accept the documented ordering shorthand and record remediation status` | 12 |
-| 5 | this commit | `docs: document final production readiness evidence` | 2 |
+| 5 | `d6d26e1` | `docs: document final production readiness evidence` | 2 |
+| 6 | `4b9fb2f` | `fix: close the deferred review findings and second-review defects` | 36 |
+| 7 | this commit | `docs: record the phase 6 review closure` | 3 |
 
-Commits 2–5 were created with hooks enabled and explicit path staging;
-`.claude/`, `.gitignore`, and `CLAUDE.md` were never staged. Commit 5 cannot
-name its own hash before it exists; the four hashes above are the actual
-commits this report travels with.
+Commits 2–6 were created with hooks enabled and explicit path staging.
+`.claude/` and `CLAUDE.md` were never staged. Commit 6 stages a *filtered*
+`.gitignore`: the stored blob is HEAD's content plus the
+`.claude/settings.local.json` rule, written with `git hash-object -w` and
+installed with `git update-index --cacheinfo`, so the three `grudge setup` lines
+stay out of the commit while finding E is tracked. Commit 7 cannot name its own
+hash before it exists; the six hashes above are the actual commits this report
+travels with.
 
 Commit 2's message body contains the typo "packsaging gate" (meant "packaging
 gate"). Amending a commit was out of scope, so it is recorded here rather than
 rewritten.
+
+## 14. Phase 6 — independent review closure (2026-11-01)
+
+### 14.1 What the second review covered
+
+A read-only review of commit `d6d26e1` re-checked the seven findings §7 had
+deferred and looked specifically for defects the remediation itself had
+introduced. It found one: the new `hook paths` check required an execute bit on
+`grudge.mjs`, which the installer writes `0644`, so `doctor` failed on every
+POSIX install (F3 below). Every claim in this section was re-verified in code
+before a fix was scheduled; none was accepted on the reviewer's word.
+
+Dispositions use the same vocabulary as §7: **FIXED** (a named check proves the
+old behaviour is gone), **DEFERRED** (real, deliberately not changed), and no
+finding was relabelled to make the tree look better.
+
+### 14.2 The seven deferred findings
+
+| Finding | Fix | Evidence |
+|---|---|---|
+| `doctor` had no repository boundary when resolving the install upward, so a nested repository bound to an outer install | New `installer/install-root.js`: `repositoryRoot` treats a `.git` file and a `.git` directory as the same boundary; `findInstallRoot` binds a directory to its own repository's install; `findProjectInstallRoot` never reaches above it. `doctor` and `uninstall` share it | `install-root.test.js` (10) and the installer tests "doctor reports no install for a nested repository instead of borrowing the outer one", "findInstallRoot refuses to cross into an enclosing repository's install" |
+| `uninstall` used the raw working directory, so it removed nothing from a subdirectory and still exited 0 | `uninstall` resolves the project install with the same boundary rule. With no install it returns `found: false`, exits 1, and says in text and JSON that nothing was removed; it can no longer reach a `$HOME` install from an unrelated directory | "uninstall from a subdirectory removes the repository install", "uninstall in an unrelated directory removes nothing and says so", and the CLI exit-code assertions in `phase22-install-hardening.test.js` |
+| `--scope global` wrote `$HOME/.gitignore`, which git never reads | global setup skips `planGitignore` and warns instead | "global setup does not create or modify `$HOME/.gitignore`" |
+| `hook paths` resolved only `grudge.mjs` commands | commands are classified as a script, a `PATH` binary or unresolved; `PATH` lookup honours the platform executable suffixes; package runners warn; a Grudge command that cannot be resolved fails | "hook paths accepts an absolute shim, rejects a missing one, and resolves PATH names", "hook paths rejects a relative node_modules/.bin shim instead of ignoring it", "hook paths warns, and does not fail, when a package runner hides the target" |
+| `.claude/settings.json` was not matched by the repository `.gitignore` | the repository ignores `.claude/settings.local.json` only, never the shared file or the directory | "the repository ignores personal Claude settings but keeps the shared file trackable" |
+| `verify-release.mjs` joined its argv into a shell string | `runNpm` spawns `process.execPath` with an argv array and `shell: false`, and resolves the npm CLI per platform | "the release gate resolves the npm CLI script instead of building a shell command", "npm runs with an argument array, so spaces and shell metacharacters stay literal" |
+| the default suite inspected only synthetic wheels | `tests/test_real_wheel.py` (4): builds the wheel from a copy of the build inputs, inspects members, metadata and console scripts, installs it into a virtualenv and runs `grudge` and `grudge-engine` from inside it | the test itself, plus the `scripts/verify_wheel.py` artifact gate (§14.5 row 9) |
+
+### 14.3 Findings from the second review
+
+| ID | Severity | Defect | Status | Evidence |
+|---|---|---|---|---|
+| F1 | High | PreToolUse refused any input over 1 MiB *before evaluating a rule*, so a large call carried a prohibited command past the guard | FIXED — the ceiling is 16 MiB; below it the payload is evaluated; above it PreToolUse denies with a reason. In-process input above the ceiling fails closed only when a block rule can apply to that tool | "a matching call larger than 1 MiB is blocked instead of silently allowed", "input beyond the hard ceiling is denied for PreToolUse and never allowed", "an over-limit payload fails closed only when a block rule could apply" (`phase17-hooks.test.js`) |
+| F2 | High | `mcp__server__tool` normalized to `mcp`, so a rule written for `write_file`, `read_file`, `shell` or `http` covered nothing on MCP servers, which is how most hosts expose filesystem and shell access | FIXED — MCP events carry `tools` (the raw name, `mcp`, and the canonical capability when the name is recognisable); both engines match against it; unknown names are never guessed | the MCP test in `phase25-mapping.test.js`; conformance `28-mcp-capability`, `29-mcp-unknown-tool`, `30-mcp-ordering` agree in Node and Python |
+| F3 | High | The new `hook paths` check required an execute bit on `grudge.mjs`, but the installer writes it `0644` and it is an argument to `node` — so `doctor` failed on every POSIX install, a regression introduced by this remediation | FIXED — a `script`-kind command only has to exist; the execute bit is still required for `PATH`-style binaries | "hook paths accepts the installed runtime without an execute bit" |
+| F4 | High | `uninstall` restored whatever path the backup manifest named, so a hostile checkout could ship a manifest that overwrote files outside the install | FIXED — backup names are validated, and both the target and its backup must resolve inside the install; anything else is skipped and reported | "uninstall refuses a backup manifest that points outside the install" (the victim file stays byte-identical, two warnings) |
+| F5 | Medium | A structurally valid but stale `compiled.json` is undetectable: an old copy keeps enforcing old rules and silently omits new ones | DEFERRED, documented — the file is state, not build output the runtime can date, and guessing staleness could disable a deliberate rule set. `docs/hooks.md` states the limitation and the remedy | the `.grudge/compiled.json` rows and the paragraph following them in `docs/hooks.md` |
+| F6 | Medium | A recorded backup that no longer existed aborted `uninstall` before it removed anything | FIXED — restore failures become warnings and removal continues | "uninstall continues when the recorded backup no longer exists" |
+| F7 | Medium | A Grudge hook registration that resolved to nothing only produced a warning, so `doctor` stayed green on a dead install | FIXED — an unresolvable Grudge command is a failure | "hook paths fails a Grudge command whose target cannot be resolved" |
+| F8 | Medium | PostToolUse persisted tool arguments unbounded: a `Write` copied its whole body into the session log and through the redactor | FIXED — every string is truncated to 4 KiB and every collection to 50 items | "PostToolUse bounds the persisted arguments of a large call" |
+| F9 | Low | The replay module called itself hermetic while patching a fixed list of entry points on one thread | FIXED — the docstrings state it is an accident guard, not a security boundary | module and `_hermetic_guards` docstrings in `grudge/replay/sandbox.py` |
+| F10 | Low | Python `_values` yielded container objects, and only matched a substring when the sink field was itself a string; the Node engine walks leaves | FIXED — both engines walk leaves and match equal-or-containing leaves | conformance `31-taint-nested-objects`, `32-taint-nested-substring` agree in Node and Python |
+| F11 | Medium | `stats.record` read, incremented and wrote the legacy counter without the stats lock, so concurrent callers lost increments | FIXED — the legacy read-modify-write takes `withStatsLock`; the append-only log path is untouched | "concurrent record calls keep every legacy counter increment" (24 writers); the test fails when the lock is removed (measured: 1 failed) |
+| F12 | Low | CI had no `permissions:` block and referenced mutable action tags | FIXED — `permissions: contents: read` in both workflows; `checkout`, `setup-node` and `setup-python` are pinned to commit SHAs | `.github/workflows/grudge-gate.yml`, `.github/workflows/grudge-guard.yml` |
+| F13 | Low | `pyproject.toml` built with setuptools 75.8.0 while the lock installed 84.2.1, so CI tested a different build toolchain from the one it pinned | FIXED — the pins agree, and `release_check` fails when they diverge | "build toolchain drift is reported" (`tests/test_release_check.py`) |
+
+### 14.4 Claims corrected in this report
+
+- **P3-2 was labelled FIXED while it was not.** §7 recorded the unlocked legacy
+  increment as fixed; `stats.record` still performed an unlocked read-modify-write
+  at `d6d26e1`. It is fixed now (F11) and the label follows the evidence.
+- **P2-3 stays FIXED, with a boundary.** Corrupt, wrong-version and oversized
+  rule files warn and are refused; a valid-but-stale file is a different case and
+  is not detected (F5).
+- **§5 described the wheel gate as building "the wheel".** That is true of
+  `scripts/verify_wheel.py`, but until finding G the *default* suite only
+  inspected synthetic wheels; the real artifact is now built and installed on
+  every test run.
+- **§8's totals are a Phase 5 snapshot.** §14.5 supersedes them.
+
+### 14.5 Validation on the final tree
+
+The ambient interpreter on this workstation carries pytest 8.3.4 and rich 13.9.4,
+below `requirements.lock`, so every Python gate was re-run in a virtualenv built
+from the lock (pytest 9.2.0, rich 14.3.4), with `build` and `twine` added for the
+wheel gate exactly as CI's `package` job does.
+
+| # | Gate | Command | Result | Exit |
+|---|---|---|---|---|
+| 1 | Python tests (locked env) | `python -m pytest` | 342 collected: 341 passed, 1 skipped | 0 |
+| 2 | Dependency integrity | `python -m pip check` | `No broken requirements found.` | 0 |
+| 3 | Lint | `python -m ruff check .` | `All checks passed!` | 0 |
+| 4 | Types | `python -m mypy .` | `Success: no issues found in 129 source files` | 0 |
+| 5 | Docs index and links | `python -m scripts.docs_check` | `43 indexed, non-empty, linked documentation files` | 0 |
+| 6 | Release metadata | `python -m scripts.release_check` | `local npm/PyPI metadata and published-version documentation agree` | 0 |
+| 7 | Node suites (from `packages/grudge`) | `npm test` | 173 tests, 173 pass, 0 fail | 0 |
+| 8 | npm artifact gate | `npm run release:verify` | `PASS (30/30 checks)` | 0 |
+| 9 | Wheel artifact gate | `python scripts/verify_wheel.py` | `PASS (8/8 checks)` | 0 |
+| 10 | Shared conformance | `python -m pytest tests/test_guard_conformance.py` and `node --test test/phase15-core.test.js` | 41 fixtures, both engines agree | 0 |
+
+The suite grew from 338 Python and 143 Node tests at Phase 5 to 342 and 173:
+`install-root.test.js` (10), `tests/test_real_wheel.py` (4), the new installer
+cases (43 total), `stats-consistency.test.js` (15, including the `record`
+concurrency case), `release-packaging.test.js` (9) and `test_release_check.py`
+(10).
+
+### 14.6 What remains
+
+F5 is the only finding from either review that is not fixed, and it is a
+documented limitation rather than an open defect. Everything else that is still
+undone is process, not code: pushing these commits, observing CI on them, and
+publishing a corrected version (§10 rows 1–3).
