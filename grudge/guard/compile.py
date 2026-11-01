@@ -92,8 +92,14 @@ def _under(path: str, root: str) -> bool:
 
 
 def _values(value: Any) -> Iterable[Any]:
+    """Yield every leaf under ``value``.
+
+    Containers are traversed, never compared: the Node engine walks the same
+    leaves, so a tainted object is matched by the secret string inside it, not
+    by structural equality of two dicts.
+    """
+
     if isinstance(value, Mapping):
-        yield value
         for child in value.values():
             yield from _values(child)
     elif isinstance(value, list):
@@ -112,6 +118,15 @@ def _event_value(event: Mapping[str, Any], field: str | None) -> Any:
     return event.get(field)
 
 
+def _tool_matches(event: Mapping[str, Any], name: str) -> bool:
+    """True when the event is this tool, including MCP capability aliases."""
+
+    if event.get("tool") == name:
+        return True
+    tools = event.get("tools")
+    return isinstance(tools, list) and name in tools
+
+
 def _rule_violations(
     rule: Mapping[str, Any], events: list[Mapping[str, Any]]
 ) -> list[int]:
@@ -124,16 +139,16 @@ def _rule_violations(
         return [
             index
             for index, event in enumerate(events)
-            if event.get("tool") == tool and _matches(event.get("args", {}), match)
+            if _tool_matches(event, tool) and _matches(event.get("args", {}), match)
         ]
     if kind == "ordering":
         ordering = rule["ordering"]
         seen_before = False
         violations: list[int] = []
         for index, event in enumerate(events):
-            if event.get("tool") == ordering["before"]:
+            if _tool_matches(event, ordering["before"]):
                 seen_before = True
-            elif event.get("tool") == ordering["after"] and not seen_before:
+            elif _tool_matches(event, ordering["after"]) and not seen_before:
                 violations.append(index)
         return violations
     if kind == "taint_flow":
@@ -141,21 +156,28 @@ def _rule_violations(
         sources: list[Any] = []
         violations = []
         for index, event in enumerate(events):
-            if event.get("tool") == taint["source"] and _matches(
+            if _tool_matches(event, taint["source"]) and _matches(
                 event.get("args", {}), taint.get("sourceMatch", {})
             ):
                 sources.extend(_values(_event_value(event, taint.get("sourceField"))))
-            if event.get("tool") == taint["sink"]:
-                sink_value = _event_value(event, taint.get("sinkField"))
+            if _tool_matches(event, taint["sink"]):
+                sink_values = list(_values(_event_value(event, taint.get("sinkField"))))
+                # Mirror the Node engine exactly: a source matches a leaf when
+                # they are equal, or when both are strings and the leaf contains
+                # the source. Comparing only whole values missed taint inside a
+                # nested object, which is the shape most HTTP bodies have.
                 if any(
-                    source != ""
-                    and source is not None
-                    and source in list(_values(sink_value))
-                    for source in sources
-                ) or any(
-                    isinstance(source, str)
-                    and isinstance(sink_value, str)
-                    and source in sink_value
+                    source is not None
+                    and source != ""
+                    and any(
+                        source == candidate
+                        or (
+                            isinstance(source, str)
+                            and isinstance(candidate, str)
+                            and source in candidate
+                        )
+                        for candidate in sink_values
+                    )
                     for source in sources
                 ):
                     violations.append(index)

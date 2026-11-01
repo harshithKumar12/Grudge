@@ -9,7 +9,9 @@ import { readTail } from "../core/session.js";
 import { appendEvent, claimHookEvent } from "../core/stats.js";
 
 const MAX_REASON = 400;
-const MAX_INPUT = 1024 * 1024;
+// Mirrors the input ceiling in commands/hook.js. The CLI refuses anything
+// larger before parsing, so this path only guards in-process callers.
+const MAX_INPUT = 16 * 1024 * 1024;
 // Accounting is best effort and bounded: a slow disk may drop a counter, but it
 // can never delay or change an enforcement decision.
 const ACCOUNTING_BUDGET_MS = 1000;
@@ -137,14 +139,21 @@ async function account(root, payload, hit) {
   await appendEvent(root, { type: "catch", outcome: "blocked", scarId: hit.rule.id, sessionId, dedupeKey, injectedChars: serialized.length + 1 });
 }
 
+/** Every tool a rule can read, so an undecidable call can be matched safely. */
+function ruleTools(rule) {
+  return [rule.tool, rule.ordering?.before, rule.ordering?.after, rule.taint?.source, rule.taint?.sink].filter(Boolean);
+}
+
 /**
  * Enforce PreToolUse.
  *
  * - A matching `block` rule always exits 2: the rule check is never raced.
  * - State reads are bounded (compiled file size, session bytes and events), so
  *   runtime stays bounded without a timeout that could allow a match.
- * - Corrupt state, malformed input and internal errors allow the call and say
- *   so on stderr; a timeout can no longer be one of those paths.
+ * - Only genuinely undecidable input fails open: malformed state, malformed
+ *   payload, and internal errors allow the call and say so on stderr. A payload
+ *   too large to evaluate is denied when any block rule could apply, because the
+ *   prohibited call may be inside the part that could not be read.
  */
 export async function preToolUse(payload = {}, options = {}) {
   const runStarted = performance.now();
@@ -155,10 +164,18 @@ export async function preToolUse(payload = {}, options = {}) {
     const config = await effectiveConfig(roots, root, warnings);
     if (process.env.GRUDGE_DISABLE === "1") return report(allow(), warnings);
     if (!config.projectActive && !config.globalActive) return report(allow(), warnings);
-    if (JSON.stringify(payload).length > MAX_INPUT) {
-      return report(allow(), [...warnings, "grudge: oversized hook input; allowed (fail-open)"]);
-    }
     const state = await loadState(roots, root, config, payload, warnings);
+    const maxInput = Number(options.maxInput) > 0 ? Number(options.maxInput) : MAX_INPUT;
+    if (Buffer.byteLength(JSON.stringify(payload), "utf8") > maxInput) {
+      const target = normalize(payload).tool;
+      const applicable = state.rules.some((rule) => rule.mode === "block" && ruleTools(rule).includes(target));
+      if (applicable) {
+        const reason = `grudge: hook input exceeds ${maxInput} bytes; a block rule applies to '${target}'; blocked (fail-closed)`;
+        const output = { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: reason }, blocked: true, reason };
+        return report({ code: 2, stdout: `${JSON.stringify(output)}\n`, stderr: `${reason}\n`, blocked: true, reason }, warnings);
+      }
+      return report(allow(), [...warnings, `grudge: hook input exceeds ${maxInput} bytes; no block rule applies to '${target}'; allowed`]);
+    }
     const hit = decide(state.rules, state.prior, payload);
     const result = decision(hit);
     if (state.rules.length) await settle(account(root, payload, hit), ACCOUNTING_BUDGET_MS);

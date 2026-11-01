@@ -1,11 +1,12 @@
 // OWNER: lane-c
-import { access, readFile } from "node:fs/promises";
+import { access, readFile, stat } from "node:fs/promises";
 import { createHash } from "node:crypto";
-import { dirname, join, resolve, isAbsolute } from "node:path";
+import { join, resolve, isAbsolute } from "node:path";
 import { homedir } from "node:os";
 import { grudgeHookEvents, isGrudgeHookCommand, isGrudgeStatusLine, parseJson } from "../installer/json-merge.js";
 import { missingStatusLineScripts } from "../installer/statusline-paths.js";
 import { hasManagedBlock, managedBlock } from "../installer/managed-block.js";
+import { resolveInstallRoot, repositoryRoot } from "../installer/install-root.js";
 import { measureOutputs as measureBudgetOutputs } from "../core/budget.js";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -23,13 +24,15 @@ export async function doctor(options = {}) {
   // Claude Code loads `<root>/.claude/settings.json` from the directory the
   // session starts in only; it never walks up. `doctor` still has to inspect the
   // install when it is run from a subdirectory, so resolve the install root
-  // upward instead of reporting an empty directory as broken.
-  const root = await resolveInstallRoot(launchDir, home);
+  // upward instead of reporting an empty directory as broken. The walk stops at
+  // the repository boundary, so a nested repository never inherits an enclosing
+  // project's install.
+  const { root, kind: installKind } = await resolveInstallRoot({ launchDir, home });
   const config = await readJson(join(root, ".grudge/config.json"));
   const configPath = join(root, ".grudge/config.json");
   const runtimePath = join(root, ".grudge/bin/grudge.mjs");
   const checks = [];
-  const declaredScope = config?.scope ?? (root === home ? "global" : "repo");
+  const declaredScope = config?.scope ?? (installKind === "project" ? "repo" : "global");
   // Project state (rules, .gitignore, CLAUDE.md) belongs to the project the
   // session runs in. A user-scope install has no project of its own, so keep
   // inspecting the launch directory there.
@@ -112,22 +115,26 @@ export async function doctor(options = {}) {
   // session directory, so a subdirectory cannot find the module and the host
   // treats the error as "allowed". Say it loudly instead of trusting the file.
   const badHookPaths = [];
+  const unverifiedHookCommands = [];
   for (const command of hookCommands) {
-    const script = grudgeCommandScript(command);
-    if (!script) continue;
-    if (!isAbsolute(script)) badHookPaths.push(`${command} (relative path)`);
-    else if (!(await fileExists(script))) badHookPaths.push(`${command} (script missing)`);
+    const verdict = await checkHookCommand(command, { root, pathEnv: options.pathEnv });
+    if (verdict.problem) badHookPaths.push(`${command} (${verdict.problem})`);
+    else if (verdict.unverified) unverifiedHookCommands.push(command);
   }
+  const hookPathsDetail = badHookPaths.length
+    ? `re-run grudge setup: ${badHookPaths[0]}`
+    : hookCommands.length
+      ? unverifiedHookCommands.length
+        ? `absolute and present; ${unverifiedHookCommands.length} command(s) cannot be verified: ${unverifiedHookCommands[0]}`
+        : "absolute and present"
+      : "not configured";
   checks.push({
     name: "hook paths",
     ok: badHookPaths.length === 0,
-    detail: badHookPaths.length
-      ? `re-run grudge setup: ${badHookPaths[0]}`
-      : hookCommands.length
-        ? "absolute and present"
-        : "not configured",
+    warning: badHookPaths.length === 0 && unverifiedHookCommands.length > 0,
+    detail: hookPathsDetail,
   });
-  checks.push(await launchDirectoryCheck({ launchDir, installRoot: root, home, projectHooks: projectHookCount, userHooks: userHookCount, projectSources }));
+  checks.push(await launchDirectoryCheck({ launchDir, installRoot: root, home, kind: installKind, projectHooks: projectHookCount, userHooks: userHookCount, projectSources }));
   const warnings = [];
   if (userHookCount > 0 && projectHookCount > 0) {
     warnings.push("Grudge hooks are installed at both user and project scope; duplicate invocations are deduplicated by session and event.");
@@ -184,7 +191,7 @@ export async function doctor(options = {}) {
     command: "grudge verify",
     detail: "not proven by file checks; run `grudge verify` to prove blocking works",
   };
-  const result = { ok: checks.every((check) => check.ok), root, launchDirectory: launchDir, checks, budgetMeasurements, warnings, enforcement };
+  const result = { ok: checks.every((check) => check.ok), root, installKind, launchDirectory: launchDir, checks, budgetMeasurements, warnings, enforcement };
   if (options.print !== false) {
     for (const check of checks) process.stdout.write(`${check.warning ? "⚠" : check.ok ? "✓" : "✗"} ${check.name}: ${check.detail}\n`);
     // File checks prove what is installed, never that a hook stops a call.
@@ -236,29 +243,6 @@ async function exists(path) {
 }
 
 /**
- * Find the directory Grudge is installed in, starting at the launch directory.
- *
- * Claude Code loads a project's `.claude/settings.json` only from the directory
- * the session started in, so a `doctor` run from `project/nested` must still
- * inspect the install at `project`. The walk stops at the home directory:
- * `~/.grudge` is a user-scope install whose settings load from anywhere, and
- * nothing above it belongs to this user's projects.
- */
-async function resolveInstallRoot(launchDir, home) {
-  let current = launchDir;
-  while (true) {
-    if (await fileExists(join(current, ".grudge/config.json"))) return current;
-    if (current === home) break;
-    const parent = dirname(current);
-    if (parent === current) break;
-    current = parent;
-  }
-  // No project install on the way up: a user-scope install is still usable from
-  // any directory, and home is where the legacy checks expect it.
-  return home;
-}
-
-/**
  * State the one thing file checks cannot observe: whether the host will read
  * these settings at all. Absolute hook paths are useless when the command is
  * never started, so fail loudly instead of reporting a healthy install.
@@ -270,7 +254,16 @@ async function resolveInstallRoot(launchDir, home) {
  * install that the host does load would be a false alarm, so the declared file
  * decides the verdict and the remedy names that same file.
  */
-async function launchDirectoryCheck({ launchDir, installRoot, home, projectHooks, userHooks, projectSources }) {
+async function launchDirectoryCheck({ launchDir, installRoot, home, kind, projectHooks, userHooks, projectSources }) {
+  // Nothing to launch: name the missing install instead of comparing two
+  // directories that both happen to be the launch directory.
+  if (kind === "none") {
+    return {
+      name: "launch directory",
+      ok: false,
+      detail: `no Grudge install at or above ${launchDir}; run grudge setup here (or grudge setup --scope global to guard every directory)`,
+    };
+  }
   if (launchDir === installRoot) {
     return { name: "launch directory", ok: true, detail: `session starts at the installed root (${installRoot})` };
   }
@@ -301,24 +294,6 @@ async function launchDirectoryCheck({ launchDir, installRoot, home, projectHooks
     };
   }
   return { name: "launch directory", ok: true, detail: `session starts at ${launchDir}; no Grudge hooks are registered` };
-}
-
-/**
- * Nearest directory at or above `start` that carries a repository marker.
- * Claude Code anchors `.claude/settings.local.json` here, so two directories
- * share local-scope settings exactly when they share this root.
- */
-async function repositoryRoot(start, home) {
-  let current = start;
-  while (true) {
-    for (const marker of [".git", ".hg", ".svn"]) {
-      if (await exists(join(current, marker))) return current;
-    }
-    if (current === home) return null;
-    const parent = dirname(current);
-    if (parent === current) return null;
-    current = parent;
-  }
 }
 
 function quotePath(value) {
@@ -375,12 +350,103 @@ function grudgeHookCommands(settings) {
   return [...new Set(commands)];
 }
 
-/** Extract the runtime script path from a registered Grudge hook command. */
-function grudgeCommandScript(command) {
-  for (const token of splitCommand(command)) {
-    if (token.endsWith("grudge.mjs")) return token;
+/** Command names Grudge installs as executables or shims. */
+const GRUDGE_COMMAND_NAMES = new Set(["grudge", "grudge-cli"]);
+
+/** Package runners that resolve a command at run time, not from PATH. */
+const PACKAGE_RUNNERS = new Set(["npx", "bunx", "pnpm", "yarn"]);
+
+/** Drop a Windows executable suffix so `grudge.cmd` and `grudge` compare equal. */
+function stripExecutableSuffix(name) {
+  return String(name).replace(/\.(?:cmd|exe|bat|ps1)$/i, "");
+}
+
+/**
+ * Classify one registered hook command.
+ *
+ * Only two registrations are Grudge hooks whose path can be checked: a path to
+ * the runtime (`grudge.mjs`) and an installed command or shim (`grudge`,
+ * `grudge-cli`, `.../.bin/grudge`). A command that matches the Grudge-hook
+ * pattern but has neither is reported as unverifiable instead of skipped: a
+ * registration whose path is never resolved is how a broken install passes a
+ * file-level check.
+ */
+function classifyHookCommand(command) {
+  const tokens = splitCommand(command);
+  for (const token of tokens) {
+    if (/(?:^|[\\/])grudge\.mjs$/i.test(token)) return { kind: "script", token };
+  }
+  for (const token of tokens) {
+    const base = stripExecutableSuffix(String(token).split(/[\\/]/).pop() ?? "");
+    if (GRUDGE_COMMAND_NAMES.has(base.toLowerCase())) return { kind: "bin", token };
+  }
+  return { kind: "unresolved", token: "" };
+}
+
+async function isFile(path) {
+  try {
+    return (await stat(path)).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/** True when `path` is a file this platform could execute. */
+async function isExecutable(path, platform = process.platform) {
+  try {
+    const stats = await stat(path);
+    if (!stats.isFile()) return false;
+    // Windows resolves executability from the extension, which classifyHookCommand
+    // already checked; POSIX needs the execute bit.
+    return platform === "win32" ? true : (stats.mode & 0o111) !== 0;
+  } catch {
+    return false;
+  }
+}
+
+/** Resolve a bare command name the way the shell will, using the same PATH. */
+async function resolveOnPath(name, { pathEnv = process.env.PATH ?? process.env.Path ?? "", platform = process.platform, pathExt = process.env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD" } = {}) {
+  const separator = platform === "win32" ? ";" : ":";
+  const extensions = platform === "win32"
+    ? ["", ...String(pathExt).split(";").filter(Boolean).map((extension) => extension.toLowerCase())]
+    : [""];
+  for (const directory of String(pathEnv).split(separator)) {
+    if (!directory) continue;
+    for (const extension of extensions) {
+      const full = join(directory, `${name}${extension}`);
+      if (await isExecutable(full, platform)) return full;
+    }
   }
   return null;
+}
+
+/**
+ * Verify one hook command. A `problem` fails the check; `unverified` only
+ * warns, because the command may well work but its target is chosen by a
+ * package runner at run time.
+ *
+ * Grudge registers the runtime as an *argument* to `node`, so the script does
+ * not need an execute bit: requiring one failed every POSIX install, where the
+ * script is written 0644. A command Grudge can attribute to itself but cannot
+ * resolve is a failure, not a warning - that is the silent "healthy but dead"
+ * report this check exists to prevent.
+ */
+async function checkHookCommand(command, { pathEnv } = {}) {
+  const first = stripExecutableSuffix(String(splitCommand(command)[0] ?? "").split(/[\\/]/).pop() ?? "");
+  if (PACKAGE_RUNNERS.has(first.toLowerCase())) return { unverified: true };
+  const classified = classifyHookCommand(command);
+  if (classified.kind === "unresolved") return { problem: "cannot resolve a Grudge command" };
+  const pathLike = /[\\/]/.test(classified.token);
+  if (!pathLike) {
+    const resolved = await resolveOnPath(classified.token, { pathEnv });
+    return resolved ? { resolved } : { problem: "not found on PATH" };
+  }
+  if (!isAbsolute(classified.token)) return { problem: "relative path" };
+  if (classified.kind === "script") {
+    return (await isFile(classified.token)) ? { resolved: classified.token } : { problem: "script missing" };
+  }
+  if (await isExecutable(classified.token)) return { resolved: classified.token };
+  return { problem: "command missing" };
 }
 
 /** True when `path` exists (file or directory). */

@@ -65,3 +65,39 @@ test("a rule for each canonical tool blocks the matching Claude Code call", asyn
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("MCP capabilities are enforced by canonical rules and stay attributable to mcp", async () => {
+  // MCP is how hosts expose filesystem and shell access. A `mcp__server__tool`
+  // name never equals `write_file`, so without a capability alias a rule
+  // written for the documented vocabulary silently covered nothing.
+  const root = await mkdtemp(join(tmpdir(), "grudge-map25-mcp-"));
+  const rules = [
+    { id: "mcp-write", mode: "block", kind: "call_shape", tool: "write_file", match: { path: { $contains: "NEEDLE_MCP" } }, english: "Never write that path.", createdFrom: "test" },
+    { id: "mcp-any", mode: "block", kind: "call_shape", tool: "mcp", match: { server: "github" }, english: "Never call the github server.", createdFrom: "test" },
+  ];
+  await writeJsonAtomic(join(root, ".grudge", "compiled.json"), { version: 1, rules });
+  await writeJsonAtomic(join(root, ".grudge", "config.json"), {});
+  try {
+    const capability = await preToolUse({ cwd: root, session_id: "mcp-1", tool_name: "mcp__filesystem__write_file", tool_input: { path: "a/NEEDLE_MCP.txt", content: "x" } });
+    assert.equal(capability.code, 2);
+    assert.equal(capability.scarId, "mcp-write");
+
+    const shaped = normalize({ tool: "mcp__filesystem__write_file", args: { path: "a.txt" } });
+    assert.equal(shaped.tool, "mcp");
+    assert.deepEqual(shaped.tools, ["mcp", "write_file", "mcp__filesystem__write_file"]);
+    assert.equal(shaped.args.path, "a.txt");
+    assert.equal(shaped.args.server, "filesystem");
+
+    // A rule written for `mcp` still matches every MCP tool...
+    const anyMcp = await preToolUse({ cwd: root, session_id: "mcp-2", tool_name: "mcp__github__create_issue", tool_input: {} });
+    assert.equal(anyMcp.code, 2);
+    assert.equal(anyMcp.scarId, "mcp-any");
+
+    // ...and an unknown MCP tool is never guessed into a capability.
+    assert.deepEqual(normalize({ tool: "mcp__db__query", args: {} }).tools, ["mcp", "mcp__db__query"]);
+    const unknown = await preToolUse({ cwd: root, session_id: "mcp-3", tool_name: "mcp__db__query", tool_input: { path: "a/NEEDLE_MCP.txt" } });
+    assert.equal(unknown.code, 0);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

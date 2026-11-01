@@ -4,6 +4,8 @@ import { join, resolve } from "node:path";
 import { removeManagedBlock } from "../installer/managed-block.js";
 import { parseJson } from "../installer/json-merge.js";
 import { restoreBackup } from "../installer/backup.js";
+import { findProjectInstallRoot } from "../installer/install-root.js";
+import { homedir } from "node:os";
 
 // Grudge owns these names inside `.grudge`; everything else there is the
 // user's and must survive an uninstall.
@@ -39,12 +41,35 @@ async function removeManagedState(statePath) {
 
 /** Remove only managed Grudge state and restore the latest backup when available. */
 export async function uninstall(options = {}) {
-  const root = resolve(options.cwd ?? process.cwd());
+  const launchDir = resolve(options.cwd ?? process.cwd());
+  const home = resolve(options.home ?? homedir());
+  // Resolve the install the same way `doctor` does, but never past the
+  // repository boundary: uninstalling from `repo/src` must act on `repo`, while
+  // uninstalling from an unrelated directory must not reach an install above it.
+  const root = await findProjectInstallRoot({ launchDir, home });
+  if (!root) {
+    const reason = `no Grudge install at or above ${launchDir} (searched up to the repository boundary); nothing was removed`;
+    if (options.print !== false) process.stdout.write(`${reason}\n`);
+    return { ok: false, found: false, root: launchDir, removed: [], restored: [], preserved: [], reason };
+  }
   const configPath = join(root, ".grudge/config.json");
   const config = await readJson(configPath);
   const removed = [];
   const restored = [];
-  if (config?.lastBackup) restored.push(...await restoreBackup(root, config.lastBackup));
+  const warnings = [];
+  if (config?.lastBackup) {
+    // A missing or hand-edited backup must not turn the escape hatch into a
+    // crash: report it, then keep removing the managed state.
+    try {
+      const entries = await restoreBackup(root, config.lastBackup);
+      restored.push(...entries.filter((entry) => entry.action !== "skipped"));
+      for (const entry of entries.filter((item) => item.action === "skipped")) {
+        warnings.push(`did not restore ${entry.file}: ${entry.reason}`);
+      }
+    } catch (error) {
+      warnings.push(`could not restore backup '${config.lastBackup}': ${error?.code ?? error?.message ?? error}; continuing with removal`);
+    }
+  }
   for (const path of [join(root, "AGENTS.md"), join(root, "CLAUDE.md"), join(root, "GEMINI.md"), join(root, ".windsurfrules"), join(root, ".github/copilot-instructions.md")]) {
     const text = await readOptional(path);
     if (text === null) continue;
@@ -63,11 +88,12 @@ export async function uninstall(options = {}) {
   } else if (options.removeRuntime !== false) {
     try { await unlink(join(root, ".grudge/bin/grudge.mjs")); removed.push(join(root, ".grudge/bin/grudge.mjs")); } catch (error) { if (error.code !== "ENOENT") throw error; }
   }
-  const result = { root, removed, restored, preserved };
+  const result = { ok: true, found: true, root, removed, restored, preserved, warnings };
   if (options.print !== false) {
     for (const path of removed) process.stdout.write(`removed ${path}\n`);
     // Never delete silently: say what stayed and why.
     for (const path of preserved) process.stdout.write(`preserved ${path} (not created by Grudge)\n`);
+    for (const warning of warnings) process.stdout.write(`warning: ${warning}\n`);
   }
   return result;
 }

@@ -77,11 +77,17 @@ function commandItems(command, result) {
       ...(!result.runtimeInstalled ? [{ status: "warning", label: "Runtime", detail: "not installed" }] : []),
     ];
   }
-  if (command === "uninstall") return [
-    { status: "ok", label: "root", detail: result.root },
-    { status: "ok", label: "Restored", detail: `${result.restored?.length ?? 0} files` },
-    { status: result.removed?.length ? "ok" : "skipped", label: "Removed", detail: `${result.removed?.length ?? 0} paths` },
-  ];
+  if (command === "uninstall") {
+    if (result?.found === false) return [
+      { status: "skipped", label: "Install", detail: result.reason ?? "no Grudge install found" },
+    ];
+    return [
+      { status: "ok", label: "root", detail: result.root },
+      { status: "ok", label: "Restored", detail: `${result.restored?.length ?? 0} files` },
+      { status: result.removed?.length ? "ok" : "skipped", label: "Removed", detail: `${result.removed?.length ?? 0} paths` },
+      ...(result.warnings ?? []).map((warning) => ({ status: "warning", label: "Warning", detail: warning })),
+    ];
+  }
   if (command === "stats") return [
     { status: "ok", label: "Blocks", detail: String(result.blocks ?? 0) },
     { status: "ok", label: "Warnings", detail: String(result.warnings ?? 0) },

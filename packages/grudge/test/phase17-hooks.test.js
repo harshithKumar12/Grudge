@@ -10,7 +10,7 @@ import { preToolUse } from "../src/hooks/pre-tool-use.js";
 import { sessionStart } from "../src/hooks/session-start.js";
 import { userPromptSubmit } from "../src/hooks/user-prompt-submit.js";
 import { stop } from "../src/hooks/stop.js";
-import { runHook } from "../src/commands/hook.js";
+import { runHook, MAX_HOOK_INPUT } from "../src/commands/hook.js";
 
 async function fixtureRoot(rules, config = {}) {
   const root = await mkdtemp(join(tmpdir(), "grudge-hooks-"));
@@ -97,5 +97,50 @@ test("hook timing p50 and p95 stay below 150ms in-process", async () => {
     }
     times.sort((a, b) => a - b);
     assert.ok(times[Math.floor(times.length * 0.95)] < 150, `p95=${times[Math.floor(times.length * 0.95)].toFixed(2)}ms`);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+const shellRule = { id: "no-secret", mode: "block", kind: "call_shape", tool: "shell", match: { command: { $contains: "GRUDGE_SECRET" } }, ordering: { before: "", after: "" }, taint: null, english: "Never run that command.", createdFrom: "test" };
+
+test("a matching call larger than 1 MiB is blocked instead of silently allowed", async () => {
+  // The old ceiling refused anything over 1 MiB before evaluating any rule, so
+  // a large Write or heredoc carried the prohibited call straight past the
+  // guard. The payload must be evaluated, not skipped.
+  const root = await fixtureRoot([shellRule]);
+  try {
+    const command = `echo GRUDGE_SECRET ${"x".repeat(1_500_000)}`;
+    const payload = JSON.stringify({ cwd: root, session_id: "big", tool_name: "Bash", tool_input: { command } });
+    assert.ok(payload.length > 1024 * 1024);
+
+    const result = await runHook("PreToolUse", payload);
+
+    assert.equal(result.code, 2);
+    assert.equal(result.blocked, true);
+    assert.match(result.stderr, /grudge: blocked by no-secret/);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("input beyond the hard ceiling is denied for PreToolUse and never allowed", async () => {
+  const result = await runHook("PreToolUse", "x".repeat(MAX_HOOK_INPUT + 1));
+
+  assert.equal(result.code, 2);
+  assert.equal(result.blocked, true);
+  assert.match(result.stderr, /cannot be evaluated; blocked \(fail-closed\)/);
+  // Other events cannot deny a call, so they keep the host running and say so.
+  const stop = await runHook("Stop", "x".repeat(MAX_HOOK_INPUT + 1));
+  assert.equal(stop.code, 0);
+  assert.match(stop.stderr, /oversized hook input; allowed \(fail-open\)/);
+});
+
+test("an over-limit payload fails closed only when a block rule could apply", async () => {
+  const root = await fixtureRoot([shellRule]);
+  try {
+    const blocked = await preToolUse({ cwd: root, session_id: "s1", tool_name: "Bash", tool_input: { command: "echo hi" } }, { maxInput: 64 });
+    assert.equal(blocked.code, 2);
+    assert.match(blocked.stderr, /a block rule applies to 'shell'; blocked \(fail-closed\)/);
+
+    const allowed = await preToolUse({ cwd: root, session_id: "s2", tool_name: "Read", tool_input: { file_path: "README.md" } }, { maxInput: 64 });
+    assert.equal(allowed.code, 0);
+    assert.match(allowed.stderr, /no block rule applies to 'read_file'; allowed/);
   } finally { await rm(root, { recursive: true, force: true }); }
 });

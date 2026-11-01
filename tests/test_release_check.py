@@ -15,6 +15,7 @@ METADATA = (
     "packages/grudge/LICENSE",
     "packages/grudge/scripts/verify-release.mjs",
     "pyproject.toml",
+    "requirements.lock",
     "CHANGELOG.md",
     "README.md",
 )
@@ -120,6 +121,21 @@ def test_missing_packed_directory_is_reported(tmp_path: Path) -> None:
 
     assert (
         "packages/grudge/package.json files is missing dist" in check_release(root)
+    )
+
+
+def test_build_toolchain_drift_is_reported(tmp_path: Path) -> None:
+    """The wheel CI tests must come from the same setuptools the lock installs."""
+    root = _copy_metadata(tmp_path)
+    (root / "requirements.lock").write_text(
+        "setuptools==0.0.1\npytest==9.2.0\n", encoding="utf-8"
+    )
+
+    errors = check_release(root)
+    assert any(
+        error.startswith("pyproject.toml builds with setuptools ")
+        and "requirements.lock installs 0.0.1" in error
+        for error in errors
     )
 
 

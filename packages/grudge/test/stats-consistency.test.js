@@ -6,7 +6,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { appendEvent, readEvents, reportSinceLast } from "../src/core/stats.js";
+import { appendEvent, readEvents, readStats, record, reportSinceLast } from "../src/core/stats.js";
 import { writeJsonAtomic } from "../src/core/store.js";
 import { stats } from "../src/commands/stats.js";
 import { report } from "../src/commands/report.js";
@@ -341,5 +341,20 @@ test("legacy stop counters stay readable when no events were ever appended", asy
     assert.equal(counters.blocks, 1);
     assert.equal(counters.stops, 5);
     assert.equal(counters.lastStopAt, "2026-10-01T00:00:00.000Z");
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("concurrent record calls keep every legacy counter increment", async () => {
+  // `record` still maintains the Phase 20 stats.json counter, which is a
+  // read-modify-write. Unlocked, N concurrent callers all read the same value
+  // and write it back plus one, so blocks undercounts and stats disagrees with
+  // the append-only log.
+  const root = await scratch();
+  try {
+    await Promise.all(Array.from({ length: 24 }, () => record(root, "blocks")));
+    const counters = await readStats(root);
+    const events = await readEvents(root);
+    assert.equal(counters.blocks, 24);
+    assert.equal(events.filter((event) => event.outcome === "blocked").length, 24);
   } finally { await rm(root, { recursive: true, force: true }); }
 });

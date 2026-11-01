@@ -19,7 +19,7 @@
  */
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { realpathSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
@@ -34,7 +34,6 @@ const REQUIRED_TARBALL_FILES = ["package.json", "README.md", "LICENSE", "dist/gr
 const DEV_ONLY_TARBALL = /^(?:test|scripts|node_modules|coverage|\.github|\.claude|\.grudge)\//;
 
 const checks = [];
-const quote = (value) => `"${String(value).replaceAll('"', '\\"')}"`;
 
 function record(name, ok, detail = "") {
   checks.push({ name, ok });
@@ -52,10 +51,32 @@ function run(command, args, { cwd = packageRoot, input, shell = false } = {}) {
   return { code: result.status ?? 1, stdout: result.stdout ?? "", stderr: result.stderr ?? "" };
 }
 
-/** npm is a .cmd shim on Windows, which needs a shell to start. */
-function npm(args, options = {}) {
-  const line = [process.platform === "win32" ? "npm.cmd" : "npm", ...args.map(quote)].join(" ");
-  return run(line, [], { ...options, shell: true, cwd: options.cwd ?? packageRoot });
+/**
+ * Candidate npm CLI entry scripts, most reliable first.
+ *
+ * `npm pack` / `npm install` must run without a shell. On Windows `npm` is a
+ * `.cmd` shim, and handing a concatenated command string to `cmd.exe` is where
+ * quoting bugs (and injection, if an argument ever stops being a constant)
+ * live. The CLI JavaScript entry is the program the shim starts; running it
+ * with `process.execPath` keeps every argument a separate argv element.
+ */
+export function npmCliCandidates({ execPath = process.execPath, env = process.env, platform = process.platform } = {}) {
+  const candidates = [];
+  const execpath = env.npm_execpath;
+  if (execpath && /\.(?:c|m)?js$/i.test(execpath)) candidates.push(execpath);
+  const nodeDir = dirname(execPath);
+  candidates.push(join(nodeDir, "node_modules", "npm", "bin", "npm-cli.js"));
+  if (platform !== "win32") candidates.push(join(nodeDir, "..", "lib", "node_modules", "npm", "bin", "npm-cli.js"));
+  return [...new Set(candidates.map((value) => resolve(value)))];
+}
+
+/** Run npm without a shell, as a node script with an argument array. */
+export function runNpm(args, options = {}) {
+  const cli = options.cli ?? npmCliCandidates().find((candidate) => existsSync(candidate));
+  if (!cli) {
+    throw new Error(`cannot locate the npm CLI next to ${process.execPath}; run this gate with npm run release:verify`);
+  }
+  return run(process.execPath, [cli, ...args], { cwd: options.cwd ?? packageRoot });
 }
 
 function parsePackJson(stdout) {
@@ -138,7 +159,7 @@ async function main() {
     const build = run(process.execPath, [join(packageRoot, "scripts", "build.mjs")]);
     if (!record("build", build.code === 0, build.stderr.trim())) return finish();
 
-    const packed = npm(["pack", "--json", "--pack-destination", work]);
+    const packed = runNpm(["pack", "--json", "--pack-destination", work]);
     if (!record("pack", packed.code === 0, packed.stderr.trim().split("\n")[0])) return finish();
     const info = parsePackJson(packed.stdout);
     // An unexpected `npm pack --json` shape must fail the gate, not throw a
@@ -166,7 +187,7 @@ async function main() {
     const consumer = join(work, "consumer");
     await mkdir(consumer, { recursive: true });
     await writeFile(join(consumer, "package.json"), JSON.stringify({ name: "grudge-release-consumer", private: true, version: "0.0.0" }, null, 2));
-    const install = npm(["install", tarball, "--no-audit", "--no-fund", "--no-save"], { cwd: consumer });
+    const install = runNpm(["install", tarball, "--no-audit", "--no-fund", "--no-save"], { cwd: consumer });
     if (!record("install tarball into a clean directory", install.code === 0, install.stderr.trim().split("\n")[0])) return finish();
 
     const runtime = join(consumer, "node_modules", "grudge-cli", "dist", "grudge.mjs");

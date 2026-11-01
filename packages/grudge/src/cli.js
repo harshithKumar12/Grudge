@@ -175,6 +175,8 @@ export async function dispatch(parsed, { stdin = readStdin } = {}) {
   if (command === "scars" && positional[0] === "show" && !result?.pending && !result?.scar) return 1;
   if (command === "propose" && result?.error) return 1;
   if (command === "accept" && result?.error) return 1;
+  // A no-op uninstall must not look like success: say so with a non-zero code.
+  if (command === "uninstall" && result?.ok === false) return 1;
   if (command === "doctor" && result?.ok === false) {
     const notInstalled = !result.checks?.find((check) => check.name === "config")?.ok
       && !result.checks?.find((check) => check.name === "runtime")?.ok;
