@@ -46,11 +46,31 @@ export async function hook(event, payload = {}, options = {}) {
   }
 }
 
-/** Run a hook from stdin for command-line adapters. */
+/**
+ * Absolute ceiling on hook input. Below it the payload is evaluated in full;
+ * above it the input cannot be parsed safely at all. Either way a PreToolUse
+ * call is never silently allowed: an oversized call is denied with a reason,
+ * because the offending invocation may be inside the part that was dropped.
+ */
+export const MAX_HOOK_INPUT = 16 * 1024 * 1024;
+
 export async function runHook(event, input = "", options = {}) {
+  const key = aliases[event] || event;
+  const size = Buffer.byteLength(input, "utf8");
+  if (size > MAX_HOOK_INPUT) {
+    const reason = `grudge: hook input is ${size} bytes, over the ${MAX_HOOK_INPUT}-byte limit and cannot be evaluated; blocked (fail-closed)`;
+    if (key === "pre-tool-use") {
+      const output = {
+        hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: reason },
+        blocked: true,
+        reason,
+      };
+      return { code: 2, stdout: `${JSON.stringify(output)}\n`, stderr: `${reason}\n`, blocked: true, reason };
+    }
+    return { code: 0, stdout: "", stderr: `grudge: oversized hook input; allowed (fail-open)\n` };
+  }
   let payload = {};
   try {
-    if (input.length > 1024 * 1024) return { code: 0, stdout: "", stderr: "grudge: oversized hook input; allowed (fail-open)\n" };
     payload = input.trim() ? JSON.parse(input) : {};
     if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new Error("hook input must be an object");
   } catch {

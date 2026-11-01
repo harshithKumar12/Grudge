@@ -1,6 +1,6 @@
 // OWNER: lane-c
 import { copyFile, mkdir, readFile, writeFile, access, rm, unlink } from "node:fs/promises";
-import { join, relative, dirname, isAbsolute } from "node:path";
+import { join, relative, dirname, isAbsolute, resolve } from "node:path";
 import { hasManagedBlock, removeManagedBlock } from "./managed-block.js";
 import { parseJson, sameJson, stripGrudgeSettings } from "./json-merge.js";
 
@@ -46,14 +46,35 @@ export async function restoreEntries(entries) {
 }
 
 export async function readBackupManifest(root, timestamp) {
-  const path = join(root, ".grudge", "backups", timestamp, "manifest.json");
+  const path = join(backupRoot(root, timestamp), "manifest.json");
   return JSON.parse(await readFile(path, "utf8"));
 }
 
+/** Resolve the directory of one backup, refusing names that escape `backups/`. */
+function backupRoot(root, timestamp) {
+  if (typeof timestamp !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(timestamp)) {
+    throw Object.assign(new Error(`invalid backup name: ${JSON.stringify(timestamp)}`), { code: "GRUDGE_INVALID_BACKUP" });
+  }
+  return join(root, ".grudge", "backups", timestamp);
+}
+
+/** True when `target` is `root` or lives underneath it. */
+function inside(root, target) {
+  const relativePath = relative(resolve(root), resolve(target));
+  return relativePath === "" || (!relativePath.startsWith("..") && !isAbsolute(relativePath));
+}
+
 export async function restoreBackup(root, timestamp, { remove = false } = {}) {
+  const directory = backupRoot(root, timestamp);
   const manifest = await readBackupManifest(root, timestamp);
   const results = [];
-  for (const entry of manifest.entries) {
+  for (const entry of Array.isArray(manifest.entries) ? manifest.entries : []) {
+    // The manifest is a project file: a checkout could ship one that points at
+    // `~/.ssh/authorized_keys`. Only paths inside this install are restorable.
+    if (!inside(root, entry.file ?? "") || !inside(directory, entry.backup ?? "")) {
+      results.push({ file: String(entry.file ?? ""), action: "skipped", reason: "path is outside the install or the backup directory" });
+      continue;
+    }
     const managed = await cleanManagedFile(entry);
     if (managed) {
       results.push(managed);
@@ -67,8 +88,7 @@ export async function restoreBackup(root, timestamp, { remove = false } = {}) {
     }
   }
   if (remove) {
-    const { rm } = await import("node:fs/promises");
-    await rm(join(root, ".grudge", "backups", timestamp), { recursive: true, force: true });
+    await rm(directory, { recursive: true, force: true });
   }
   return results;
 }

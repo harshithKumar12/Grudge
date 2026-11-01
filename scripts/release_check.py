@@ -24,6 +24,7 @@ def check_release(root: Path = ROOT) -> list[str]:
     )
     source = (root / "packages/grudge/src/version.js").read_text(encoding="utf-8")
     pyproject = (root / "pyproject.toml").read_text(encoding="utf-8")
+    lock_text = (root / "requirements.lock").read_text(encoding="utf-8")
     changelog = (root / "CHANGELOG.md").read_text(encoding="utf-8")
     readme = (root / "README.md").read_text(encoding="utf-8")
 
@@ -98,6 +99,25 @@ def check_release(root: Path = ROOT) -> list[str]:
     )
     if f"## {expected} " not in changelog:
         errors.append(f"CHANGELOG.md has no heading for {expected}")
+    # The build toolchain is installed twice - isolated from `[build-system]`
+    # and pinned in the lock. If they disagree, the artifact CI tests is not the
+    # artifact built from pyproject, so a defective setuptools release could
+    # pass locally and fail, or vice versa, on release.
+    build_requires = _match(
+        pyproject, r"^requires\s*=\s*\[([^\]]*)\]", flags=re.MULTILINE
+    )
+    build_pin = re.search(r"setuptools==([^\s\"']+)", build_requires)
+    lock_pin = re.search(r"^setuptools==([^\s]+)", lock_text, flags=re.MULTILINE)
+    if not build_pin or not lock_pin:
+        errors.append(
+            "pyproject.toml [build-system] and requirements.lock must both "
+            "pin setuptools"
+        )
+    elif build_pin.group(1) != lock_pin.group(1):
+        errors.append(
+            f"pyproject.toml builds with setuptools {build_pin.group(1)}, but "
+            f"requirements.lock installs {lock_pin.group(1)}"
+        )
     published = (
         rf"Grudge CLI `{re.escape(expected)}` is published in both public "
         "package registries"

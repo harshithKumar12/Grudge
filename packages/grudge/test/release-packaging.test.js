@@ -2,12 +2,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { access, mkdtemp, readFile, rm } from "node:fs/promises";
+import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { adapter, defaultRuntimeCommand } from "../src/installer/adapters/claude-code.js";
-import { runtimeDependencyCheck } from "../scripts/verify-release.mjs";
+import { npmCliCandidates, runNpm, runtimeDependencyCheck } from "../scripts/verify-release.mjs";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const dist = join(packageRoot, "dist", "grudge.mjs");
@@ -89,6 +89,47 @@ test("the claude-code adapter never falls back to a relative runtime command", a
     assert.ok(plannedScript.startsWith(root));
     assert.ok(plan.statusLine.includes(root));
   } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("the release gate resolves the npm CLI script instead of building a shell command", () => {
+  const candidates = npmCliCandidates({ execPath: process.execPath, env: {}, platform: process.platform });
+  assert.ok(candidates.length > 0);
+  assert.ok(candidates.every((candidate) => isAbsolute(candidate)));
+  assert.ok(candidates.some((candidate) => candidate.endsWith(join("npm", "bin", "npm-cli.js"))), candidates.join(", "));
+  // `npm run` exports the CLI path; it must be preferred when it is a script.
+  const fromEnv = npmCliCandidates({ execPath: process.execPath, env: { npm_execpath: join(packageRoot, "npm-cli.js") }, platform: process.platform });
+  assert.equal(fromEnv[0], join(packageRoot, "npm-cli.js"));
+  // A non-script npm_execpath (an old shim) is not treated as a CLI entry.
+  assert.ok(!fromEnv.some((candidate) => candidate.endsWith("npm.cmd")));
+  const shimOnly = npmCliCandidates({ execPath: process.execPath, env: { npm_execpath: "C:\\npm\\npm.cmd" }, platform: process.platform });
+  assert.ok(!shimOnly.some((candidate) => candidate.endsWith("npm.cmd")), shimOnly.join(", "));
+});
+
+test("npm runs with an argument array, so spaces and shell metacharacters stay literal", async () => {
+  // Deferred finding: the gate joined argv into one shell string, so a path
+  // with a space or a metacharacter could be split or interpreted.
+  const dir = await mkdtemp(join(tmpdir(), "grudge-npm-argv-"));
+  const cli = join(dir, "npm-cli.js");
+  try {
+    await writeFile(cli, "process.stdout.write(JSON.stringify(process.argv.slice(2)));\n");
+    const hostile = ["pack", "--pack-destination", join(dir, "a b & echo injected"), "$(whoami)", "|", "<", ">", "^", "%PATH%"];
+    const result = runNpm(hostile, { cli, cwd: dir });
+    assert.equal(result.code, 0, result.stderr);
+    assert.deepEqual(JSON.parse(result.stdout), hostile);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("the repository ignores personal Claude settings but keeps the shared file trackable", async () => {
+  // Deferred finding: `.claude/settings.json` in this checkout is machine-local
+  // and untracked, but Claude Code defines it as the shared, committable file.
+  // Ignore the personal file explicitly; never ignore the directory.
+  const ignore = await readFile(join(packageRoot, "..", "..", ".gitignore"), "utf8");
+  const lines = ignore.split(/\r?\n/).map((line) => line.trim());
+  assert.ok(lines.includes(".claude/settings.local.json"), "personal local settings must be ignored");
+  assert.ok(!lines.includes(".claude/settings.json"), "shared project settings must stay trackable");
+  assert.ok(!lines.includes(".claude/") && !lines.includes(".claude"), "ignoring the directory would hide shared settings");
 });
 
 test("setup from the built runtime registers an absolute, existing hook script", async () => {

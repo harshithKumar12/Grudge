@@ -1,7 +1,7 @@
 // OWNER: lane-c
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, writeFile, access, mkdir, rm } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile, access, chmod, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
@@ -209,6 +209,8 @@ test("repeated uninstall is idempotent", async () => {
   await setup({ cwd, home: cwd, agents: ["claude-code"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
   await uninstall({ cwd, print: false });
   const second = await uninstall({ cwd, print: false });
+  assert.equal(second.found, false);
+  assert.equal(second.ok, false);
   assert.equal(second.removed.length, 0);
 });
 
@@ -501,3 +503,235 @@ test("setup quotes an install path with spaces so the absolute hook still resolv
   assert.equal(result.checks.find(({ name }) => name === "hook paths").ok, true);
   assert.equal(result.checks.find(({ name }) => name === "launch directory").ok, true);
 });
+
+/** Install a project, then replace every registered hook command with `command`. */
+async function projectWithHookCommand(command) {
+  const cwd = await scratch();
+  const home = await scratch();
+  const runtime = join(cwd, "runtime.mjs");
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  await mkdir(join(cwd, ".git"), { recursive: true });
+  await setup({ cwd, home, agents: ["claude-code"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
+  const settingsPath = join(cwd, ".claude", "settings.json");
+  const settings = JSON.parse(await readFile(settingsPath, "utf8"));
+  for (const event of Object.keys(settings.hooks)) {
+    settings.hooks[event][0].hooks[0].command = command.replaceAll("EVENT", event);
+  }
+  settings.statusLine.command = command.replaceAll("EVENT", "Stop");
+  await writeFile(settingsPath, `${JSON.stringify(settings, null, 2)}\n`);
+  return { cwd, home, settingsPath };
+}
+
+/** Create an executable stub at `path`. */
+async function executable(path) {
+  await mkdir(join(path, ".."), { recursive: true });
+  await writeFile(path, "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+  return path;
+}
+
+test("hook paths rejects a relative node_modules/.bin shim instead of ignoring it", async () => {
+  // Deferred finding: only `grudge.mjs` tokens were resolved, so a shim
+  // registration was recognised as a Grudge hook and then never checked.
+  const { cwd, home } = await projectWithHookCommand("node ./node_modules/.bin/grudge hook EVENT");
+
+  const check = (await doctor({ cwd, home, print: false })).checks.find(({ name }) => name === "hook paths");
+
+  assert.equal(check.ok, false);
+  assert.match(check.detail, /relative path/);
+});
+
+test("hook paths accepts an absolute shim, rejects a missing one, and resolves PATH names", async () => {
+  const shim = await executable(join(await scratch(), "bin", "grudge"));
+  const resolved = await projectWithHookCommand(`"${shim}" hook EVENT`);
+  const resolvedCheck = (await doctor({ cwd: resolved.cwd, home: resolved.home, print: false })).checks.find(({ name }) => name === "hook paths");
+  assert.equal(resolvedCheck.ok, true, resolvedCheck.detail);
+
+  const missing = await projectWithHookCommand(`"${join(await scratch(), "bin", "grudge")}" hook EVENT`);
+  const missingCheck = (await doctor({ cwd: missing.cwd, home: missing.home, print: false })).checks.find(({ name }) => name === "hook paths");
+  assert.equal(missingCheck.ok, false);
+  assert.match(missingCheck.detail, /command missing/);
+
+  // A bare name is resolved from the same PATH the host will use.
+  const onPath = await projectWithHookCommand("grudge hook EVENT");
+  const blank = (await doctor({ cwd: onPath.cwd, home: onPath.home, print: false, pathEnv: "" })).checks.find(({ name }) => name === "hook paths");
+  assert.equal(blank.ok, false);
+  assert.match(blank.detail, /not found on PATH/);
+  const found = (await doctor({ cwd: onPath.cwd, home: onPath.home, print: false, pathEnv: join(shim, "..") })).checks.find(({ name }) => name === "hook paths");
+  assert.equal(found.ok, true, found.detail);
+});
+
+test("hook paths warns, and does not fail, when a package runner hides the target", async () => {
+  const { cwd, home } = await projectWithHookCommand("npx grudge hook EVENT");
+
+  const result = await doctor({ cwd, home, print: false });
+  const check = result.checks.find(({ name }) => name === "hook paths");
+
+  assert.equal(check.ok, true);
+  assert.equal(check.warning, true);
+  assert.match(check.detail, /cannot be verified/);
+});
+
+test("doctor reports no install for a nested repository instead of borrowing the outer one", async () => {
+  // Deferred finding: the upward walk had no repository boundary, so a nested
+  // repository reported the enclosing project's install.
+  const cwd = await scratch();
+  const home = await scratch();
+  const runtime = join(cwd, "runtime.mjs");
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  await setup({ cwd, home, agents: ["claude-code"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
+  const vendored = join(cwd, "vendor", "lib");
+  await mkdir(join(vendored, ".git"), { recursive: true });
+  const launch = join(vendored, "src");
+  await mkdir(launch, { recursive: true });
+
+  const result = await doctor({ cwd: launch, home, print: false });
+  const config = result.checks.find(({ name }) => name === "config");
+  const directory = result.checks.find(({ name }) => name === "launch directory");
+
+  assert.equal(result.installKind, "none");
+  assert.equal(result.root, launch);
+  assert.equal(config.ok, false);
+  assert.equal(directory.ok, false);
+  assert.match(directory.detail, /no Grudge install at or above/);
+});
+
+test("uninstall from a subdirectory removes the repository install", async () => {
+  const cwd = await scratch();
+  const home = await scratch();
+  const runtime = join(cwd, "runtime.mjs");
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  await mkdir(join(cwd, ".git"), { recursive: true });
+  await setup({ cwd, home, agents: ["claude-code"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
+  const nested = join(cwd, "src", "deep");
+  await mkdir(nested, { recursive: true });
+
+  const result = await uninstall({ cwd: nested, home, print: false });
+
+  assert.equal(result.found, true);
+  assert.equal(result.root, cwd);
+  assert.ok(result.removed.length > 0);
+  await assert.rejects(access(join(cwd, ".grudge")));
+});
+
+test("uninstall in an unrelated directory removes nothing and says so", async () => {
+  const home = await scratch();
+  const runtime = join(home, "runtime.mjs");
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  // A user-scope install above a directory that is in no repository.
+  await setup({ cwd: home, home, agents: ["codex"], scope: "global", yes: true, runtimeScript: runtime, print: false });
+  const stray = join(home, "Downloads", "scratch");
+  await mkdir(stray, { recursive: true });
+
+  const result = await uninstall({ cwd: stray, home, print: false });
+
+  assert.equal(result.found, false);
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.removed, []);
+  assert.match(result.reason, /no Grudge install at or above/);
+  // The user install is untouched.
+  assert.equal(await readFile(join(home, ".grudge/config.json"), "utf8").then(() => true), true);
+});
+
+test("hook paths accepts the installed runtime without an execute bit", async () => {
+  // The runtime is an argument to `node`, so POSIX installs write it 0644 and
+  // still execute it. Requiring mode & 0o111 failed every POSIX install.
+  const cwd = await scratch();
+  const home = await scratch();
+  const runtime = join(cwd, "runtime.mjs");
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  await setup({ cwd, home, agents: ["claude-code"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
+  await chmod(join(cwd, ".grudge", "bin", "grudge.mjs"), 0o644);
+
+  const check = (await doctor({ cwd, home, print: false })).checks.find(({ name }) => name === "hook paths");
+
+  assert.equal(check.ok, true, check.detail);
+});
+
+test("hook paths fails a Grudge command whose target cannot be resolved", async () => {
+  // A shell-wrapped registration is recognised as a Grudge hook but no token
+  // can be resolved, so the install may be dead. Warning-only passed it.
+  const { cwd, home } = await projectWithHookCommand('sh -c "node mygrudge.mjs hook EVENT"');
+
+  const check = (await doctor({ cwd, home, print: false })).checks.find(({ name }) => name === "hook paths");
+
+  assert.equal(check.ok, false);
+  assert.match(check.detail, /cannot resolve a Grudge command/);
+});
+
+/** Read and rewrite the installed config so the test controls `lastBackup`. */
+async function setLastBackup(cwd, value) {
+  const path = join(cwd, ".grudge", "config.json");
+  const config = JSON.parse(await readFile(path, "utf8"));
+  config.lastBackup = value;
+  await writeFile(path, `${JSON.stringify(config, null, 2)}\n`);
+}
+
+test("uninstall refuses a backup manifest that points outside the install", async () => {
+  // The manifest is an ordinary project file, so a hostile checkout could ship
+  // one that writes to the user's home. Restores are confined to the install.
+  const cwd = await scratch();
+  const home = await scratch();
+  const outside = await scratch();
+  const victim = join(outside, "victim.txt");
+  await writeFile(victim, "original\n");
+  const runtime = join(cwd, "runtime.mjs");
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  await mkdir(join(cwd, ".git"), { recursive: true });
+  await setup({ cwd, home, agents: ["codex"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
+  const forged = join(cwd, ".grudge", "backups", "forged");
+  await mkdir(forged, { recursive: true });
+  await writeFile(join(forged, "payload.txt"), "owned\n");
+  await writeFile(join(forged, "manifest.json"), `${JSON.stringify({
+    version: 1,
+    entries: [
+      { file: victim, existed: true, backup: join(forged, "payload.txt"), root: forged },
+      { file: join(cwd, "AGENTS.md"), existed: true, backup: join(outside, "payload.txt"), root: forged },
+    ],
+  }, null, 2)}\n`);
+  await setLastBackup(cwd, "forged");
+
+  const result = await uninstall({ cwd, home, print: false });
+
+  assert.equal(await readFile(victim, "utf8"), "original\n");
+  assert.equal(result.found, true);
+  assert.equal(result.warnings.length, 2);
+  assert.ok(result.warnings.every((warning) => /outside the install or the backup directory/.test(warning)));
+});
+
+test("uninstall continues when the recorded backup no longer exists", async () => {
+  const cwd = await scratch();
+  const home = await scratch();
+  const runtime = join(cwd, "runtime.mjs");
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  await mkdir(join(cwd, ".git"), { recursive: true });
+  await setup({ cwd, home, agents: ["codex"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
+  await setLastBackup(cwd, "deleted-by-hand");
+
+  const result = await uninstall({ cwd, home, print: false });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.found, true);
+  assert.match(result.warnings[0], /could not restore backup 'deleted-by-hand'/);
+  await assert.rejects(access(join(cwd, ".grudge")));
+});
+
+test("global setup does not create or modify $HOME/.gitignore", async () => {
+  // Deferred finding: `--scope global` installed at home and then wrote
+  // `$HOME/.gitignore`, which git never reads.
+  const cwd = await scratch();
+  const home = await scratch();
+  const runtime = join(cwd, "runtime.mjs");
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
+
+  const created = await setup({ cwd, home, agents: ["claude-code"], scope: "global", yes: true, runtimeScript: runtime, print: false });
+  await assert.rejects(access(join(home, ".gitignore")));
+  assert.ok(created.warnings.some((warning) => /\.gitignore/.test(warning)));
+
+  // An existing file the user owns stays byte-identical.
+  const existing = `${join(home, "node_modules/")}\n`;
+  await writeFile(join(home, ".gitignore"), existing);
+  await setup({ cwd, home, agents: ["claude-code"], scope: "global", yes: true, runtimeScript: runtime, print: false });
+  assert.equal(await readFile(join(home, ".gitignore"), "utf8"), existing);
+});
+
+

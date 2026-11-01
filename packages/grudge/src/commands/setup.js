@@ -69,7 +69,14 @@ export async function setup(options = {}) {
     }
     const runtimeExists = await fileExists(runtimeSource);
     if (runtimeExists) await planRuntime(runtimeSource, runtimeTarget, context);
-    await planGitignore(context);
+    // Git never reads `$HOME/.gitignore`, so a global install must not write
+    // one: it would modify a file the user owns for no effect. Project state
+    // (rules, .gitignore) is a repository concern and stays repo-scoped.
+    if (selectedScope === "global") {
+      warnings.push("global setup does not write a .gitignore: git never reads ~/.gitignore, and the file is not Grudge's to change");
+    } else {
+      await planGitignore(context);
+    }
     const config = await planConfig(root, runtimeTarget, selected.map((adapter) => adapter.id), context, runtimeExists, runtimeSource, { scope: selectedScope, runtimeCommand });
     if (!context.dryRun && runtimeExists) await smokeTest(runtimeTarget, root);
     // Claude Code loads a project's `.claude/settings.json` only from the

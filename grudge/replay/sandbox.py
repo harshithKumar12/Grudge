@@ -1,8 +1,12 @@
-"""Hermetic replay of an agent against an in-memory cassette world.
+"""Replay an agent against an in-memory cassette world.
 
-The sandbox keeps the policy live while replacing every tool boundary with a
-frozen cassette response.  It never constructs the example world, and its
-failure path always produces a valid :class:`~grudge.schema.trace.Trace`.
+Every tool boundary is replaced by a frozen cassette response, so the example
+world is never constructed and replay is deterministic.  ``_hermetic_guards``
+additionally blocks the usual ways an agent can accidentally touch the real
+filesystem or network, but it is an accident guard, not a security boundary:
+the agent runs in the same interpreter, so other syscalls, subprocesses, native
+code and work handed to another thread are outside its reach.  The failure path
+always produces a valid :class:`~grudge.schema.trace.Trace`.
 """
 
 from __future__ import annotations
@@ -137,7 +141,12 @@ CassetteToolAdapter = CassetteWorld
 
 @contextmanager
 def _hermetic_guards() -> Iterator[None]:
-    """Reject filesystem and socket access while an agent is running."""
+    """Block common filesystem and socket entry points on the calling thread.
+
+    Only the patched entry points are covered, and only on the thread that owns
+    the context: this stops an agent that reaches for ``open()`` or a socket by
+    habit, and nothing more.  Treat the agent as trusted code.
+    """
 
     def blocked_filesystem(*args: Any, **kwargs: Any) -> NoReturn:
         del args, kwargs

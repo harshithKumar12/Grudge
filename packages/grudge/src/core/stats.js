@@ -272,15 +272,19 @@ export async function record(root, field, scarId = null) {
   const outcome = field === "blocks" ? "blocked" : field === "warnings" ? "warned" : undefined;
   await appendEvent(root, { type: outcome ? "catch" : field === "acceptedScars" ? "accepted" : "proposal", outcome, scarId });
   // Keep the old JSON counter readable for Phase 20 consumers and older installs.
-  const current = await readStats(root);
-  current[field] += 1;
-  if (scarId) {
-    const item = current.perScar[scarId] && typeof current.perScar[scarId] === "object" ? current.perScar[scarId] : {};
-    item[field] = Number.isFinite(item[field]) ? item[field] + 1 : 1;
-    current.perScar[scarId] = item;
-  }
-  await writeJsonAtomic(statsPath(root), current);
-  return current;
+  // The counter is a read-modify-write, so it takes the lock: two concurrent
+  // callers otherwise both read N and write N+1, losing one increment.
+  return withStatsLock(root, async () => {
+    const current = await readStats(root);
+    current[field] += 1;
+    if (scarId) {
+      const item = current.perScar[scarId] && typeof current.perScar[scarId] === "object" ? current.perScar[scarId] : {};
+      item[field] = Number.isFinite(item[field]) ? item[field] + 1 : 1;
+      current.perScar[scarId] = item;
+    }
+    await writeJsonAtomic(statsPath(root), current);
+    return current;
+  });
 }
 
 /** Compute the explicitly estimated savings figure used by stats and statusline. */

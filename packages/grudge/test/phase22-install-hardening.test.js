@@ -123,13 +123,27 @@ test("unmarked directories default to a repository setup", async () => {
 test("uninstall has a readable summary and keeps JSON output opt-in", async () => {
   const cwd = await scratch();
   await mkdir(join(cwd, ".git"), { recursive: true });
+
+  // Nothing installed: the command must say so, in text and in JSON, and must
+  // not exit 0 as though it had removed something.
+  const missing = spawnSync(process.execPath, [bundle, "uninstall", "--cwd", cwd], { cwd, encoding: "utf8" });
+  assert.equal(missing.status, 1, missing.stderr);
+  assert.match(missing.stdout, /no Grudge install at or above/);
+  const missingJson = spawnSync(process.execPath, [bundle, "uninstall", "--cwd", cwd, "--json"], { cwd, encoding: "utf8" });
+  assert.equal(missingJson.status, 1, missingJson.stderr);
+  assert.equal(JSON.parse(missingJson.stdout).found, false);
+
+  const runtime = join(cwd, "runtime.mjs");
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  await setup({ cwd, home: await scratch(), agents: ["codex"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
+
   const human = spawnSync(process.execPath, [bundle, "uninstall", "--cwd", cwd], { cwd, encoding: "utf8" });
   assert.equal(human.status, 0, human.stderr);
   assert.match(human.stdout, new RegExp(`Grudge uninstall v${VERSION_PATTERN}`));
   assert.match(human.stdout, new RegExp(`root: ${cwd.replaceAll("\\", "\\\\")}`));
-  assert.match(human.stdout, /Restored: 0/);
-  assert.match(human.stdout, /Removed: 0/);
+  assert.match(human.stdout, /Restored: \d+ files/);
+  assert.match(human.stdout, /Removed: [1-9]\d* paths/);
   const json = spawnSync(process.execPath, [bundle, "uninstall", "--cwd", cwd, "--json"], { cwd, encoding: "utf8" });
-  assert.equal(json.status, 0, json.stderr);
-  assert.equal(JSON.parse(json.stdout).root, cwd);
+  assert.equal(json.status, 1, json.stderr);
+  assert.equal(JSON.parse(json.stdout).found, false);
 });

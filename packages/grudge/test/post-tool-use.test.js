@@ -73,3 +73,20 @@ test("PostToolUse fails open for malformed payloads and write errors", async () 
   assert.equal(writeFailure.ok, false);
   assert.match(writeFailure.warning, /post-tool-use skipped/);
 });
+
+test("PostToolUse bounds the persisted arguments of a large call", async () => {
+  // A Write carries the entire file body; unbounded it copies megabytes into
+  // the session log and hands them to the regex redactor.
+  const root = await mkdtemp(join(tmpdir(), "grudge-post-tool-args-"));
+  const content = "x".repeat(2_000_000);
+  const result = await postToolUse(
+    { session_id: "big-args", tool_name: "Write", tool_input: { file_path: "big.txt", content } },
+    { root },
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.event.args.file_path, "big.txt");
+  assert.ok(result.event.args.content.length <= 4096);
+  const line = (await read(join(root, ".grudge"), "big-args"))[0];
+  assert.ok(Buffer.byteLength(JSON.stringify(line)) < 20_000);
+});

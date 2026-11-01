@@ -55,8 +55,14 @@ function field(event, name) {
   return event.args && Object.prototype.hasOwnProperty.call(event.args, name) ? event.args[name] : event[name];
 }
 
+/** True when a rule names this event's tool, including MCP capability aliases. */
+function toolMatches(event, name) {
+  if (event.tool === name) return true;
+  return Array.isArray(event.tools) && event.tools.includes(name);
+}
+
 function callViolations(rule, events) {
-  const found = events.flatMap((event, index) => event.tool === rule.tool && matches(event.args ?? {}, rule.match ?? {}) ? [index] : []);
+  const found = events.flatMap((event, index) => toolMatches(event, rule.tool) && matches(event.args ?? {}, rule.match ?? {}) ? [index] : []);
   return found;
 }
 
@@ -65,8 +71,8 @@ function orderingViolations(rule, events) {
   const result = [];
   for (let index = 0; index < events.length; index += 1) {
     const event = events[index];
-    if (event.tool === rule.ordering?.before) prerequisite = true;
-    else if (event.tool === rule.ordering?.after && !prerequisite) result.push(index);
+    if (toolMatches(event, rule.ordering?.before)) prerequisite = true;
+    else if (toolMatches(event, rule.ordering?.after) && !prerequisite) result.push(index);
   }
   return result;
 }
@@ -77,11 +83,11 @@ function taintViolations(rule, events) {
   const result = [];
   for (let index = 0; index < events.length; index += 1) {
     const event = events[index];
-    if (event.tool === taint.source && matches(event.args ?? {}, taint.sourceMatch ?? {})) {
+    if (toolMatches(event, taint.source) && matches(event.args ?? {}, taint.sourceMatch ?? {})) {
       const value = field(event, taint.sourceField);
       if (value !== null && value !== undefined && value !== "") sources.push(...values(value));
     }
-    if (event.tool !== taint.sink) continue;
+    if (!toolMatches(event, taint.sink)) continue;
     const sink = field(event, taint.sinkField);
     const sinkValues = values(sink);
     if (sources.some((source) => source !== null && source !== "" && sinkValues.some((candidate) => source === candidate || (typeof source === "string" && typeof candidate === "string" && candidate.includes(source))))) result.push(index);
