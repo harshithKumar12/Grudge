@@ -27,7 +27,7 @@ async function statuslineStats(root) {
 }
 
 async function statuslineScars(root, counters) {
-  if (counters.acceptedScars > 0) return counters.acceptedScars;
+  if (counters.accepted > 0) return counters.accepted;
   if (!compiledCache.has(root)) compiledCache.set(root, readJson(join(root, ".grudge", "compiled.json"), null));
   const compiled = await compiledCache.get(root);
   return Array.isArray(compiled?.rules) ? compiled.rules.filter((rule) => rule.mode !== "off").length : 0;
@@ -39,16 +39,15 @@ export async function statusline(options = {}) {
   const config = await statuslineConfig(root);
   if (process.env.GRUDGE_DISABLE === "1" || config.mode === "off") return "";
   const counters = await statuslineStats(root);
-  // acceptedScars is the durable count maintained by the stats contract. Keep a
-  // cached compiled fallback for repositories created before that counter was
-  // introduced, without rereading compiled.json on every statusLine poll.
-  const scars = await statuslineScars(root, counters);
   const sessionId = typeof options.session === "string" ? options.session : typeof options.sessionId === "string" ? options.sessionId : null;
   const session = sessionId ? await aggregate(root, sessionId, config.avoidedRetryTokens) : null;
   const lifetime = await aggregate(root, null, config.avoidedRetryTokens);
+  // acceptedScars is the durable legacy counter; the canonical count is the
+  // append-only event log, with compiled.json as the pre-counter fallback.
+  const scars = await statuslineScars(root, { accepted: lifetime.accepted || counters.acceptedScars });
   const line = session
     ? `grudge: ${scars} scars, ${session.blocked} blocked, ~${formatEstimatedTokens(session.avoidedRetryTokens)} tokens saved (est.) · session ${session.caught} caught/${session.warned} warned`
-    : `grudge: ${scars} scars, ${counters.blocks} blocked, ~${formatEstimatedTokens(lifetime.avoidedRetryTokens || estimatedTokensSaved(counters.blocks, config.avoidedRetryTokens))} tokens saved (est.)`;
+    : `grudge: ${scars} scars, ${lifetime.blocked} blocked, ~${formatEstimatedTokens(lifetime.avoidedRetryTokens || estimatedTokensSaved(lifetime.blocked, config.avoidedRetryTokens))} tokens saved (est.)`;
   if (options.print !== false) process.stdout.write(`${line}\n`);
   return line;
 }

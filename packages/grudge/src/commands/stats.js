@@ -11,19 +11,30 @@ export async function stats(options = {}) {
   const counters = await readStats(root);
   const report = await aggregate(root, null, config.avoidedRetryTokens);
   const compiled = await readJson(join(root, ".grudge", "compiled.json"), null);
-  const scars = Array.isArray(compiled?.rules) ? compiled.rules.filter((rule) => rule.mode !== "off").length : counters.acceptedScars;
+  const scars = Array.isArray(compiled?.rules) ? compiled.rules.filter((rule) => rule.mode !== "off").length : report.accepted;
+  // `.grudge/stats.jsonl` is the canonical event log. The legacy
+  // `.grudge/stats.json` counters stopped being written when accounting moved to
+  // the append-only log, so they must never override the aggregate (a stale zero
+  // made `grudge stats` print "Blocks: 0" while `grudge report` showed the real
+  // count). `aggregate` already falls back to the legacy file when no events
+  // exist, which keeps pre-0.2.1 installs readable.
   const result = {
     ...counters,
+    blocks: report.blocked,
+    warnings: report.warned,
+    proposals: report.proposals,
+    acceptedScars: report.accepted,
     caught: report.caught,
     blocked: report.blocked,
     warned: report.warned,
-    proposals: report.proposals,
     accepted: report.accepted,
+    stops: report.stops,
+    lastStopAt: report.lastStopAt,
     injectedChars: report.injectedChars,
     injectedTokens: report.injectedTokens,
     netSavingsTokens: report.netSavingsTokens,
     scars,
-     estimatedTokensSaved: report.avoidedRetryTokens || estimatedTokensSaved(counters.blocks, config.avoidedRetryTokens),
+    estimatedTokensSaved: report.avoidedRetryTokens || estimatedTokensSaved(report.blocked, config.avoidedRetryTokens),
     estimated: true,
   };
   if (options.json) {
