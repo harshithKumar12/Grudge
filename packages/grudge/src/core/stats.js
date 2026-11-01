@@ -175,10 +175,29 @@ export async function readEvents(root = process.cwd()) {
 }
 
 function emptyAggregate(sessionId = null) {
-  return { sessionId, caught: 0, blocked: 0, warned: 0, proposals: 0, accepted: 0, injectedChars: 0, injectedTokens: 0, avoidedRetryTokens: 0, netSavingsTokens: 0, estimated: true };
+  return { sessionId, caught: 0, blocked: 0, warned: 0, proposals: 0, accepted: 0, stops: 0, lastStopAt: null, injectedChars: 0, injectedTokens: 0, avoidedRetryTokens: 0, netSavingsTokens: 0, estimated: true };
 }
 
-/** Aggregate savings events for one session or the entire append-only log. */
+/**
+ * The authoritative statistics event model.
+ *
+ * `.grudge/stats.jsonl` is append-only and every counter is derived from it by
+ * this function; no hook writes a counter directly. One line is one event:
+ *
+ * | `type`                         | Counted as | Notes |
+ * |---|---|---|
+ * | `catch` + `outcome: "warned"`  | `caught`, `warned` | a `warn` rule matched |
+ * | `catch` + any other outcome    | `caught`, `blocked` | blocked is the default: a catch that is not a warning stopped the call |
+ * | `proposal`                     | `proposals` | a scar was proposed |
+ * | `accepted`                     | `accepted` | a scar was accepted |
+ * | `stop`                         | `stops` | one per deduplicated Stop delivery |
+ * | `injection`                    | `injectedChars` | prompt/session-start text |
+ * | `hook`                         | nothing | duplicate-delivery claim; deliberately not a counter |
+ *
+ * A call that is allowed writes only a `hook` claim, so it can never inflate
+ * `caught`/`blocked`. Replayed deliveries carry a `dedupeKey` and are collapsed
+ * by `readEvents` before this function sees them, so nothing is counted twice.
+ */
 export function aggregateEvents(events, sessionId = null, avoidedRetryTokens = 1500) {
   const result = emptyAggregate(sessionId);
   const avoided = Number.isFinite(avoidedRetryTokens) && avoidedRetryTokens >= 0 ? avoidedRetryTokens : 1500;
@@ -191,6 +210,11 @@ export function aggregateEvents(events, sessionId = null, avoidedRetryTokens = 1
       else result.blocked += 1;
     } else if (type === "proposal" || type === "proposed") result.proposals += 1;
     else if (type === "accepted" || type === "accept") result.accepted += 1;
+    else if (type === "stop") {
+      result.stops += 1;
+      const at = event.at ?? event.timestamp;
+      if (typeof at === "string" && at) result.lastStopAt = at;
+    }
     result.injectedChars += finite(event.injectedChars ?? event.chars);
   }
   result.avoidedRetryTokens = result.blocked * avoided;
@@ -208,6 +232,8 @@ async function legacyAggregate(root, sessionId, avoidedRetryTokens) {
   result.warned = finite(legacy.warnings);
   result.proposals = finite(legacy.proposals);
   result.accepted = finite(legacy.acceptedScars);
+  result.stops = finite(legacy.stops);
+  result.lastStopAt = typeof legacy.lastStopAt === "string" ? legacy.lastStopAt : null;
   const avoided = Number.isFinite(avoidedRetryTokens) && avoidedRetryTokens >= 0 ? avoidedRetryTokens : 1500;
   result.avoidedRetryTokens = result.blocked * avoided;
   result.injectedTokens = Math.ceil(result.injectedChars / 4);
