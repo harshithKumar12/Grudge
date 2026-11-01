@@ -26,11 +26,14 @@ The event names are `pre-tool-use`, `session-start`, `user-prompt-submit`,
 PreToolUse, SessionStart, UserPromptSubmit, and Stop.
 
 `grudge doctor` re-reads the registered commands and fails the `hook paths`
-check when a command it can attribute to Grudge — one whose script token ends in
-`grudge.mjs` — is relative or points at a missing script; the fix it prints is
-`re-run grudge setup`. A Grudge command registered some other way (for example
-`./node_modules/.bin/grudge hook …`) is still recognised as a Grudge hook, but
-this check does not resolve its target.
+check when it cannot resolve a command it can attribute to Grudge. A command
+that names `grudge.mjs` must be absolute and the script must exist; a bare
+`grudge`, `grudge-cli` or a generated shim is resolved on `PATH` with the
+platform's executable suffixes. Package runners (`npx`, `bunx`, `pnpm`, `yarn`)
+resolve their binary at run time, so those warn instead of passing silently.
+A registration that mentions Grudge but exposes no resolvable token (for
+example `sh -c "node grudge.mjs hook …"`) fails: it is the "healthy but dead"
+install this check exists to catch.
 
 ## Claude Code settings discovery
 
@@ -91,7 +94,9 @@ here", not "installed correctly".
 Absolute paths remain required for a different reason: once a session is
 running, the hook process inherits whatever directory the tool call runs in, and
 a relative script path stops resolving. `grudge doctor` fails `hook paths` when
-a registered `grudge.mjs` command is relative or points at a missing file.
+a registered command it can attribute to Grudge is relative, names a missing
+script, is not found on `PATH`, or cannot be resolved at all; package runners
+warn because their target is chosen at run time.
 
 ### Manual acceptance test
 
@@ -192,7 +197,9 @@ rules, and internal errors emit one short stderr warning and exit 0 (fail open).
 
 `GRUDGE_DISABLE=1` allows immediately. `mode: "off"` allows immediately for the
 installation that declares it, while the other installation (global or project)
-keeps enforcing. Oversized input (over 1 MiB) fails open.
+keeps enforcing. Hook input up to 16 MiB is evaluated in full; a PreToolUse
+payload above that ceiling is denied, because the prohibited call may be in the
+part that could not be read.
 
 ## Enforcement failure policy
 
@@ -218,7 +225,10 @@ never turn a matching block into an allow.
 | Large session history (over the byte/event cap) | **Deny is unchanged**; the bounded tail is what taint rules see |
 | Stale or held `.grudge/stats.jsonl.lock` | **Deny is unchanged**; the enforcement path takes no lock |
 | `.grudge/compiled.json` missing or corrupt | Allow with no rules; a corrupt file cannot invent a match |
-| Malformed or oversized hook input | Allow, with an explicit stderr warning |
+| `.grudge/compiled.json` valid but stale | **Used as written.** A structurally valid rule file is never second-guessed: an outdated copy keeps enforcing its old rules and silently omits new ones |
+| Malformed hook input (not JSON, or not an object) | Allow, with an explicit stderr warning |
+| PreToolUse input above the 16 MiB ceiling | **Deny** (exit 2) with a reason — the call cannot be evaluated |
+| Other hook input above the 16 MiB ceiling | Allow, with an explicit stderr warning — those events cannot deny a call |
 | Accounting (stats/session write) fails or is slow | Decision unchanged; accounting is bounded to 1 s and dropped if it overruns |
 | Duplicate delivery of the same hook event | **Still enforced**; only the counter is deduplicated |
 
@@ -227,6 +237,13 @@ contention, a stale lock, a timeout, or an internal accounting error. The
 fail-open cases above are all *infrastructure or input* failures, where nothing
 proves the call is prohibited; callers that need stronger guarantees can run
 `grudge verify` to prove blocking on the actual install.
+
+A stale-but-valid `compiled.json` is the one failure this policy cannot see: the
+file parses, its version is supported, and its rules are well formed, so it is
+loaded as-is. It is the expected shape of "this checkout is older than the
+scars", not corruption, and guessing that it is out of date could disable a
+deliberate rule set. Re-run the compile step after changing scars, and treat the
+compiled file as build output: regenerate it rather than hand-editing it.
 
 Writes to `.grudge/stats.jsonl` are lock-free appends, and `seq` is the 1-based
 line number computed by readers, so a killed process can never leave a lock that
