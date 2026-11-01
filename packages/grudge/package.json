@@ -27,6 +27,9 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
+    "prepack": "npm run build",
+    "prepublishOnly": "npm test && npm run release:verify",
+    "release:verify": "node scripts/verify-release.mjs",
     "test": "npm run build && node --test --test-concurrency=1 test/*.test.js",
     "setup:repo": "node dist/grudge.mjs setup --cwd ../.. --yes --agents claude-code --scope repo",
     "doctor:repo": "node dist/grudge.mjs doctor --cwd ../..",
