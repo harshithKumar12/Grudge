@@ -26,8 +26,99 @@ The event names are `pre-tool-use`, `session-start`, `user-prompt-submit`,
 PreToolUse, SessionStart, UserPromptSubmit, and Stop.
 
 `grudge doctor` re-reads the registered commands and fails the `hook paths`
-check when one is relative or points at a missing script; the fix it prints is
-`re-run grudge setup`.
+check when a command it can attribute to Grudge — one whose script token ends in
+`grudge.mjs` — is relative or points at a missing script; the fix it prints is
+`re-run grudge setup`. A Grudge command registered some other way (for example
+`./node_modules/.bin/grudge hook …`) is still recognised as a Grudge hook, but
+this check does not resolve its target.
+
+## Claude Code settings discovery
+
+Absolute hook paths keep the runtime resolvable, but they do not decide whether
+Claude Code reads the settings file at all.
+
+Measured with Claude Code 2.1.283 on Windows 11 (2026-11-01), against a project
+installed with `--scope repo` and a blocking rule:
+
+| Session start directory | Hooks loaded | Result of the prohibited call |
+|---|---|---|
+| project root | yes | blocked, exit 2, reason on the tool result |
+| `project/nested` | **no** | executed; `.grudge/stats.jsonl` gained no event |
+| `project/nested` with `--settings <project>/.claude/settings.json` | yes | blocked, exit 2 |
+
+Claude Code loads a project's `.claude/settings.json` from the directory the
+session starts in. It does not walk up to the repository root, and a project
+install is not discovered from a subdirectory. Nothing in the hook command can
+change that, because the command never runs.
+
+The two project files are not interchangeable. Claude Code reads
+`.claude/settings.local.json` (written by `--scope local`) from the git
+repository root, even when the session starts in a subdirectory. The exception
+is Windows, where the local file is read from the start directory like the
+shared one; the same applies outside a git repository. So a `--scope local`
+install behaves differently from `--scope repo`:
+
+- On Linux and macOS, a session started anywhere inside the same git repository
+  loads the local hooks, and `grudge doctor` passes `launch directory`.
+- On Windows, and outside a repository, a session started in a subdirectory
+  does not load them, and doctor fails with a remedy that names
+  `settings.local.json` — the file that actually holds the hooks — rather than
+  `settings.json`.
+
+The supported alternatives are:
+
+1. **Start the session at the installed root.** `cd <repo> && claude`.
+2. **Name the settings file explicitly** for a session started elsewhere:
+   `claude --settings <repo>/.claude/settings.json`. Verified to load the hooks
+   and block from a nested working directory.
+3. **Install at user scope** (`grudge setup --scope global --agents claude-code`),
+   which writes `~/.claude/settings.json` and is therefore loaded in every
+   project. Grudge never installs at user scope implicitly, and never edits
+   unrelated user settings.
+
+Inside a running session, `/hooks` lists the hooks Claude Code actually loaded,
+which is the fastest way to confirm that a repository install is in effect.
+`grudge doctor` resolves the install upward from the directory it runs in and
+adds a `launch directory` check. For a shared `settings.json` install, a launch
+directory other than the installed root fails, because those hooks do not load
+there. For a `settings.local.json` install the check follows the host rule
+above: inside the same git repository on Linux and macOS it passes, and
+elsewhere it fails with a remedy that names the local settings file. Doctor
+cannot observe a `--settings` flag or the host's session state, so pair it with
+`/hooks`; a green doctor plus an empty `/hooks` list still means "not loaded
+here", not "installed correctly".
+
+Absolute paths remain required for a different reason: once a session is
+running, the hook process inherits whatever directory the tool call runs in, and
+a relative script path stops resolving. `grudge doctor` fails `hook paths` when
+a registered `grudge.mjs` command is relative or points at a missing file.
+
+### Manual acceptance test
+
+Settings discovery is host behaviour, so the automated suite cannot cover it.
+Repeat this check after changing hook registration or when a guard looks
+inactive (measured with Claude Code 2.1.283):
+
+1. In a scratch repository, run
+   `grudge setup --scope repo --agents claude-code --yes`, then make a blocking
+   rule: `grudge propose --rule 'never call shell where command ~ "GRUDGE_MANUAL_TEST"' --why "manual check" --accept`.
+2. Start `claude` in the repository root, ask it to run
+   `echo GRUDGE_MANUAL_TEST`, and confirm the call is blocked with "Do not
+   retry; change approach or ask the user.". `/hooks` lists the five Grudge
+   hooks, and `.grudge/stats.jsonl` gains a `catch` event.
+3. Start a second session in a subdirectory (`cd nested && claude`) and repeat
+   the request. Expected on 2.1.283: the call executes, `/hooks` lists no
+   Grudge hooks, and no `catch` event is appended. `grudge doctor` from that
+   subdirectory must fail `launch directory` and name the `--settings` remedy.
+4. Start a third session from the same subdirectory with
+   `claude --settings <repo>/.claude/settings.json` and repeat: the call is
+   blocked.
+5. If the host changes, record the new result in the table above before
+   changing any code.
+
+Step 4 passing is not a defect in step 3; it is the documented workaround. A
+regression is step 1 or 4 failing to block, or step 3 blocking without
+`--settings` (the host started walking up, so the limitation no longer holds).
 
 ## Root resolution and rule precedence
 

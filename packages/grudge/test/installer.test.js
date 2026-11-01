@@ -1,7 +1,7 @@
 // OWNER: lane-c
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, writeFile, access, mkdir } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile, access, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
@@ -331,4 +331,173 @@ test("uninstall removes .grudge entirely when Grudge created everything (P3-3)",
   const result = await uninstall({ cwd, print: false });
   assert.deepEqual(result.preserved, []);
   await assert.rejects(access(join(cwd, ".grudge")));
+});
+
+test("setup states that project hooks only load from the launch directory", async () => {
+  const cwd = await scratch();
+  const runtime = join(cwd, "runtime.mjs");
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  const result = await setup({ cwd, home: cwd, agents: ["claude-code"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
+  const warning = result.warnings.find((item) => /only when the session starts in/.test(item));
+  assert.ok(warning, "setup must state the launch-directory limitation");
+  assert.match(warning, /--settings/);
+  assert.ok(warning.includes(join(cwd, ".claude", "settings.json")));
+});
+
+test("setup describes local-scope discovery accurately per platform", async () => {
+  const cwd = await scratch();
+  const runtime = join(cwd, "runtime.mjs");
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  const result = await setup({ cwd, home: cwd, agents: ["claude-code"], scope: "local", yes: true, runtimeScript: runtime, print: false });
+  const warning = result.warnings.find((item) => item.includes(join(cwd, ".claude", "settings.local.json")));
+  assert.ok(warning, "setup must describe the local settings file it wrote");
+  if (process.platform === "win32") {
+    assert.match(warning, /only when the session starts in/);
+    assert.match(warning, /--settings/);
+  } else {
+    assert.match(warning, /from the repository root/);
+    assert.doesNotMatch(warning, /only when the session starts in/);
+  }
+});
+
+test("doctor inspects the project install from a nested launch directory and names the remedy", async () => {
+  const cwd = await scratch();
+  const home = await scratch();
+  const runtime = join(cwd, "runtime.mjs");
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  await setup({ cwd, home, agents: ["claude-code"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
+  const nested = join(cwd, "project", "nested");
+  await mkdir(nested, { recursive: true });
+
+  const result = await doctor({ cwd: nested, home, print: false });
+
+  // The install is resolved upward, so the real state is inspected...
+  assert.equal(result.root, cwd);
+  assert.equal(result.launchDirectory, nested);
+  assert.equal(result.checks.find(({ name }) => name === "config").ok, true);
+  assert.equal(result.checks.find(({ name }) => name === "hook paths").ok, true);
+  assert.equal(result.checks.find(({ name }) => name === ".gitignore").detail, "3/3 entries");
+  // ...but the session would run unguarded, so doctor must not report healthy.
+  assert.deepEqual(result.checks.filter((check) => !check.ok).map(({ name }) => name), ["launch directory"]);
+  const launch = result.checks.find(({ name }) => name === "launch directory");
+  assert.equal(launch.ok, false);
+  assert.match(launch.detail, /does not walk up/);
+  assert.match(launch.detail, /--settings/);
+  assert.equal(result.ok, false);
+});
+
+test("doctor reads local-scope hooks from the repository root on POSIX", async () => {
+  const cwd = await scratch();
+  const home = await scratch();
+  const runtime = join(cwd, "runtime.mjs");
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  await mkdir(join(cwd, ".git"));
+  await setup({ cwd, home, agents: ["claude-code"], scope: "local", yes: true, runtimeScript: runtime, print: false });
+  const nested = join(cwd, "project", "nested");
+  await mkdir(nested, { recursive: true });
+
+  const result = await doctor({ cwd: nested, home, print: false });
+  const launch = result.checks.find(({ name }) => name === "launch directory");
+
+  if (process.platform === "win32") {
+    // Windows is the documented exception: the local file is read from the
+    // start directory, so a nested session really is unguarded.
+    assert.equal(launch.ok, false);
+    assert.match(launch.detail, /settings\.local\.json/);
+    assert.match(launch.detail, /--settings/);
+  } else {
+    // `.claude/settings.local.json` is read from the git repository root even
+    // when the session starts in a subdirectory, so the hooks do load here.
+    assert.equal(launch.ok, true);
+    assert.match(launch.detail, /repository root/);
+    assert.equal(result.ok, true);
+  }
+});
+
+test("doctor fails local-scope hooks where no repository can explain them and names the local file", async () => {
+  const cwd = await scratch();
+  const home = await scratch();
+  const runtime = join(cwd, "runtime.mjs");
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  // No repository marker: the repository-root rule cannot explain these hooks
+  // loading, so the verdict must fail and name the file that holds them.
+  await setup({ cwd, home, agents: ["claude-code"], scope: "local", yes: true, runtimeScript: runtime, print: false });
+  const nested = join(cwd, "project", "nested");
+  await mkdir(nested, { recursive: true });
+
+  const result = await doctor({ cwd: nested, home, print: false });
+  const launch = result.checks.find(({ name }) => name === "launch directory");
+  const localFile = join(cwd, ".claude", "settings.local.json");
+
+  assert.equal(launch.ok, false);
+  assert.ok(launch.detail.includes(localFile), launch.detail);
+  assert.match(launch.detail, /--settings/);
+  assert.equal(result.ok, false);
+});
+
+test("doctor keeps a user-scope install green from a nested launch directory", async () => {
+  const cwd = await scratch();
+  const home = await scratch();
+  const runtime = join(cwd, "runtime.mjs");
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  await setup({ cwd, home, agents: ["claude-code"], scope: "global", yes: true, runtimeScript: runtime, print: false });
+  const nested = join(cwd, "project", "nested");
+  await mkdir(nested, { recursive: true });
+
+  const result = await doctor({ cwd: nested, home, print: false });
+
+  assert.equal(result.root, home);
+  assert.match(result.checks.find(({ name }) => name === "install scope").detail, /^user /);
+  const launch = result.checks.find(({ name }) => name === "launch directory");
+  assert.equal(launch.ok, true);
+  assert.match(launch.detail, /load from any directory/);
+  assert.equal(result.ok, true);
+});
+
+test("doctor reports missing hooks when the settings file is deleted", async () => {
+  const cwd = await scratch();
+  const runtime = join(cwd, "runtime.mjs");
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  await setup({ cwd, home: cwd, agents: ["claude-code"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
+  await rm(join(cwd, ".claude", "settings.json"));
+
+  const result = await doctor({ cwd, home: cwd, print: false });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.checks.find(({ name }) => name === "hooks").detail, "not configured");
+  // The launch directory is still correct; the missing file is the problem.
+  assert.equal(result.checks.find(({ name }) => name === "launch directory").ok, true);
+  assert.match(result.checks.find(({ name }) => name === "hook completeness").detail, /missing SessionStart/);
+});
+
+test("doctor reports an unreadable rule file instead of calling it valid (P2-3)", async () => {
+  const cwd = await scratch();
+  const runtime = join(cwd, "runtime.mjs");
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  await setup({ cwd, home: cwd, agents: ["claude-code"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
+  await writeFile(join(cwd, ".grudge", "compiled.json"), '{"version":99,"rules":[]}\n');
+
+  const result = await doctor({ cwd, home: cwd, print: false });
+
+  const compiled = result.checks.find(({ name }) => name === "compiled.json");
+  assert.equal(compiled.ok, false);
+  assert.match(compiled.detail, /invalid or unsupported version/);
+  assert.equal(result.ok, false);
+});
+
+test("setup quotes an install path with spaces so the absolute hook still resolves", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "grudge installer spaces-"));
+  const home = await scratch();
+  const runtime = join(cwd, "runtime.mjs");
+  await writeFile(runtime, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  await setup({ cwd, home, agents: ["claude-code"], scope: "repo", yes: true, runtimeScript: runtime, print: false });
+
+  const settings = JSON.parse(await readFile(join(cwd, ".claude", "settings.json"), "utf8"));
+  const command = settings.hooks.PreToolUse[0].hooks[0].command;
+  const expected = `"${process.execPath}" "${join(cwd, ".grudge", "bin", "grudge.mjs")}" hook PreToolUse`;
+  assert.equal(command, expected);
+
+  const result = await doctor({ cwd, home, print: false });
+  assert.equal(result.checks.find(({ name }) => name === "hook paths").ok, true);
+  assert.equal(result.checks.find(({ name }) => name === "launch directory").ok, true);
 });

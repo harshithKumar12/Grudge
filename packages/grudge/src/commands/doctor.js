@@ -1,7 +1,7 @@
 // OWNER: lane-c
 import { access, readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
-import { join, resolve, isAbsolute } from "node:path";
+import { dirname, join, resolve, isAbsolute } from "node:path";
 import { homedir } from "node:os";
 import { grudgeHookEvents, isGrudgeHookCommand, isGrudgeStatusLine, parseJson } from "../installer/json-merge.js";
 import { missingStatusLineScripts } from "../installer/statusline-paths.js";
@@ -18,20 +18,27 @@ const EXPECTED_HOOKS = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostT
 
 /** Inspect an installed repository without changing it. */
 export async function doctor(options = {}) {
-  const root = resolve(options.cwd ?? process.cwd());
+  const launchDir = resolve(options.cwd ?? process.cwd());
   const home = resolve(options.home ?? homedir());
-  const localConfig = await readJson(join(root, ".grudge/config.json"));
-  const config = localConfig ?? (root === home ? null : await readJson(join(home, ".grudge/config.json")));
-  const installRoot = localConfig || root === home ? root : home;
-  const configPath = join(installRoot, ".grudge/config.json");
-  const runtimePath = join(installRoot, ".grudge/bin/grudge.mjs");
+  // Claude Code loads `<root>/.claude/settings.json` from the directory the
+  // session starts in only; it never walks up. `doctor` still has to inspect the
+  // install when it is run from a subdirectory, so resolve the install root
+  // upward instead of reporting an empty directory as broken.
+  const root = await resolveInstallRoot(launchDir, home);
+  const config = await readJson(join(root, ".grudge/config.json"));
+  const configPath = join(root, ".grudge/config.json");
+  const runtimePath = join(root, ".grudge/bin/grudge.mjs");
   const checks = [];
-  const declaredScope = config?.scope ?? (installRoot === home ? "global" : "repo");
+  const declaredScope = config?.scope ?? (root === home ? "global" : "repo");
+  // Project state (rules, .gitignore, CLAUDE.md) belongs to the project the
+  // session runs in. A user-scope install has no project of its own, so keep
+  // inspecting the launch directory there.
+  const projectRoot = declaredScope === "global" ? launchDir : root;
   checks.push({ name: "node", ok: Number(process.versions.node.split(".")[0]) >= 18, detail: process.version });
   checks.push({
     name: "install scope",
     ok: true,
-    detail: `${declaredScope === "global" ? "user" : "project"} (${declaredScope}; state: ${join(installRoot, ".grudge")})`,
+    detail: `${declaredScope === "global" ? "user" : "project"} (${declaredScope}; state: ${join(root, ".grudge")})`,
   });
   checks.push({ name: "config", ok: Boolean(config), detail: config ? `parse OK (${configPath})` : "missing or invalid" });
   const runtime = await readOptional(runtimePath);
@@ -54,14 +61,21 @@ export async function doctor(options = {}) {
   let userHookCount = 0;
   let projectEvents = new Set();
   let userEvents = new Set();
+  // Which settings file actually holds the project hooks decides whether the
+  // host loads them from a subdirectory: `.claude/settings.json` is read from
+  // the start directory, `.claude/settings.local.json` from the repository root.
+  const projectSources = [];
   let sameScopeDuplicates = false;
   let grudgeStatusLine = false;
   const hookCommands = [];
   const statusLineConflicts = [];
   const statusLineMissing = [];
   const settingsPaths = [
-    { path: join(root, ".claude/settings.json"), scope: "project" },
-    { path: join(root, ".claude/settings.local.json"), scope: "project" },
+    // A user-scope install can live at `~/.grudge`, where the project paths and
+    // the user path coincide; label by scope so the instruction checks look at
+    // the right CLAUDE.md.
+    { path: join(root, ".claude/settings.json"), scope: declaredScope === "global" ? "user" : "project" },
+    { path: join(root, ".claude/settings.local.json"), scope: declaredScope === "global" ? "user" : "project" },
     { path: join(home, ".claude/settings.json"), scope: "user" },
   ].filter(({ path }, index, entries) => entries.findIndex((entry) => entry.path === path) === index);
   for (const { path, scope } of settingsPaths) {
@@ -78,6 +92,7 @@ export async function doctor(options = {}) {
         projectOrUserEvents(userEvents, events);
       } else {
         projectHookCount += count;
+        if (count > 0) projectSources.push({ path, local: path.endsWith("settings.local.json") });
         projectOrUserEvents(projectEvents, events);
       }
       if (count > events.size) sameScopeDuplicates = true;
@@ -112,6 +127,7 @@ export async function doctor(options = {}) {
         ? "absolute and present"
         : "not configured",
   });
+  checks.push(await launchDirectoryCheck({ launchDir, installRoot: root, home, projectHooks: projectHookCount, userHooks: userHookCount, projectSources }));
   const warnings = [];
   if (userHookCount > 0 && projectHookCount > 0) {
     warnings.push("Grudge hooks are installed at both user and project scope; duplicate invocations are deduplicated by session and event.");
@@ -125,7 +141,7 @@ export async function doctor(options = {}) {
     const events = new Set([...projectEvents, ...userEvents]);
     const missing = EXPECTED_HOOKS.filter((event) => !events.has(event));
     checks.push({ name: "hook completeness", ok: missing.length === 0, detail: missing.length ? `missing ${missing.join(", ")}; run grudge setup --agents claude-code` : "all expected Claude Code events are registered" });
-    if (projectEvents.size && !hasManagedBlock(await readOptional(join(root, "CLAUDE.md")))) {
+    if (projectEvents.size && !hasManagedBlock(await readOptional(join(projectRoot, "CLAUDE.md")))) {
       warnings.push("project hooks are installed but the managed block is missing from CLAUDE.md; run grudge setup --scope repo --agents claude-code");
       checks.push({ name: "project instructions", ok: true, warning: true, detail: warnings.at(-1) });
     }
@@ -143,15 +159,18 @@ export async function doctor(options = {}) {
       checks.push({ name: "status line target", ok: true, warning: true, detail });
     }
   }
-  const compiled = await readJson(join(root, ".grudge/compiled.json"));
-  checks.push({ name: "compiled.json", ok: compiled === null || (compiled.version === 1 && Array.isArray(compiled.rules)), detail: compiled === null ? "not present" : "valid" });
-  const gitignore = await readOptional(join(root, ".gitignore"));
-  const projectState = await exists(join(root, ".grudge"));
+  const compiled = await readJson(join(projectRoot, ".grudge/compiled.json"));
+  const compiledOk = compiled === null || (compiled.version === 1 && Array.isArray(compiled.rules));
+  // Reporting "valid" next to a failed check is how a corrupt rule file looks
+  // healthy: the runtime skips it and the guard silently stops enforcing.
+  checks.push({ name: "compiled.json", ok: compiledOk, detail: compiled === null ? "not present" : compiledOk ? "valid" : "invalid or unsupported version; enforcement is skipped" });
+  const gitignore = await readOptional(join(projectRoot, ".gitignore"));
+  const projectState = declaredScope !== "global" && await exists(join(projectRoot, ".grudge"));
   if (projectState) {
     const ignored = [".grudge/session/", ".grudge/stats.json", ".grudge/*.log"].filter((line) => gitignore?.split(/\r?\n/).includes(line));
     checks.push({ name: ".gitignore", ok: ignored.length === 3, detail: `${ignored.length}/3 entries` });
   } else checks.push({ name: ".gitignore", ok: true, detail: "no project .grudge state; nothing to ignore" });
-  const budgetMeasurements = await measureBudgets({ root, compiled, measureOutputs: options.measureOutputs });
+  const budgetMeasurements = await measureBudgets({ root: projectRoot, compiled, measureOutputs: options.measureOutputs });
   for (const measurement of budgetMeasurements) {
     const lineStatus = measurement.withinLineCap === undefined || measurement.withinLineCap;
     const ok = measurement.withinCap && lineStatus;
@@ -165,7 +184,7 @@ export async function doctor(options = {}) {
     command: "grudge verify",
     detail: "not proven by file checks; run `grudge verify` to prove blocking works",
   };
-  const result = { ok: checks.every((check) => check.ok), root, checks, budgetMeasurements, warnings, enforcement };
+  const result = { ok: checks.every((check) => check.ok), root, launchDirectory: launchDir, checks, budgetMeasurements, warnings, enforcement };
   if (options.print !== false) {
     for (const check of checks) process.stdout.write(`${check.warning ? "⚠" : check.ok ? "✓" : "✗"} ${check.name}: ${check.detail}\n`);
     // File checks prove what is installed, never that a hook stops a call.
@@ -214,6 +233,96 @@ async function readOptional(path) {
 
 async function exists(path) {
   try { await access(path); return true; } catch { return false; }
+}
+
+/**
+ * Find the directory Grudge is installed in, starting at the launch directory.
+ *
+ * Claude Code loads a project's `.claude/settings.json` only from the directory
+ * the session started in, so a `doctor` run from `project/nested` must still
+ * inspect the install at `project`. The walk stops at the home directory:
+ * `~/.grudge` is a user-scope install whose settings load from anywhere, and
+ * nothing above it belongs to this user's projects.
+ */
+async function resolveInstallRoot(launchDir, home) {
+  let current = launchDir;
+  while (true) {
+    if (await fileExists(join(current, ".grudge/config.json"))) return current;
+    if (current === home) break;
+    const parent = dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  // No project install on the way up: a user-scope install is still usable from
+  // any directory, and home is where the legacy checks expect it.
+  return home;
+}
+
+/**
+ * State the one thing file checks cannot observe: whether the host will read
+ * these settings at all. Absolute hook paths are useless when the command is
+ * never started, so fail loudly instead of reporting a healthy install.
+ *
+ * The two project files are not equivalent. Claude Code reads the shared
+ * `.claude/settings.json` from the directory the session starts in, but reads
+ * `.claude/settings.local.json` from the repository root — except on Windows,
+ * where the local file stays next to `settings.json`. Failing a local-scope
+ * install that the host does load would be a false alarm, so the declared file
+ * decides the verdict and the remedy names that same file.
+ */
+async function launchDirectoryCheck({ launchDir, installRoot, home, projectHooks, userHooks, projectSources }) {
+  if (launchDir === installRoot) {
+    return { name: "launch directory", ok: true, detail: `session starts at the installed root (${installRoot})` };
+  }
+  if (userHooks > 0) {
+    return {
+      name: "launch directory",
+      ok: true,
+      detail: `session starts at ${launchDir}; user-scope hooks in ${join(home, ".claude/settings.json")} load from any directory${projectHooks > 0 ? `, but project hooks only load from ${installRoot}` : ""}`,
+    };
+  }
+  if (projectHooks > 0) {
+    const primary = projectSources[0] ?? { path: join(installRoot, ".claude", "settings.json"), local: false };
+    if (primary.local && process.platform !== "win32") {
+      const launchRepository = await repositoryRoot(launchDir, home);
+      const installRepository = await repositoryRoot(installRoot, home);
+      if (launchRepository && launchRepository === installRepository) {
+        return {
+          name: "launch directory",
+          ok: true,
+          detail: `session starts at ${launchDir}; Claude Code reads local-scope hooks in ${primary.path} from the repository root ${launchRepository}, so they load here`,
+        };
+      }
+    }
+    return {
+      name: "launch directory",
+      ok: false,
+      detail: `session starts at ${launchDir}, not the installed root ${installRoot}; Claude Code loads ${primary.path} only from the start directory and does not walk up, so the hooks do not load here. Start the session in ${installRoot} or run claude --settings ${quotePath(primary.path)}`,
+    };
+  }
+  return { name: "launch directory", ok: true, detail: `session starts at ${launchDir}; no Grudge hooks are registered` };
+}
+
+/**
+ * Nearest directory at or above `start` that carries a repository marker.
+ * Claude Code anchors `.claude/settings.local.json` here, so two directories
+ * share local-scope settings exactly when they share this root.
+ */
+async function repositoryRoot(start, home) {
+  let current = start;
+  while (true) {
+    for (const marker of [".git", ".hg", ".svn"]) {
+      if (await exists(join(current, marker))) return current;
+    }
+    if (current === home) return null;
+    const parent = dirname(current);
+    if (parent === current) return null;
+    current = parent;
+  }
+}
+
+function quotePath(value) {
+  return `"${String(value).replaceAll('"', '\\"')}"`;
 }
 
 function countGrudgeHooks(value) {

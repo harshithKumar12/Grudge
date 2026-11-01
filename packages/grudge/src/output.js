@@ -59,7 +59,11 @@ function renderDoctor(result, options) {
   // point at the only command that can.
   if (!failed) lines.push("Enforcement: not proven by file checks. Run `grudge verify` to prove blocking works.");
   lines.push(`${passed} passed, ${failed} failed, ${warnings} warnings`);
-  lines.push(`Next: ${failed ? "grudge setup --scope repo --agents claude-code" : "grudge verify"}`);
+  // A launch-directory failure is not fixed by reinstalling the repository
+  // scope; a user-scope install is loaded from every directory.
+  const origin = (result?.checks ?? []).filter((check) => !check.ok);
+  const launchOnly = origin.length === 1 && origin[0].name === "launch directory";
+  lines.push(`Next: ${launchOnly ? "grudge setup --scope global" : failed ? "grudge setup --scope repo --agents claude-code" : "grudge verify"}`);
   return `${lines.join("\n")}\n`;
 }
 
@@ -138,6 +142,9 @@ function fixFor(detail, command) {
   const text = String(detail).toLowerCase();
   if (text.includes("runtime missing") || text.includes("not installed")) return "grudge setup --scope repo";
   if (text.includes("config") || text.includes("gitignore")) return "grudge setup --scope repo";
+  // The hooks are installed; the session just started elsewhere. Setup cannot
+  // fix that, so point at the launch directory instead.
+  if (text.includes("--settings")) return "start the session in the installed root, or pass claude --settings <root>/.claude/settings.json";
   if (text.includes("hook")) return "grudge setup --scope repo --agents claude-code";
   if (command === "doctor") return "grudge doctor --debug";
   return "rerun the command with --debug for details";
