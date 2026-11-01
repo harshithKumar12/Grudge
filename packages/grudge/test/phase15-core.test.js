@@ -23,6 +23,11 @@ test("DSL parses call, ordering, and taint forms", () => {
   assert.deepEqual(parse("must call verify_user before call transfer"), {
     kind: "ordering", tool: "transfer", match: {}, ordering: { before: "verify_user", after: "transfer" }, taint: { source: "", sink: "" }, polarity: "must", source: "must call verify_user before call transfer",
   });
+  // The managed block and README document the shorthand without `call`; both
+  // spellings must produce the same rule (audit P2-4).
+  assert.deepEqual(parse("must call verify_user before transfer"), {
+    kind: "ordering", tool: "transfer", match: {}, ordering: { before: "verify_user", after: "transfer" }, taint: { source: "", sink: "" }, polarity: "must", source: "must call verify_user before transfer",
+  });
   assert.equal(parse('never call http where body tainted_by read_file(path ~ "keys")').taint.sourceMatch.path.$contains, "keys");
 });
 

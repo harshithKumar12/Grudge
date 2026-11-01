@@ -171,7 +171,12 @@ export function parse(source) {
     take("call");
     const before = name();
     if (peek()?.raw === "before") {
-      take("before"); take("call"); const after = name();
+      take("before");
+      // The managed block and README document the shorthand
+      // `must call <tool> before <tool>`; the canonical form is
+      // `before call <tool>`. Accept both instead of rejecting the documented one.
+      if (peek()?.raw === "call") take("call");
+      const after = name();
       if (peek()) error(source, peek().pos, "unexpected text after ordering rule", "remove the trailing text");
       return { kind: "ordering", tool: after, match: {}, ordering: { before, after }, taint: { source: "", sink: "" }, polarity: "must", source };
     }

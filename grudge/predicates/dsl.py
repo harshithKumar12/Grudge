@@ -205,7 +205,9 @@ class _Parser:
             self.expect("call")
             tool = self.name()
             if self.take("before"):
-                self.expect("call")
+                # Accept the shorthand printed by the README and managed block
+                # (`before <tool>`) as well as the canonical `before call <tool>`.
+                self.take("call")
                 return Ordering(before=tool, after=self.name())
             args = self.arguments() if self.take("where") else {}
             return CallShape(tool=tool, args=args)

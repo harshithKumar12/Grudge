@@ -57,6 +57,11 @@ def test_parser_preserves_schema_and_filtered_taint_details() -> None:
     assert parse_predicate(
         "must call verify_user before call transfer_funds"
     ) == Ordering(before="verify_user", after="transfer_funds")
+    # The README and managed block document the shorthand without `call`; both
+    # spellings must parse to the same rule (independent audit P2-4).
+    assert parse_predicate(
+        "must call verify_user before transfer_funds"
+    ) == Ordering(before="verify_user", after="transfer_funds")
     assert parse_predicate('never call erase where path not under "workspace/"') == (
         PredicateSet.not_(
             CallShape(tool="erase", args={"path": {"$not_under": "workspace/"}})
@@ -86,7 +91,9 @@ def test_canonical_spacing_argument_order_and_unicode() -> None:
     [
         ("", 1, 1, "start with"),
         ("never send_http", 1, 7, "insert 'call'"),
-        ("must call verify before transfer", 1, 25, "insert 'call'"),
+        # `before <tool>` and `before call <tool>` both parse (P2-4); only the
+        # mandatory `call` after `must` still has to be spelled out.
+        ("must verify transfer", 1, 6, "insert 'call'"),
         (
             'never call delete_file\nwhere path not "workspace/"',
             2,

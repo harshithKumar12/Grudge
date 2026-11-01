@@ -47,6 +47,10 @@
 | [`docs/AUDIT-TEST-MATRIX.md`](AUDIT-TEST-MATRIX.md) | Every black-box test the independent audit executed, with environment, result, exit code, and evidence. | audit | final |
 | [`docs/PRODUCTION-REMEDIATION-REPORT.md`](PRODUCTION-REMEDIATION-REPORT.md) | Remediation of P0-1 through P0-4 and P1-1: original reproduction, root cause, files changed, fix, regression test, installed-package evidence, and residual risk. | 0.2.1 remediation | final |
 | [`docs/PRODUCTION-REMEDIATION-TEST-MATRIX.md`](PRODUCTION-REMEDIATION-TEST-MATRIX.md) | Re-run of the audit matrix against the remediated installed packages, with the post-fix result and evidence for every row. | 0.2.1 remediation | final |
+| [`docs/INDEPENDENT-RE-AUDIT.md`](INDEPENDENT-RE-AUDIT.md) | Independent re-audit of commit `0e06293`: reproduced P0-1..P0-4 and P1-1 against installed artifacts, found the release-metadata blocker, ran an authenticated live Claude Code check, and records the FAIL verdict. | 0.2.1 re-audit | final |
+| [`docs/INDEPENDENT-RE-AUDIT-TEST-MATRIX.md`](INDEPENDENT-RE-AUDIT-TEST-MATRIX.md) | Every independent case in the re-audit with its command, expected/actual result, status, and evidence. | 0.2.1 re-audit | final |
+| [`docs/FINAL-RELEASE-CONSISTENCY-REPORT.md`](FINAL-RELEASE-CONSISTENCY-REPORT.md) | Root cause, fix, evidence, and verdict for the three release-consistency defects: the stale published tarball, `grudge stats` block counts, and Claude Code nested settings discovery. | 0.2.1 release consistency | final |
+| [`docs/FINAL-RELEASE-CONSISTENCY-TEST-MATRIX.md`](FINAL-RELEASE-CONSISTENCY-TEST-MATRIX.md) | Every release-consistency check with its command, expected and observed result, and status. | 0.2.1 release consistency | final |
 | [`../TEST.md`](../TEST.md) | Scratch-directory walkthrough for setup, hooks, stats, savings, and uninstall. | 24 | final |
 
 ## Status vocabulary

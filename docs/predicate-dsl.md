@@ -34,7 +34,7 @@ JSON strings use double quotes and normal JSON escapes.
 rule          = never_call | must_call | ordering | taint | flow | outcome | group ;
 never_call    = "never", "call", name, ["where", conditions] ;
 must_call     = "must", "call", name, ["where", conditions] ;
-ordering      = "must", "call", name, "before", "call", name ;
+ordering      = "must", "call", name, "before", ["call"], name ;
 taint         = "never", "call", name, "where", name, "tainted_by",
                 name, "(", [conditions], ")" ;
 flow          = "never", "flow", name, ["field", name], "to", name,
@@ -89,6 +89,10 @@ not timestamps or numeric index sorting, defines earlier. An absent target is
 safe; this is a prerequisite rule, not a requirement to call the target. The
 prerequisite need not have returned successfully and is not consumed. Evidence
 contains precisely the target calls that lacked their prerequisite.
+
+`before call <tool>` and `before <tool>` are equivalent. The grammar accepts the
+optional `call` after `before`, so the shorthand used in the README and the
+managed block parses to the same `Ordering` node as the canonical form.
 
 ### Taint flow — MVP-lite implemented
 
