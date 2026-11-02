@@ -10,11 +10,13 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import tempfile
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
+from grudge.predicates.dsl import _canonical_tool
 from grudge.schema.predicate import (
     CallShape,
     FilteredTaintFlow,
@@ -26,6 +28,7 @@ from grudge.schema.predicate import (
 from grudge.schema.scar import Scar
 
 SCHEMA_VERSION = 1
+_DRIVE_RE = re.compile(r"^[A-Za-z]:")
 
 
 def _matches(value: Any, expected: Any) -> bool:
@@ -49,17 +52,55 @@ def _matches(value: Any, expected: Any) -> bool:
     return bool(value == expected)
 
 
-def _under(path: str, root: str) -> bool:
-    """Compare slash and Windows paths without allowing a prefix collision."""
+def _canonical_path(value: str) -> str:
+    """Canonicalize a path lexically, matching the Node runtime exactly.
 
-    left = path.replace("\\", "/").rstrip("/")
-    right = root.replace("\\", "/").rstrip("/")
+    Separators unify, ``.`` and ``..`` collapse without touching the filesystem,
+    and Windows paths (drive letter or UNC) compare case-insensitively while
+    POSIX paths stay case-sensitive.
+    """
+
+    text = str(value).replace("\\", "/")
+    drive_match = bool(_DRIVE_RE.match(text))
+    windows = drive_match or text.startswith("//")
+    drive = text[:2].lower() if drive_match else ""
+    rest = text[2:] if drive_match else text
+    segments: list[str] = []
+    for part in rest.split("/"):
+        if part in ("", "."):
+            continue
+        if part == "..":
+            if segments:
+                segments.pop()
+            continue
+        segments.append(part.lower() if windows else part)
+    body = "/".join(segments)
+    if drive:
+        return f"{drive}/{body}"
+    if rest.startswith("/"):
+        return f"/{body}"
+    return body
+
+
+def _under(path: str, root: str) -> bool:
+    """Compare canonical paths without allowing a prefix collision."""
+
+    left = _canonical_path(path)
+    right = _canonical_path(root).rstrip("/")
+    if not right:
+        return left == ""
     return left == right or left.startswith(right + "/")
 
 
 def _values(value: Any) -> Iterable[Any]:
+    """Yield every leaf under ``value``.
+
+    Containers are traversed, never compared: the Node engine walks the same
+    leaves, so a tainted object is matched by the secret string inside it, not
+    by structural equality of two dicts.
+    """
+
     if isinstance(value, Mapping):
-        yield value
         for child in value.values():
             yield from _values(child)
     elif isinstance(value, list):
@@ -78,6 +119,15 @@ def _event_value(event: Mapping[str, Any], field: str | None) -> Any:
     return event.get(field)
 
 
+def _tool_matches(event: Mapping[str, Any], name: str) -> bool:
+    """True when the event is this tool, including MCP capability aliases."""
+
+    if event.get("tool") == name:
+        return True
+    tools = event.get("tools")
+    return isinstance(tools, list) and name in tools
+
+
 def _rule_violations(
     rule: Mapping[str, Any], events: list[Mapping[str, Any]]
 ) -> list[int]:
@@ -90,16 +140,16 @@ def _rule_violations(
         return [
             index
             for index, event in enumerate(events)
-            if event.get("tool") == tool and _matches(event.get("args", {}), match)
+            if _tool_matches(event, tool) and _matches(event.get("args", {}), match)
         ]
     if kind == "ordering":
         ordering = rule["ordering"]
         seen_before = False
         violations: list[int] = []
         for index, event in enumerate(events):
-            if event.get("tool") == ordering["before"]:
+            if _tool_matches(event, ordering["before"]):
                 seen_before = True
-            elif event.get("tool") == ordering["after"] and not seen_before:
+            elif _tool_matches(event, ordering["after"]) and not seen_before:
                 violations.append(index)
         return violations
     if kind == "taint_flow":
@@ -107,21 +157,28 @@ def _rule_violations(
         sources: list[Any] = []
         violations = []
         for index, event in enumerate(events):
-            if event.get("tool") == taint["source"] and _matches(
+            if _tool_matches(event, taint["source"]) and _matches(
                 event.get("args", {}), taint.get("sourceMatch", {})
             ):
                 sources.extend(_values(_event_value(event, taint.get("sourceField"))))
-            if event.get("tool") == taint["sink"]:
-                sink_value = _event_value(event, taint.get("sinkField"))
+            if _tool_matches(event, taint["sink"]):
+                sink_values = list(_values(_event_value(event, taint.get("sinkField"))))
+                # Mirror the Node engine exactly: a source matches a leaf when
+                # they are equal, or when both are strings and the leaf contains
+                # the source. Comparing only whole values missed taint inside a
+                # nested object, which is the shape most HTTP bodies have.
                 if any(
-                    source != ""
-                    and source is not None
-                    and source in list(_values(sink_value))
-                    for source in sources
-                ) or any(
-                    isinstance(source, str)
-                    and isinstance(sink_value, str)
-                    and source in sink_value
+                    source is not None
+                    and source != ""
+                    and any(
+                        source == candidate
+                        or (
+                            isinstance(source, str)
+                            and isinstance(candidate, str)
+                            and source in candidate
+                        )
+                        for candidate in sink_values
+                    )
                     for source in sources
                 ):
                     violations.append(index)
@@ -135,26 +192,52 @@ def evaluate_rule(
     """Evaluate one compiled rule using the shared fixture result shape."""
 
     at_events = _rule_violations(rule, events)
+    # A `must` call shape is a requirement, not a prohibition: it is violated
+    # when no matching call exists. Every other kind keeps the prohibition
+    # meaning, so a missing call is safe.
+    if rule["kind"] == "call_shape" and rule.get("polarity") == "must":
+        return {"violated": not at_events, "atEvents": at_events}
     return {"violated": bool(at_events), "atEvents": at_events}
+
+
+def _polarity(predicate: Predicate) -> str:
+    """Return the compiled polarity for one predicate.
+
+    ``CallShape`` on its own means "this call is required"; the parser wraps
+    ``never call`` in ``PredicateSet(kind="not")``. Taint rules are always
+    prohibitions, and ordering rules are obligations in both compilers.
+    """
+
+    if isinstance(predicate, PredicateSet) and predicate.kind == "not":
+        return "never"
+    if isinstance(predicate, (Ordering, CallShape)):
+        return "must"
+    return "never"
 
 
 def _flatten(predicate: Predicate) -> tuple[str, dict[str, Any]]:
     if isinstance(predicate, CallShape):
-        return "call_shape", {"tool": predicate.tool, "match": predicate.args}
+        return "call_shape", {
+            "tool": _canonical_tool(predicate.tool),
+            "match": predicate.args,
+        }
     if isinstance(predicate, Ordering):
         return "ordering", {
-            "tool": predicate.after,
-            "ordering": {"before": predicate.before, "after": predicate.after},
+            "tool": _canonical_tool(predicate.after),
+            "ordering": {
+                "before": _canonical_tool(predicate.before),
+                "after": _canonical_tool(predicate.after),
+            },
             "match": {},
         }
     if isinstance(predicate, FilteredTaintFlow):
         flow = predicate.flow
         return "taint_flow", {
-            "tool": flow.sink,
+            "tool": _canonical_tool(flow.sink),
             "match": {},
             "taint": {
-                "source": flow.source,
-                "sink": flow.sink,
+                "source": _canonical_tool(flow.source),
+                "sink": _canonical_tool(flow.sink),
                 "sourceField": flow.source_field,
                 "sinkField": flow.sink_field,
                 "sourceMatch": predicate.source_args,
@@ -162,11 +245,11 @@ def _flatten(predicate: Predicate) -> tuple[str, dict[str, Any]]:
         }
     if isinstance(predicate, TaintFlow):
         return "taint_flow", {
-            "tool": predicate.sink,
+            "tool": _canonical_tool(predicate.sink),
             "match": {},
             "taint": {
-                "source": predicate.source,
-                "sink": predicate.sink,
+                "source": _canonical_tool(predicate.source),
+                "sink": _canonical_tool(predicate.sink),
                 "sourceField": predicate.source_field,
                 "sinkField": predicate.sink_field,
                 "sourceMatch": {},
@@ -179,7 +262,7 @@ def _flatten(predicate: Predicate) -> tuple[str, dict[str, Any]]:
         and isinstance(predicate.predicates[0], CallShape)
     ):
         child = predicate.predicates[0]
-        return "call_shape", {"tool": child.tool, "match": child.args}
+        return "call_shape", {"tool": _canonical_tool(child.tool), "match": child.args}
     raise ValueError(
         f"predicate is not supported by runtime guard: {type(predicate).__name__}"
     )
@@ -199,6 +282,7 @@ def compile_scar(scar: Scar, *, created_from: str) -> dict[str, Any]:
         "match": fields.get("match", {}),
         "ordering": fields.get("ordering", {"before": "", "after": ""}),
         "taint": fields.get("taint", {"source": "", "sink": ""}),
+        "polarity": _polarity(scar.predicate),
         "english": scar.predicate.describe(),
         "createdFrom": created_from,
     }

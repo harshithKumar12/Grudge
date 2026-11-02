@@ -9,11 +9,28 @@ import { append } from "../core/session.js";
 import { claimHookEvent } from "../core/stats.js";
 
 const MAX_RESULT_BYTES = 4 * 1024;
+// Arguments are persisted for replay, not for storage: a Write carries the
+// whole file body. Cap every string value so one large call cannot grow the
+// session log without bound (or hand megabytes to the redactor).
+const MAX_ARG_BYTES = 4 * 1024;
+const MAX_ARG_ITEMS = 50;
 
 function truncateUtf8(text, maxBytes) {
   const bytes = Buffer.from(text, "utf8");
   if (bytes.length <= maxBytes) return text;
   return bytes.subarray(0, maxBytes).toString("utf8");
+}
+
+/** Bound every string and collection inside a value. */
+export function boundValue(value, maxBytes = MAX_ARG_BYTES) {
+  if (typeof value === "string") return truncateUtf8(value, maxBytes);
+  if (Array.isArray(value)) return value.slice(0, MAX_ARG_ITEMS).map((item) => boundValue(item, maxBytes));
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).slice(0, MAX_ARG_ITEMS).map(([key, item]) => [key, boundValue(item, maxBytes)]),
+    );
+  }
+  return value;
 }
 
 function resultText(value) {
@@ -42,19 +59,20 @@ export async function postToolUse(payload = {}, options = {}) {
       ?? payload.tool_response
       ?? payload.output;
     const canonical = normalize({ ...payload, result: rawResult });
-    const args = redactValue(canonical.args);
+    const args = boundValue(redactValue(canonical.args));
     const redactedResult = redactValue(canonical.result ?? "");
     const boundedResult = truncateUtf8(resultText(redactedResult), MAX_RESULT_BYTES);
     const resultHash = createHash("sha256").update(boundedResult, "utf8").digest("hex");
     const event = {
       tool: canonical.tool,
+      ...(canonical.tools ? { tools: canonical.tools } : {}),
       args,
       result: boundedResult,
       resultHash,
       byteSize: Buffer.byteLength(boundedResult, "utf8"),
       timestamp: (options.now instanceof Date ? options.now : new Date(options.now ?? Date.now())).toISOString(),
     };
-    const root = options.root ?? payload.cwd ?? process.cwd();
+    const root = options.roots?.projectRoot ?? options.root ?? payload.cwd ?? process.cwd();
     if ((await claimHookEvent(root, "PostToolUse", payload)).duplicate) return { ok: true, duplicate: true, event };
     await append(join(root, ".grudge"), sessionId, event);
     return { ok: true, event };

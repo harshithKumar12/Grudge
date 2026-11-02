@@ -48,7 +48,7 @@ Options:
   -j, --json      Machine-readable output
   -y, --yes       Skip prompts (setup)
   -a, --agents    Comma-separated agent list (setup)
-  -s, --scope     repo or user (setup)
+  -s, --scope     repo, local, or global (setup)
   -c, --cwd       Run against another directory
   --keep          Keep the temporary project (verify)
 
@@ -140,7 +140,7 @@ export async function dispatch(parsed, { stdin = readStdin } = {}) {
   if (command === "propose") {
     if ((!options.rule && !options.rulestdin) || !options.why) throw Object.assign(new Error("usage: grudge propose --rule <dsl> --why <sentence>"), { exitCode: 2 });
     const rule = options.rulestdin ? await stdin() : options.rule;
-    result = await commands.propose({ ...root, rule, why: options.why, preventive: Boolean(options.preventive), accept: Boolean(options.accept), session: options.session });
+    result = await commands.propose({ ...root, rule, why: options.why, preventive: Boolean(options.preventive), accept: Boolean(options.accept), session: options.session, fromStdin: Boolean(options.rulestdin) });
   } else if (command === "accept") {
     if (!positional[0]) throw Object.assign(new Error("usage: grudge accept <id>"), { exitCode: 2 });
     result = await commands.accept(positional[0], { root: root.root });
@@ -175,6 +175,8 @@ export async function dispatch(parsed, { stdin = readStdin } = {}) {
   if (command === "scars" && positional[0] === "show" && !result?.pending && !result?.scar) return 1;
   if (command === "propose" && result?.error) return 1;
   if (command === "accept" && result?.error) return 1;
+  // A no-op uninstall must not look like success: say so with a non-zero code.
+  if (command === "uninstall" && result?.ok === false) return 1;
   if (command === "doctor" && result?.ok === false) {
     const notInstalled = !result.checks?.find((check) => check.name === "config")?.ok
       && !result.checks?.find((check) => check.name === "runtime")?.ok;

@@ -59,7 +59,11 @@ function renderDoctor(result, options) {
   // point at the only command that can.
   if (!failed) lines.push("Enforcement: not proven by file checks. Run `grudge verify` to prove blocking works.");
   lines.push(`${passed} passed, ${failed} failed, ${warnings} warnings`);
-  lines.push(`Next: ${failed ? "grudge setup --scope repo --agents claude-code" : "grudge verify"}`);
+  // A launch-directory failure is not fixed by reinstalling the repository
+  // scope; a user-scope install is loaded from every directory.
+  const origin = (result?.checks ?? []).filter((check) => !check.ok);
+  const launchOnly = origin.length === 1 && origin[0].name === "launch directory";
+  lines.push(`Next: ${launchOnly ? "grudge setup --scope global" : failed ? "grudge setup --scope repo --agents claude-code" : "grudge verify"}`);
   return `${lines.join("\n")}\n`;
 }
 
@@ -73,11 +77,17 @@ function commandItems(command, result) {
       ...(!result.runtimeInstalled ? [{ status: "warning", label: "Runtime", detail: "not installed" }] : []),
     ];
   }
-  if (command === "uninstall") return [
-    { status: "ok", label: "root", detail: result.root },
-    { status: "ok", label: "Restored", detail: `${result.restored?.length ?? 0} files` },
-    { status: result.removed?.length ? "ok" : "skipped", label: "Removed", detail: `${result.removed?.length ?? 0} paths` },
-  ];
+  if (command === "uninstall") {
+    if (result?.found === false) return [
+      { status: "skipped", label: "Install", detail: result.reason ?? "no Grudge install found" },
+    ];
+    return [
+      { status: "ok", label: "root", detail: result.root },
+      { status: "ok", label: "Restored", detail: `${result.restored?.length ?? 0} files` },
+      { status: result.removed?.length ? "ok" : "skipped", label: "Removed", detail: `${result.removed?.length ?? 0} paths` },
+      ...(result.warnings ?? []).map((warning) => ({ status: "warning", label: "Warning", detail: warning })),
+    ];
+  }
   if (command === "stats") return [
     { status: "ok", label: "Blocks", detail: String(result.blocks ?? 0) },
     { status: "ok", label: "Warnings", detail: String(result.warnings ?? 0) },
@@ -138,6 +148,9 @@ function fixFor(detail, command) {
   const text = String(detail).toLowerCase();
   if (text.includes("runtime missing") || text.includes("not installed")) return "grudge setup --scope repo";
   if (text.includes("config") || text.includes("gitignore")) return "grudge setup --scope repo";
+  // The hooks are installed; the session just started elsewhere. Setup cannot
+  // fix that, so point at the launch directory instead.
+  if (text.includes("--settings")) return "start the session in the installed root, or pass claude --settings <root>/.claude/settings.json";
   if (text.includes("hook")) return "grudge setup --scope repo --agents claude-code";
   if (command === "doctor") return "grudge doctor --debug";
   return "rerun the command with --debug for details";

@@ -1,5 +1,5 @@
 // OWNER: lane-a
-import { appendFile, mkdir, readFile, rm } from "node:fs/promises";
+import { appendFile, mkdir, open, rm, stat } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { readJson, writeJsonAtomic } from "./store.js";
@@ -7,6 +7,8 @@ import { readJson, writeJsonAtomic } from "./store.js";
 export const EMPTY_STATS = Object.freeze({ blocks: 0, warnings: 0, proposals: 0, acceptedScars: 0, perScar: {} });
 const LOCK_RETRY_MS = 2;
 const LOCK_TIMEOUT_MS = 30000;
+const LOCK_STALE_MS = 120000;
+const DEDUPE_TAIL_BYTES = 64 * 1024;
 
 function clean(value) {
   const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
@@ -25,21 +27,63 @@ export function statsPath(root = process.cwd()) { return join(root, ".grudge", "
 export function statsLogPath(root = process.cwd()) { return join(root, ".grudge", "stats.jsonl"); }
 export function reportStatePath(root = process.cwd()) { return join(root, ".grudge", "report-state.json"); }
 
+/**
+ * Serialize mutations that must be atomic read-modify-write (report cursors).
+ *
+ * This lock is deliberately NOT used on the enforcement path: a hook decision
+ * must never wait for accounting, and a stale lock left by a killed process is
+ * taken over once it is older than LOCK_STALE_MS.
+ */
 async function withStatsLock(root, callback) {
   const lock = join(root, ".grudge", "stats.jsonl.lock");
   await mkdir(join(root, ".grudge"), { recursive: true });
   const started = Date.now();
-  while (true) {
+  for (;;) {
     try {
       await mkdir(lock);
       break;
     } catch (error) {
-      if (!["EEXIST", "EPERM", "EBUSY"].includes(error?.code) || Date.now() - started >= LOCK_TIMEOUT_MS) throw error;
+      if (!["EEXIST", "EPERM", "EBUSY"].includes(error?.code)) throw error;
+      if (await isStaleLock(lock)) {
+        await rm(lock, { recursive: true, force: true });
+        continue;
+      }
+      if (Date.now() - started >= LOCK_TIMEOUT_MS) throw error;
       await new Promise((resolve) => setTimeout(resolve, LOCK_RETRY_MS));
     }
   }
   try { return await callback(); } finally {
     await rm(lock, { recursive: true, force: true });
+  }
+}
+
+async function isStaleLock(lock) {
+  try {
+    const info = await stat(lock);
+    return Date.now() - info.mtimeMs > LOCK_STALE_MS;
+  } catch {
+    // It disappeared between the failed mkdir and the stat: retry the acquire.
+    return false;
+  }
+}
+
+/** Read the last chunk of the append-only log without loading the whole file. */
+async function readTail(root, bytes = DEDUPE_TAIL_BYTES) {
+  let handle;
+  try {
+    handle = await open(statsLogPath(root), "r");
+    const info = await handle.stat();
+    const start = Math.max(0, info.size - bytes);
+    const length = info.size - start;
+    if (length <= 0) return "";
+    const buffer = Buffer.alloc(length);
+    await handle.read(buffer, 0, length, start);
+    return buffer.toString("utf8");
+  } catch (error) {
+    if (error?.code === "ENOENT") return "";
+    throw error;
+  } finally {
+    if (handle) await handle.close().catch(() => {});
   }
 }
 
@@ -51,24 +95,47 @@ function isAdvisory(event) {
 
 function eventSession(event) { return event?.sessionId ?? event?.session_id ?? null; }
 
-/** Append one savings event without ever rewriting the event log. */
+/**
+ * Append one savings event without ever rewriting the event log.
+ *
+ * The log is append-only and lock-free: `seq` is the 1-based line number,
+ * computed by the reader, so concurrent writers never contend and a killed
+ * writer can never leave a lock behind. Duplicate delivery is resolved by
+ * `dedupeKey` at read time, plus a bounded tail check here to avoid writing
+ * an obvious duplicate in the first place.
+ */
 export async function appendEvent(root = process.cwd(), event = {}) {
   const value = {
     ...event,
     timestamp: event.timestamp ?? new Date().toISOString(),
   };
   if (isAdvisory(value)) return value;
-  return withStatsLock(root, async () => {
-    const existing = await readEvents(root);
-    if (value.dedupeKey && existing.some((item) => item.dedupeKey === value.dedupeKey)) return { ...value, duplicate: true };
-    const maxSeq = existing.reduce((max, item, index) => Math.max(max, Number.isFinite(item.seq) ? item.seq : index + 1), 0);
-    value.seq = maxSeq + 1;
-    await appendFile(statsLogPath(root), `${JSON.stringify(value)}\n`, "utf8");
-    return { ...value, duplicate: false };
-  });
+  await mkdir(join(root, ".grudge"), { recursive: true });
+  if (value.dedupeKey && await hasRecentDedupeKey(root, value.dedupeKey)) return { ...value, duplicate: true };
+  await appendFile(statsLogPath(root), `${JSON.stringify(value)}\n`, "utf8");
+  return { ...value, duplicate: false };
 }
 
-/** Claim one host hook event so duplicate user/project registrations do not re-run accounting. */
+async function hasRecentDedupeKey(root, dedupeKey) {
+  const tail = await readTail(root);
+  if (!tail.includes(dedupeKey)) return false;
+  for (const line of tail.split(/\r?\n/)) {
+    if (!line.includes(dedupeKey)) continue;
+    try {
+      if (JSON.parse(line)?.dedupeKey === dedupeKey) return true;
+    } catch {
+      // A partial line from a concurrent writer is not evidence of a duplicate.
+    }
+  }
+  return false;
+}
+
+/**
+ * Claim one host hook event so duplicate registrations do not double-count.
+ *
+ * Advisory only: the returned `duplicate` flag must never gate enforcement,
+ * because a deny that becomes an allow is worse than a doubled counter.
+ */
 export async function claimHookEvent(root = process.cwd(), eventName, payload = {}) {
   const sessionId = payload.session_id ?? payload.sessionId;
   if (typeof sessionId !== "string" || !sessionId) return { duplicate: false, dedupeKey: null };
@@ -79,32 +146,58 @@ export async function claimHookEvent(root = process.cwd(), eventName, payload = 
 
 /** Read valid event objects while ignoring blank and corrupt JSONL lines. */
 export async function readEvents(root = process.cwd()) {
+  let text;
   try {
-    const text = await readFile(statsLogPath(root), "utf8");
-    const events = [];
-    let lineNumber = 0;
-    for (const line of text.split(/\r?\n/)) {
-      lineNumber += 1;
-      if (!line.trim()) continue;
-      try {
-        const value = JSON.parse(line);
-        if (value && typeof value === "object" && !Array.isArray(value) && !isAdvisory(value)) events.push({ ...value, seq: Number.isFinite(value.seq) ? value.seq : lineNumber });
-      } catch {
-        // A partial or manually edited line must not lose the report.
-      }
-    }
-    return events;
+    text = await readTail(root, Number.POSITIVE_INFINITY);
   } catch (error) {
     if (error?.code === "ENOENT") return [];
     throw error;
   }
+  const events = [];
+  const seen = new Set();
+  let lineNumber = 0;
+  for (const line of text.split(/\r?\n/)) {
+    lineNumber += 1;
+    if (!line.trim()) continue;
+    try {
+      const value = JSON.parse(line);
+      if (!value || typeof value !== "object" || Array.isArray(value) || isAdvisory(value)) continue;
+      if (typeof value.dedupeKey === "string") {
+        if (seen.has(value.dedupeKey)) continue;
+        seen.add(value.dedupeKey);
+      }
+      events.push({ ...value, seq: lineNumber });
+    } catch {
+      // A partial or manually edited line must not lose the report.
+    }
+  }
+  return events;
 }
 
 function emptyAggregate(sessionId = null) {
-  return { sessionId, caught: 0, blocked: 0, warned: 0, proposals: 0, accepted: 0, injectedChars: 0, injectedTokens: 0, avoidedRetryTokens: 0, netSavingsTokens: 0, estimated: true };
+  return { sessionId, caught: 0, blocked: 0, warned: 0, proposals: 0, accepted: 0, stops: 0, lastStopAt: null, injectedChars: 0, injectedTokens: 0, avoidedRetryTokens: 0, netSavingsTokens: 0, estimated: true };
 }
 
-/** Aggregate savings events for one session or the entire append-only log. */
+/**
+ * The authoritative statistics event model.
+ *
+ * `.grudge/stats.jsonl` is append-only and every counter is derived from it by
+ * this function; no hook writes a counter directly. One line is one event:
+ *
+ * | `type`                         | Counted as | Notes |
+ * |---|---|---|
+ * | `catch` + `outcome: "warned"`  | `caught`, `warned` | a `warn` rule matched |
+ * | `catch` + any other outcome    | `caught`, `blocked` | blocked is the default: a catch that is not a warning stopped the call |
+ * | `proposal`                     | `proposals` | a scar was proposed |
+ * | `accepted`                     | `accepted` | a scar was accepted |
+ * | `stop`                         | `stops` | one per deduplicated Stop delivery |
+ * | `injection`                    | `injectedChars` | prompt/session-start text |
+ * | `hook`                         | nothing | duplicate-delivery claim; deliberately not a counter |
+ *
+ * A call that is allowed writes only a `hook` claim, so it can never inflate
+ * `caught`/`blocked`. Replayed deliveries carry a `dedupeKey` and are collapsed
+ * by `readEvents` before this function sees them, so nothing is counted twice.
+ */
 export function aggregateEvents(events, sessionId = null, avoidedRetryTokens = 1500) {
   const result = emptyAggregate(sessionId);
   const avoided = Number.isFinite(avoidedRetryTokens) && avoidedRetryTokens >= 0 ? avoidedRetryTokens : 1500;
@@ -117,6 +210,11 @@ export function aggregateEvents(events, sessionId = null, avoidedRetryTokens = 1
       else result.blocked += 1;
     } else if (type === "proposal" || type === "proposed") result.proposals += 1;
     else if (type === "accepted" || type === "accept") result.accepted += 1;
+    else if (type === "stop") {
+      result.stops += 1;
+      const at = event.at ?? event.timestamp;
+      if (typeof at === "string" && at) result.lastStopAt = at;
+    }
     result.injectedChars += finite(event.injectedChars ?? event.chars);
   }
   result.avoidedRetryTokens = result.blocked * avoided;
@@ -134,6 +232,8 @@ async function legacyAggregate(root, sessionId, avoidedRetryTokens) {
   result.warned = finite(legacy.warnings);
   result.proposals = finite(legacy.proposals);
   result.accepted = finite(legacy.acceptedScars);
+  result.stops = finite(legacy.stops);
+  result.lastStopAt = typeof legacy.lastStopAt === "string" ? legacy.lastStopAt : null;
   const avoided = Number.isFinite(avoidedRetryTokens) && avoidedRetryTokens >= 0 ? avoidedRetryTokens : 1500;
   result.avoidedRetryTokens = result.blocked * avoided;
   result.injectedTokens = Math.ceil(result.injectedChars / 4);
@@ -172,15 +272,19 @@ export async function record(root, field, scarId = null) {
   const outcome = field === "blocks" ? "blocked" : field === "warnings" ? "warned" : undefined;
   await appendEvent(root, { type: outcome ? "catch" : field === "acceptedScars" ? "accepted" : "proposal", outcome, scarId });
   // Keep the old JSON counter readable for Phase 20 consumers and older installs.
-  const current = await readStats(root);
-  current[field] += 1;
-  if (scarId) {
-    const item = current.perScar[scarId] && typeof current.perScar[scarId] === "object" ? current.perScar[scarId] : {};
-    item[field] = Number.isFinite(item[field]) ? item[field] + 1 : 1;
-    current.perScar[scarId] = item;
-  }
-  await writeJsonAtomic(statsPath(root), current);
-  return current;
+  // The counter is a read-modify-write, so it takes the lock: two concurrent
+  // callers otherwise both read N and write N+1, losing one increment.
+  return withStatsLock(root, async () => {
+    const current = await readStats(root);
+    current[field] += 1;
+    if (scarId) {
+      const item = current.perScar[scarId] && typeof current.perScar[scarId] === "object" ? current.perScar[scarId] : {};
+      item[field] = Number.isFinite(item[field]) ? item[field] + 1 : 1;
+      current.perScar[scarId] = item;
+    }
+    await writeJsonAtomic(statsPath(root), current);
+    return current;
+  });
 }
 
 /** Compute the explicitly estimated savings figure used by stats and statusline. */

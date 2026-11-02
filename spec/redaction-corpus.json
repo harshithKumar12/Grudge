@@ -1,0 +1,117 @@
+[
+  {
+    "name": "aws-access-key",
+    "input": "aws AKIAFAKEFAKEFAKE1234 exported",
+    "expected": "aws [REDACTED KEY] exported"
+  },
+  {
+    "name": "authorization-bearer",
+    "input": "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.payload.sig",
+    "expected": "Authorization: Bearer [REDACTED]"
+  },
+  {
+    "name": "sk-credential",
+    "input": "sk-live-abcdefghijklmnop",
+    "expected": "[REDACTED KEY]"
+  },
+  {
+    "name": "github-pat",
+    "input": "ghp_abcdefghijklmnopqrstuvwxyz0123456789",
+    "expected": "[REDACTED KEY]"
+  },
+  {
+    "name": "slack-token",
+    "input": "xoxb-1234567890-abcdefghijkl",
+    "expected": "[REDACTED KEY]"
+  },
+  {
+    "name": "private-key-block",
+    "input": "-----BEGIN RSA PRIVATE KEY-----\nMIIEfake\n-----END RSA PRIVATE KEY-----",
+    "expected": "[REDACTED PRIVATE KEY]"
+  },
+  {
+    "name": "labelled-api-key",
+    "input": "api_key=sk-demo-1234567890abcdef",
+    "expected": "api_key=[REDACTED]"
+  },
+  {
+    "name": "labelled-password",
+    "input": "password: hunter2-long",
+    "expected": "password: [REDACTED]"
+  },
+  {
+    "name": "env-style-value",
+    "input": "DATABASE_URL=postgres://user:pw@host/db",
+    "expected": "DATABASE_URL=[REDACTED]"
+  },
+  {
+    "name": "aws-env-access-key-id",
+    "input": "AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE",
+    "expected": "AWS_ACCESS_KEY_ID=[REDACTED]"
+  },
+  {
+    "name": "aws-env-secret-access-key",
+    "input": "AWS_SECRET_ACCESS_KEY=abcdefghijklmnop1234",
+    "expected": "AWS_SECRET_ACCESS_KEY=[REDACTED]"
+  },
+  {
+    "name": "fake-key-prefix",
+    "input": "FAKE_KEY_sk_demo_phase2",
+    "expected": "[REDACTED KEY]"
+  },
+  {
+    "name": "ordinary-sentence",
+    "input": "The quick brown fox jumps over the lazy dog.",
+    "expected": "The quick brown fox jumps over the lazy dog."
+  },
+  {
+    "name": "ordinary-token-word",
+    "input": "token bucket algorithm is a rate limiter",
+    "expected": "token bucket algorithm is a rate limiter"
+  },
+  {
+    "name": "labelled-api-key-spaced-label",
+    "input": "api key: abcd1234efgh",
+    "expected": "api key: [REDACTED]"
+  },
+  {
+    "name": "labelled-quoted-password",
+    "input": "Password: \"hunter2!!\"",
+    "expected": "Password: [REDACTED]"
+  },
+  {
+    "name": "labelled-value-trailing-punctuation",
+    "input": "password: hunter2-long!",
+    "expected": "password: [REDACTED]"
+  },
+  {
+    "name": "labelled-value-spaced-separator",
+    "input": "api_key = abcd1234efgh!!",
+    "expected": "api_key = [REDACTED]"
+  },
+  {
+    "name": "labelled-value-query-parameter",
+    "input": "token=abcdefgh&next=1",
+    "expected": "token=[REDACTED]&next=1"
+  },
+  {
+    "name": "labelled-value-query-start",
+    "input": "token=abcdefgh?next=1",
+    "expected": "token=[REDACTED]?next=1"
+  },
+  {
+    "name": "url-query-api-key",
+    "input": "https://x.invalid/?api_key=supersecretvalue123&next=1",
+    "expected": "https://x.invalid/?api_key=[REDACTED]&next=1"
+  },
+  {
+    "name": "cookie-header",
+    "input": "Cookie: session=abc123456789",
+    "expected": "Cookie: [REDACTED]"
+  },
+  {
+    "name": "set-cookie-header",
+    "input": "set-cookie: abcdef1234567890",
+    "expected": "set-cookie: [REDACTED]"
+  }
+]

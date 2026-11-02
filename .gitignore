@@ -16,3 +16,9 @@ build/
 dist/
 .opencode/
 release-dist/
+
+# Claude Code personal settings are machine-local and must never be committed
+# (they hold absolute paths to this workstation's node and install). The shared
+# `.claude/settings.json` stays trackable on purpose: Claude Code defines it as
+# the file a repository ships, so the directory itself is not ignored.
+.claude/settings.local.json

@@ -10,6 +10,8 @@ function section(value) {
     warned: value.warned,
     proposals: value.proposals,
     accepted: value.accepted,
+    stops: value.stops,
+    lastStopAt: value.lastStopAt,
     injectedChars: value.injectedChars,
     injectedTokens: value.injectedTokens,
     avoidedRetryTokens: value.avoidedRetryTokens,

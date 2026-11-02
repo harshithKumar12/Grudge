@@ -6,6 +6,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
+# The npm tarball is a whitelist. These entries must ship, and development-only
+# trees must never be listed even though they exist in the repository.
+REQUIRED_PACKED = ("dist", "src", "package.json", "README.md", "LICENSE")
+PRESENT_PACKED = ("package.json", "README.md", "LICENSE")
+DEV_ONLY_PACKED = ("test", "scripts", "node_modules", ".github", ".claude", ".grudge")
+
 
 def check_release(root: Path = ROOT) -> list[str]:
     """Return release metadata inconsistencies without contacting registries."""
@@ -18,8 +24,61 @@ def check_release(root: Path = ROOT) -> list[str]:
     )
     source = (root / "packages/grudge/src/version.js").read_text(encoding="utf-8")
     pyproject = (root / "pyproject.toml").read_text(encoding="utf-8")
+    lock_text = (root / "requirements.lock").read_text(encoding="utf-8")
     changelog = (root / "CHANGELOG.md").read_text(encoding="utf-8")
     readme = (root / "README.md").read_text(encoding="utf-8")
+
+    errors: list[str] = []
+    scripts = npm.get("scripts") or {}
+    # `dist/` is gitignored: without a prepack build, `npm publish` ships
+    # whatever bundle happens to be on the packer's disk. That is how 0.2.1 was
+    # published with a pre-fix bundle.
+    if "build" not in str(scripts.get("prepack", "")):
+        errors.append(
+            "packages/grudge/package.json prepack must run the build before packing"
+        )
+    prepublish = str(scripts.get("prepublishOnly", ""))
+    if not prepublish:
+        errors.append(
+            "packages/grudge/package.json prepublishOnly must run the test suite"
+        )
+    elif "test" not in prepublish:
+        errors.append(
+            "packages/grudge/package.json prepublishOnly must run the test suite"
+        )
+    # A passing test suite says nothing about the artifact npm would actually
+    # upload. Publication must also run the artifact gate.
+    if "release:verify" not in prepublish:
+        errors.append(
+            "packages/grudge/package.json prepublishOnly must run the release "
+            "gate (release:verify)"
+        )
+    gate = str(scripts.get("release:verify", ""))
+    if "scripts/verify-release.mjs" not in gate:
+        errors.append(
+            "packages/grudge/package.json release:verify must run "
+            "scripts/verify-release.mjs"
+        )
+    elif not (root / "packages/grudge/scripts/verify-release.mjs").is_file():
+        errors.append("packages/grudge/scripts/verify-release.mjs is missing")
+
+    packed_files = npm.get("files") or []
+    for required in REQUIRED_PACKED:
+        if required not in packed_files:
+            errors.append(
+                f"packages/grudge/package.json files is missing {required}"
+            )
+    for entry in PRESENT_PACKED:
+        if entry in packed_files and not (root / "packages/grudge" / entry).is_file():
+            errors.append(
+                f"packages/grudge/package.json files lists {entry}, which is missing"
+            )
+    for dev_only in DEV_ONLY_PACKED:
+        if dev_only in packed_files:
+            errors.append(
+                "packages/grudge/package.json files must not include "
+                f"development directory {dev_only}"
+            )
 
     versions = {
         "package.json": str(npm.get("version")),
@@ -32,7 +91,6 @@ def check_release(root: Path = ROOT) -> list[str]:
             flags=re.MULTILINE,
         ),
     }
-    errors: list[str] = []
     expected = next(iter(versions.values()))
     errors.extend(
         f"{name} reports {version}, expected {expected}"
@@ -41,6 +99,25 @@ def check_release(root: Path = ROOT) -> list[str]:
     )
     if f"## {expected} " not in changelog:
         errors.append(f"CHANGELOG.md has no heading for {expected}")
+    # The build toolchain is installed twice - isolated from `[build-system]`
+    # and pinned in the lock. If they disagree, the artifact CI tests is not the
+    # artifact built from pyproject, so a defective setuptools release could
+    # pass locally and fail, or vice versa, on release.
+    build_requires = _match(
+        pyproject, r"^requires\s*=\s*\[([^\]]*)\]", flags=re.MULTILINE
+    )
+    build_pin = re.search(r"setuptools==([^\s\"']+)", build_requires)
+    lock_pin = re.search(r"^setuptools==([^\s]+)", lock_text, flags=re.MULTILINE)
+    if not build_pin or not lock_pin:
+        errors.append(
+            "pyproject.toml [build-system] and requirements.lock must both "
+            "pin setuptools"
+        )
+    elif build_pin.group(1) != lock_pin.group(1):
+        errors.append(
+            f"pyproject.toml builds with setuptools {build_pin.group(1)}, but "
+            f"requirements.lock installs {lock_pin.group(1)}"
+        )
     published = (
         rf"Grudge CLI `{re.escape(expected)}` is published in both public "
         "package registries"

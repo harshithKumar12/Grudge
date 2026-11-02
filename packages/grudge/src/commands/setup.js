@@ -41,7 +41,11 @@ export async function setup(options = {}) {
   const unknown = requested.filter((id) => !adapters[id]);
   if (unknown.length) throw new Error(`unknown agent adapter(s): ${unknown.join(", ")}`);
   const root = selectedScope === "global" ? home : cwd;
-  const runtimeCommand = selectedScope === "global" ? `node ${JSON.stringify(join(home, ".grudge/bin/grudge.mjs"))}` : "node .grudge/bin/grudge.mjs";
+  // Register the absolute path of the installed runtime. A relative path like
+  // `.grudge/bin/grudge.mjs` breaks the moment Claude Code runs a hook from a
+  // subdirectory or after `cd`, and the host treats the failure as "allowed".
+  const runtimeTarget = join(root, ".grudge/bin/grudge.mjs");
+  const runtimeCommand = `${shellQuote(process.execPath)} ${shellQuote(runtimeTarget)}`;
   const plans = selected.map((item) => ({ adapter: item, plan: item.plan({ cwd, home, scope: selectedScope, runtimeCommand }) }));
   const unverified = plans.filter(({ plan }) => !plan.verified).map(({ adapter, plan }) => ({ id: adapter.id, docsUrl: adapter.docsUrl, snippet: plan.snippet ?? managedBlock() }));
   const runtimeSource = options.runtimeScript
@@ -49,7 +53,6 @@ export async function setup(options = {}) {
     : process.argv[1]?.endsWith("grudge.mjs")
       ? resolve(process.argv[1])
       : resolve(options.packageRoot ?? fileURLToPath(new URL("../..", import.meta.url)), "dist/grudge.mjs");
-  const runtimeTarget = join(root, ".grudge/bin/grudge.mjs");
   const changes = [];
   const warnings = [];
   if (unmarkedDirectory && selectedScope === "global") {
@@ -66,9 +69,29 @@ export async function setup(options = {}) {
     }
     const runtimeExists = await fileExists(runtimeSource);
     if (runtimeExists) await planRuntime(runtimeSource, runtimeTarget, context);
-    await planGitignore(context);
-    const config = await planConfig(root, runtimeTarget, selected.map((adapter) => adapter.id), context, runtimeExists, runtimeSource);
+    // Git never reads `$HOME/.gitignore`, so a global install must not write
+    // one: it would modify a file the user owns for no effect. Project state
+    // (rules, .gitignore) is a repository concern and stays repo-scoped.
+    if (selectedScope === "global") {
+      warnings.push("global setup does not write a .gitignore: git never reads ~/.gitignore, and the file is not Grudge's to change");
+    } else {
+      await planGitignore(context);
+    }
+    const config = await planConfig(root, runtimeTarget, selected.map((adapter) => adapter.id), context, runtimeExists, runtimeSource, { scope: selectedScope, runtimeCommand });
     if (!context.dryRun && runtimeExists) await smokeTest(runtimeTarget, root);
+    // Claude Code loads a project's `.claude/settings.json` only from the
+    // directory the session starts in and never walks up to the repository
+    // root. No file check can prove where the next session starts, so say it at
+    // install time instead of letting a subdirectory run silently unguarded.
+    // `.claude/settings.local.json` is the exception: the host reads it from the
+    // repository root, except on Windows.
+    const claudeSettings = plans.find(({ adapter }) => adapter.id === "claude-code")?.plan.files?.find((file) => file.kind === "claude-settings")?.path;
+    if (claudeSettings && selectedScope !== "global") {
+      const localScopeReadsFromRepositoryRoot = selectedScope === "local" && process.platform !== "win32";
+      warnings.push(localScopeReadsFromRepositoryRoot
+        ? `${claudeSettings} is local-scope: Claude Code reads it from the repository root of ${root}, so a session started in a subdirectory of this repository still loads it, but a session started outside the repository does not.`
+        : `Claude Code loads ${claudeSettings} only when the session starts in ${root}; start the session there, or run claude --settings ${shellQuote(claudeSettings)}. Use --scope global to guard every directory.`);
+    }
     const result = { scope: selectedScope, cwd, root, selected: selected.map((item) => item.id), unverified, detected, dryRun: Boolean(options.dryRun), changes, warnings: [...new Set(warnings)], config, runtimeInstalled: runtimeExists, version: VERSION };
     if (!options.dryRun && backupEntries.length) await writeBackupManifest(root, timestamp, backupEntries);
     if (options.print !== false) printSetup(result);
@@ -121,12 +144,12 @@ async function planGitignore(context) {
   await writeIfChanged(path, before, `${prefix}${missing.join("\n")}\n`, context, "gitignore");
 }
 
-async function planConfig(root, runtimeTarget, selected, context, runtimeInstalled, runtimeSource) {
+async function planConfig(root, runtimeTarget, selected, context, runtimeInstalled, runtimeSource, options = {}) {
   const path = join(root, ".grudge/config.json");
   const before = await readOptional(path);
   const old = before ? parseJson(before, path) : {};
   const hash = runtimeInstalled ? createHash("sha256").update(await readFile(context.dryRun ? runtimeSource : runtimeTarget)).digest("hex") : old.scriptHash ?? null;
-  const after = `${JSON.stringify({ ...old, version: 1, packageVersion: VERSION, scriptHash: hash, adapters: [...new Set([...(old.adapters ?? []), ...selected])].sort(), mode: old.mode ?? "on", autoAccept: old.autoAccept ?? false, lastBackup: old.lastBackup ?? context.timestamp }, null, 2)}\n`;
+  const after = `${JSON.stringify({ ...old, version: 1, packageVersion: VERSION, scope: options.scope ?? old.scope ?? "repo", runtimeCommand: options.runtimeCommand ?? old.runtimeCommand ?? null, scriptHash: hash, adapters: [...new Set([...(old.adapters ?? []), ...selected])].sort(), mode: old.mode ?? "on", autoAccept: old.autoAccept ?? false, lastBackup: old.lastBackup ?? context.timestamp }, null, 2)}\n`;
   await writeIfChanged(path, before, after, context, "config");
   return JSON.parse(after);
 }
@@ -178,6 +201,16 @@ async function smokeTest(runtimePath, cwd) {
     });
     child.stdin.end(JSON.stringify({ session_id: "grudge-install-smoke", hook_event_name: "SessionStart", cwd }));
   });
+}
+
+/**
+ * Quote one token for a shell command line. Backslashes are literal inside
+ * double quotes on both cmd.exe and POSIX shells, so a Windows path survives
+ * unchanged. Quoting unconditionally keeps a registered hook command valid for
+ * every install path, including home directories with spaces.
+ */
+function shellQuote(value) {
+  return `"${String(value).replaceAll('"', '\\"')}"`;
 }
 
 async function hasProjectMarker(path) {

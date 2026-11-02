@@ -3,7 +3,7 @@
 **Purpose:** Map every file currently under `docs/` and show its purpose, owner phase, and status.
 **Audience:** Contributors, reviewers, demo operators, and future implementation agents.
 **Status:** final
-**Last updated (phase):** 25 - 2026-10-29
+**Last updated (phase):** 0.2.1 production remediation - 2026-10-31
 
 ## Documents
 
@@ -42,6 +42,16 @@
 | [`docs/token-budgets.md`](token-budgets.md) | Enforced output caps, token estimates, stats, and status-line discipline. | 20 | final |
 | [`docs/FINAL-REPORT.md`](FINAL-REPORT.md) | Final parallel-mode Definition of Done evidence, limitations, and release commands. | 21 | final |
 | [`docs/phase-25-findings.md`](phase-25-findings.md) | Step 0 investigation of the published CLI: what propose writes, how accept compiles, which tool names map, and whether the hook blocks. | 25 | final |
+| [`docs/production-readiness-audit-2026-10-30.md`](production-readiness-audit-2026-10-30.md) | Evidence-based production-readiness audit after Phase 25: executed checks, P0-P3 findings, remediation backlog, and release checklist. | audit | final |
+| [`docs/INDEPENDENT-PRODUCTION-AUDIT.md`](INDEPENDENT-PRODUCTION-AUDIT.md) | Independent production audit of 0.2.1: four P0 findings, P1-1, prioritized register, literal reproductions, and the NOT READY verdict. | audit | final |
+| [`docs/AUDIT-TEST-MATRIX.md`](AUDIT-TEST-MATRIX.md) | Every black-box test the independent audit executed, with environment, result, exit code, and evidence. | audit | final |
+| [`docs/PRODUCTION-REMEDIATION-REPORT.md`](PRODUCTION-REMEDIATION-REPORT.md) | Remediation of P0-1 through P0-4 and P1-1: original reproduction, root cause, files changed, fix, regression test, installed-package evidence, and residual risk. | 0.2.1 remediation | final |
+| [`docs/PRODUCTION-REMEDIATION-TEST-MATRIX.md`](PRODUCTION-REMEDIATION-TEST-MATRIX.md) | Re-run of the audit matrix against the remediated installed packages, with the post-fix result and evidence for every row. | 0.2.1 remediation | final |
+| [`docs/INDEPENDENT-RE-AUDIT.md`](INDEPENDENT-RE-AUDIT.md) | Independent re-audit of commit `0e06293`: reproduced P0-1..P0-4 and P1-1 against installed artifacts, found the release-metadata blocker, ran an authenticated live Claude Code check, and records the FAIL verdict. | 0.2.1 re-audit | final |
+| [`docs/INDEPENDENT-RE-AUDIT-TEST-MATRIX.md`](INDEPENDENT-RE-AUDIT-TEST-MATRIX.md) | Every independent case in the re-audit with its command, expected/actual result, status, and evidence. | 0.2.1 re-audit | final |
+| [`docs/FINAL-RELEASE-CONSISTENCY-REPORT.md`](FINAL-RELEASE-CONSISTENCY-REPORT.md) | Root cause, fix, evidence, and verdict for the three release-consistency defects: the stale published tarball, `grudge stats` block counts, and Claude Code nested settings discovery. | 0.2.1 release consistency | final |
+| [`docs/FINAL-RELEASE-CONSISTENCY-TEST-MATRIX.md`](FINAL-RELEASE-CONSISTENCY-TEST-MATRIX.md) | Every release-consistency check with its command, expected and observed result, and status. | 0.2.1 release consistency | final |
+| [`docs/PRODUCTION-READINESS-FINAL-REPORT.md`](PRODUCTION-READINESS-FINAL-REPORT.md) | Five-workstream production-readiness remediation: per-workstream evidence, the disposition of every audit finding, the full validation run, and the CONDITIONALLY READY verdict with its remaining conditions. | 0.2.1 production readiness | final |
 | [`../TEST.md`](../TEST.md) | Scratch-directory walkthrough for setup, hooks, stats, savings, and uninstall. | 24 | final |
 
 ## Status vocabulary

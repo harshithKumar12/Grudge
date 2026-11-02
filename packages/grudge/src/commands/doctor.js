@@ -1,11 +1,12 @@
 // OWNER: lane-c
-import { access, readFile } from "node:fs/promises";
+import { access, readFile, stat } from "node:fs/promises";
 import { createHash } from "node:crypto";
-import { join, resolve } from "node:path";
+import { join, resolve, isAbsolute } from "node:path";
 import { homedir } from "node:os";
-import { grudgeHookEvents, isGrudgeStatusLine, parseJson } from "../installer/json-merge.js";
+import { grudgeHookEvents, isGrudgeHookCommand, isGrudgeStatusLine, parseJson } from "../installer/json-merge.js";
 import { missingStatusLineScripts } from "../installer/statusline-paths.js";
 import { hasManagedBlock, managedBlock } from "../installer/managed-block.js";
+import { resolveInstallRoot, repositoryRoot } from "../installer/install-root.js";
 import { measureOutputs as measureBudgetOutputs } from "../core/budget.js";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -18,16 +19,30 @@ const EXPECTED_HOOKS = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostT
 
 /** Inspect an installed repository without changing it. */
 export async function doctor(options = {}) {
-  const root = resolve(options.cwd ?? process.cwd());
+  const launchDir = resolve(options.cwd ?? process.cwd());
   const home = resolve(options.home ?? homedir());
-  const localConfig = await readJson(join(root, ".grudge/config.json"));
-  const config = localConfig ?? (root === home ? null : await readJson(join(home, ".grudge/config.json")));
-  const installRoot = localConfig || root === home ? root : home;
-  const configPath = join(installRoot, ".grudge/config.json");
-  const runtimePath = join(installRoot, ".grudge/bin/grudge.mjs");
+  // Claude Code loads `<root>/.claude/settings.json` from the directory the
+  // session starts in only; it never walks up. `doctor` still has to inspect the
+  // install when it is run from a subdirectory, so resolve the install root
+  // upward instead of reporting an empty directory as broken. The walk stops at
+  // the repository boundary, so a nested repository never inherits an enclosing
+  // project's install.
+  const { root, kind: installKind } = await resolveInstallRoot({ launchDir, home });
+  const config = await readJson(join(root, ".grudge/config.json"));
+  const configPath = join(root, ".grudge/config.json");
+  const runtimePath = join(root, ".grudge/bin/grudge.mjs");
   const checks = [];
+  const declaredScope = config?.scope ?? (installKind === "project" ? "repo" : "global");
+  // Project state (rules, .gitignore, CLAUDE.md) belongs to the project the
+  // session runs in. A user-scope install has no project of its own, so keep
+  // inspecting the launch directory there.
+  const projectRoot = declaredScope === "global" ? launchDir : root;
   checks.push({ name: "node", ok: Number(process.versions.node.split(".")[0]) >= 18, detail: process.version });
-  checks.push({ name: "install scope", ok: true, detail: installRoot === root ? "project" : `user (${join(home, ".grudge")})` });
+  checks.push({
+    name: "install scope",
+    ok: true,
+    detail: `${declaredScope === "global" ? "user" : "project"} (${declaredScope}; state: ${join(root, ".grudge")})`,
+  });
   checks.push({ name: "config", ok: Boolean(config), detail: config ? `parse OK (${configPath})` : "missing or invalid" });
   const runtime = await readOptional(runtimePath);
   checks.push({ name: "runtime", ok: Boolean(runtime), detail: runtime ? "present" : "missing" });
@@ -49,13 +64,21 @@ export async function doctor(options = {}) {
   let userHookCount = 0;
   let projectEvents = new Set();
   let userEvents = new Set();
+  // Which settings file actually holds the project hooks decides whether the
+  // host loads them from a subdirectory: `.claude/settings.json` is read from
+  // the start directory, `.claude/settings.local.json` from the repository root.
+  const projectSources = [];
   let sameScopeDuplicates = false;
   let grudgeStatusLine = false;
+  const hookCommands = [];
   const statusLineConflicts = [];
   const statusLineMissing = [];
   const settingsPaths = [
-    { path: join(root, ".claude/settings.json"), scope: "project" },
-    { path: join(root, ".claude/settings.local.json"), scope: "project" },
+    // A user-scope install can live at `~/.grudge`, where the project paths and
+    // the user path coincide; label by scope so the instruction checks look at
+    // the right CLAUDE.md.
+    { path: join(root, ".claude/settings.json"), scope: declaredScope === "global" ? "user" : "project" },
+    { path: join(root, ".claude/settings.local.json"), scope: declaredScope === "global" ? "user" : "project" },
     { path: join(home, ".claude/settings.json"), scope: "user" },
   ].filter(({ path }, index, entries) => entries.findIndex((entry) => entry.path === path) === index);
   for (const { path, scope } of settingsPaths) {
@@ -64,6 +87,7 @@ export async function doctor(options = {}) {
     try {
       const settings = parseJson(text, path);
       const count = countGrudgeHooks(settings.hooks);
+      hookCommands.push(...grudgeHookCommands(settings));
       const events = grudgeHookEvents(settings);
       hooksPresent ||= count > 0;
       if (scope === "user") {
@@ -71,6 +95,7 @@ export async function doctor(options = {}) {
         projectOrUserEvents(userEvents, events);
       } else {
         projectHookCount += count;
+        if (count > 0) projectSources.push({ path, local: path.endsWith("settings.local.json") });
         projectOrUserEvents(projectEvents, events);
       }
       if (count > events.size) sameScopeDuplicates = true;
@@ -86,6 +111,30 @@ export async function doctor(options = {}) {
     } catch (error) { checks.push({ name: `settings ${path}`, ok: false, detail: error.message }); }
   }
   checks.push({ name: "hooks", ok: hooksPresent || !(config?.adapters ?? []).includes("claude-code"), detail: hooksPresent ? "present" : "not configured" });
+  // A relative hook path is the P0-1 failure: Claude Code runs it from the
+  // session directory, so a subdirectory cannot find the module and the host
+  // treats the error as "allowed". Say it loudly instead of trusting the file.
+  const badHookPaths = [];
+  const unverifiedHookCommands = [];
+  for (const command of hookCommands) {
+    const verdict = await checkHookCommand(command, { root, pathEnv: options.pathEnv });
+    if (verdict.problem) badHookPaths.push(`${command} (${verdict.problem})`);
+    else if (verdict.unverified) unverifiedHookCommands.push(command);
+  }
+  const hookPathsDetail = badHookPaths.length
+    ? `re-run grudge setup: ${badHookPaths[0]}`
+    : hookCommands.length
+      ? unverifiedHookCommands.length
+        ? `absolute and present; ${unverifiedHookCommands.length} command(s) cannot be verified: ${unverifiedHookCommands[0]}`
+        : "absolute and present"
+      : "not configured";
+  checks.push({
+    name: "hook paths",
+    ok: badHookPaths.length === 0,
+    warning: badHookPaths.length === 0 && unverifiedHookCommands.length > 0,
+    detail: hookPathsDetail,
+  });
+  checks.push(await launchDirectoryCheck({ launchDir, installRoot: root, home, kind: installKind, projectHooks: projectHookCount, userHooks: userHookCount, projectSources }));
   const warnings = [];
   if (userHookCount > 0 && projectHookCount > 0) {
     warnings.push("Grudge hooks are installed at both user and project scope; duplicate invocations are deduplicated by session and event.");
@@ -99,7 +148,7 @@ export async function doctor(options = {}) {
     const events = new Set([...projectEvents, ...userEvents]);
     const missing = EXPECTED_HOOKS.filter((event) => !events.has(event));
     checks.push({ name: "hook completeness", ok: missing.length === 0, detail: missing.length ? `missing ${missing.join(", ")}; run grudge setup --agents claude-code` : "all expected Claude Code events are registered" });
-    if (projectEvents.size && !hasManagedBlock(await readOptional(join(root, "CLAUDE.md")))) {
+    if (projectEvents.size && !hasManagedBlock(await readOptional(join(projectRoot, "CLAUDE.md")))) {
       warnings.push("project hooks are installed but the managed block is missing from CLAUDE.md; run grudge setup --scope repo --agents claude-code");
       checks.push({ name: "project instructions", ok: true, warning: true, detail: warnings.at(-1) });
     }
@@ -117,22 +166,32 @@ export async function doctor(options = {}) {
       checks.push({ name: "status line target", ok: true, warning: true, detail });
     }
   }
-  const compiled = await readJson(join(root, ".grudge/compiled.json"));
-  checks.push({ name: "compiled.json", ok: compiled === null || (compiled.version === 1 && Array.isArray(compiled.rules)), detail: compiled === null ? "not present" : "valid" });
-  const gitignore = await readOptional(join(root, ".gitignore"));
-  const projectState = await exists(join(root, ".grudge"));
+  const compiled = await readJson(join(projectRoot, ".grudge/compiled.json"));
+  const compiledOk = compiled === null || (compiled.version === 1 && Array.isArray(compiled.rules));
+  // Reporting "valid" next to a failed check is how a corrupt rule file looks
+  // healthy: the runtime skips it and the guard silently stops enforcing.
+  checks.push({ name: "compiled.json", ok: compiledOk, detail: compiled === null ? "not present" : compiledOk ? "valid" : "invalid or unsupported version; enforcement is skipped" });
+  const gitignore = await readOptional(join(projectRoot, ".gitignore"));
+  const projectState = declaredScope !== "global" && await exists(join(projectRoot, ".grudge"));
   if (projectState) {
     const ignored = [".grudge/session/", ".grudge/stats.json", ".grudge/*.log"].filter((line) => gitignore?.split(/\r?\n/).includes(line));
     checks.push({ name: ".gitignore", ok: ignored.length === 3, detail: `${ignored.length}/3 entries` });
   } else checks.push({ name: ".gitignore", ok: true, detail: "no project .grudge state; nothing to ignore" });
-  const budgetMeasurements = await measureBudgets({ root, compiled, measureOutputs: options.measureOutputs });
+  const budgetMeasurements = await measureBudgets({ root: projectRoot, compiled, measureOutputs: options.measureOutputs });
   for (const measurement of budgetMeasurements) {
     const lineStatus = measurement.withinLineCap === undefined || measurement.withinLineCap;
     const ok = measurement.withinCap && lineStatus;
     const lineDetail = measurement.lines === undefined ? "" : `, ${measurement.lines}/${measurement.lineCap} lines`;
     checks.push({ name: `budget ${measurement.name}`, ok, detail: `${measurement.chars}/${measurement.cap} chars${lineDetail}`, measurement });
   }
-  const result = { ok: checks.every((check) => check.ok), root, checks, budgetMeasurements, warnings };
+  // Scripted consumers read the JSON, so the one statement file checks cannot
+  // make has to travel in the payload too, not only in human output.
+  const enforcement = {
+    proven: false,
+    command: "grudge verify",
+    detail: "not proven by file checks; run `grudge verify` to prove blocking works",
+  };
+  const result = { ok: checks.every((check) => check.ok), root, installKind, launchDirectory: launchDir, checks, budgetMeasurements, warnings, enforcement };
   if (options.print !== false) {
     for (const check of checks) process.stdout.write(`${check.warning ? "⚠" : check.ok ? "✓" : "✗"} ${check.name}: ${check.detail}\n`);
     // File checks prove what is installed, never that a hook stops a call.
@@ -183,6 +242,64 @@ async function exists(path) {
   try { await access(path); return true; } catch { return false; }
 }
 
+/**
+ * State the one thing file checks cannot observe: whether the host will read
+ * these settings at all. Absolute hook paths are useless when the command is
+ * never started, so fail loudly instead of reporting a healthy install.
+ *
+ * The two project files are not equivalent. Claude Code reads the shared
+ * `.claude/settings.json` from the directory the session starts in, but reads
+ * `.claude/settings.local.json` from the repository root — except on Windows,
+ * where the local file stays next to `settings.json`. Failing a local-scope
+ * install that the host does load would be a false alarm, so the declared file
+ * decides the verdict and the remedy names that same file.
+ */
+async function launchDirectoryCheck({ launchDir, installRoot, home, kind, projectHooks, userHooks, projectSources }) {
+  // Nothing to launch: name the missing install instead of comparing two
+  // directories that both happen to be the launch directory.
+  if (kind === "none") {
+    return {
+      name: "launch directory",
+      ok: false,
+      detail: `no Grudge install at or above ${launchDir}; run grudge setup here (or grudge setup --scope global to guard every directory)`,
+    };
+  }
+  if (launchDir === installRoot) {
+    return { name: "launch directory", ok: true, detail: `session starts at the installed root (${installRoot})` };
+  }
+  if (userHooks > 0) {
+    return {
+      name: "launch directory",
+      ok: true,
+      detail: `session starts at ${launchDir}; user-scope hooks in ${join(home, ".claude/settings.json")} load from any directory${projectHooks > 0 ? `, but project hooks only load from ${installRoot}` : ""}`,
+    };
+  }
+  if (projectHooks > 0) {
+    const primary = projectSources[0] ?? { path: join(installRoot, ".claude", "settings.json"), local: false };
+    if (primary.local && process.platform !== "win32") {
+      const launchRepository = await repositoryRoot(launchDir, home);
+      const installRepository = await repositoryRoot(installRoot, home);
+      if (launchRepository && launchRepository === installRepository) {
+        return {
+          name: "launch directory",
+          ok: true,
+          detail: `session starts at ${launchDir}; Claude Code reads local-scope hooks in ${primary.path} from the repository root ${launchRepository}, so they load here`,
+        };
+      }
+    }
+    return {
+      name: "launch directory",
+      ok: false,
+      detail: `session starts at ${launchDir}, not the installed root ${installRoot}; Claude Code loads ${primary.path} only from the start directory and does not walk up, so the hooks do not load here. Start the session in ${installRoot} or run claude --settings ${quotePath(primary.path)}`,
+    };
+  }
+  return { name: "launch directory", ok: true, detail: `session starts at ${launchDir}; no Grudge hooks are registered` };
+}
+
+function quotePath(value) {
+  return `"${String(value).replaceAll('"', '\\"')}"`;
+}
+
 function countGrudgeHooks(value) {
   let count = 0;
   const visit = (item) => {
@@ -195,6 +312,147 @@ function countGrudgeHooks(value) {
   };
   visit(value);
   return count;
+}
+
+/** Split a shell command line into tokens, honouring double quotes. */
+function splitCommand(command) {
+  const tokens = [];
+  let current = "";
+  let quoted = false;
+  let started = false;
+  for (const character of String(command)) {
+    if (character === '"') { quoted = !quoted; started = true; continue; }
+    if (!quoted && /\s/.test(character)) {
+      if (started) { tokens.push(current); current = ""; started = false; }
+      continue;
+    }
+    current += character;
+    started = true;
+  }
+  if (started) tokens.push(current);
+  return tokens;
+}
+
+/** Collect every Grudge command string registered under `hooks`. */
+function grudgeHookCommands(settings) {
+  const commands = [];
+  const visit = (value) => {
+    if (!value || typeof value !== "object") return;
+    if (typeof value.command === "string" && isGrudgeHookCommand(value.command)) {
+      commands.push(value.command);
+    }
+    for (const child of Object.values(value)) {
+      if (Array.isArray(child)) for (const item of child) visit(item);
+      else if (child && typeof child === "object") visit(child);
+    }
+  };
+  visit(settings?.hooks);
+  return [...new Set(commands)];
+}
+
+/** Command names Grudge installs as executables or shims. */
+const GRUDGE_COMMAND_NAMES = new Set(["grudge", "grudge-cli"]);
+
+/** Package runners that resolve a command at run time, not from PATH. */
+const PACKAGE_RUNNERS = new Set(["npx", "bunx", "pnpm", "yarn"]);
+
+/** Drop a Windows executable suffix so `grudge.cmd` and `grudge` compare equal. */
+function stripExecutableSuffix(name) {
+  return String(name).replace(/\.(?:cmd|exe|bat|ps1)$/i, "");
+}
+
+/**
+ * Classify one registered hook command.
+ *
+ * Only two registrations are Grudge hooks whose path can be checked: a path to
+ * the runtime (`grudge.mjs`) and an installed command or shim (`grudge`,
+ * `grudge-cli`, `.../.bin/grudge`). A command that matches the Grudge-hook
+ * pattern but has neither is reported as unverifiable instead of skipped: a
+ * registration whose path is never resolved is how a broken install passes a
+ * file-level check.
+ */
+function classifyHookCommand(command) {
+  const tokens = splitCommand(command);
+  for (const token of tokens) {
+    if (/(?:^|[\\/])grudge\.mjs$/i.test(token)) return { kind: "script", token };
+  }
+  for (const token of tokens) {
+    const base = stripExecutableSuffix(String(token).split(/[\\/]/).pop() ?? "");
+    if (GRUDGE_COMMAND_NAMES.has(base.toLowerCase())) return { kind: "bin", token };
+  }
+  return { kind: "unresolved", token: "" };
+}
+
+async function isFile(path) {
+  try {
+    return (await stat(path)).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/** True when `path` is a file this platform could execute. */
+async function isExecutable(path, platform = process.platform) {
+  try {
+    const stats = await stat(path);
+    if (!stats.isFile()) return false;
+    // Windows resolves executability from the extension, which classifyHookCommand
+    // already checked; POSIX needs the execute bit.
+    return platform === "win32" ? true : (stats.mode & 0o111) !== 0;
+  } catch {
+    return false;
+  }
+}
+
+/** Resolve a bare command name the way the shell will, using the same PATH. */
+async function resolveOnPath(name, { pathEnv = process.env.PATH ?? process.env.Path ?? "", platform = process.platform, pathExt = process.env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD" } = {}) {
+  const separator = platform === "win32" ? ";" : ":";
+  const extensions = platform === "win32"
+    ? ["", ...String(pathExt).split(";").filter(Boolean).map((extension) => extension.toLowerCase())]
+    : [""];
+  for (const directory of String(pathEnv).split(separator)) {
+    if (!directory) continue;
+    for (const extension of extensions) {
+      const full = join(directory, `${name}${extension}`);
+      if (await isExecutable(full, platform)) return full;
+    }
+  }
+  return null;
+}
+
+/**
+ * Verify one hook command. A `problem` fails the check; `unverified` only
+ * warns, because the command may well work but its target is chosen by a
+ * package runner at run time.
+ *
+ * Grudge registers the runtime as an *argument* to `node`, so the script does
+ * not need an execute bit: requiring one failed every POSIX install, where the
+ * script is written 0644. A command Grudge can attribute to itself but cannot
+ * resolve is a failure, not a warning - that is the silent "healthy but dead"
+ * report this check exists to prevent.
+ */
+async function checkHookCommand(command, { pathEnv } = {}) {
+  const first = stripExecutableSuffix(String(splitCommand(command)[0] ?? "").split(/[\\/]/).pop() ?? "");
+  if (PACKAGE_RUNNERS.has(first.toLowerCase())) return { unverified: true };
+  const classified = classifyHookCommand(command);
+  if (classified.kind === "unresolved") return { problem: "cannot resolve a Grudge command" };
+  const pathLike = /[\\/]/.test(classified.token);
+  if (!pathLike) {
+    const resolved = await resolveOnPath(classified.token, { pathEnv });
+    return resolved ? { resolved } : { problem: "not found on PATH" };
+  }
+  if (!isAbsolute(classified.token)) return { problem: "relative path" };
+  if (classified.kind === "script") {
+    return (await isFile(classified.token)) ? { resolved: classified.token } : { problem: "script missing" };
+  }
+  if (await isExecutable(classified.token)) return { resolved: classified.token };
+  return { problem: "command missing" };
+}
+
+/** True when `path` exists (file or directory). */
+async function fileExists(path) {
+  if (!path) return false;
+  try { await access(path); return true; } catch { return false; }
 }
 
 function projectOrUserEvents(target, events) {

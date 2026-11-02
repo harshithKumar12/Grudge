@@ -10,6 +10,7 @@ import typer
 
 from grudge.cli._common import command, finish, load_callable, write_text
 from grudge.errors import GrudgeError
+from grudge.recorder.redact import redact_jsonl
 from grudge.schema.trace import Trace
 
 
@@ -27,7 +28,7 @@ def capture_agent(
             raise GrudgeError(
                 f"agent {agent_module!r} returned {type(trace).__name__}, not a Trace"
             )
-        write_text(out, trace.to_jsonl(), label="trace")
+        write_text(out, redact_jsonl(trace.to_jsonl()), label="trace")
         return {
             "command": "capture",
             "trace": str(out),

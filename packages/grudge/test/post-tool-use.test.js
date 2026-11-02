@@ -19,7 +19,9 @@ test("PostToolUse records a real Claude-style payload with redaction and metadat
   const result = await postToolUse(payload, { root, now: "2026-10-20T12:00:00.000Z" });
   assert.equal(result.ok, true);
   assert.equal(result.event.tool, "read_file");
-  assert.equal(result.event.args.note, "token: [REDACTED]");
+  // The separator is preserved on purpose (P0-4): rewriting `token=value` as
+  // `token: value` corrupts assignments and URL query strings.
+  assert.equal(result.event.args.note, "token=[REDACTED]");
   assert.equal(result.event.result.includes("FAKE_KEY_sk_demo"), false);
   assert.equal(result.event.byteSize, Buffer.byteLength(result.event.result));
   assert.equal(
@@ -70,4 +72,21 @@ test("PostToolUse fails open for malformed payloads and write errors", async () 
   );
   assert.equal(writeFailure.ok, false);
   assert.match(writeFailure.warning, /post-tool-use skipped/);
+});
+
+test("PostToolUse bounds the persisted arguments of a large call", async () => {
+  // A Write carries the entire file body; unbounded it copies megabytes into
+  // the session log and hands them to the regex redactor.
+  const root = await mkdtemp(join(tmpdir(), "grudge-post-tool-args-"));
+  const content = "x".repeat(2_000_000);
+  const result = await postToolUse(
+    { session_id: "big-args", tool_name: "Write", tool_input: { file_path: "big.txt", content } },
+    { root },
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.event.args.file_path, "big.txt");
+  assert.ok(result.event.args.content.length <= 4096);
+  const line = (await read(join(root, ".grudge"), "big-args"))[0];
+  assert.ok(Buffer.byteLength(JSON.stringify(line)) < 20_000);
 });

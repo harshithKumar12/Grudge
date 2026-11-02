@@ -42,6 +42,30 @@ PredicateGroup = PredicateSet
 _NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_.-]*")
 _OPERATORS = {"$eq", "$contains", "$under", "$not_under"}
 
+# Mirrors `toolNames` in packages/grudge/src/core/normalize.js. Events are
+# recorded under these canonical names; a rule that keeps the host's spelling
+# would never match one.
+_TOOL_ALIASES = {
+    "read": "read_file", "notebookread": "read_file",
+    "write": "write_file", "edit": "write_file", "multiedit": "write_file",
+    "notebookedit": "write_file",
+    "bash": "shell", "powershell": "shell",
+    "webfetch": "http", "websearch": "http",
+}
+
+
+def _canonical_tool(name: str) -> str:
+    """Canonical tool name for a name written in a rule.
+
+    An MCP tool keeps its own name: it is already addressed by the raw
+    ``mcp__server__tool`` form the event carries in ``tools``. Unknown names
+    keep the author's spelling rather than being guessed at.
+    """
+
+    if not name or name.startswith("mcp__"):
+        return name
+    return _TOOL_ALIASES.get(name.lower(), name)
+
 
 class _Parser:
     def __init__(self, source: str) -> None:
@@ -83,6 +107,16 @@ class _Parser:
                 self.pos = match.end()
                 return match.group()
         raise self.error("expected a name", "use a tool/argument name or JSON string")
+
+    def tool_name(self) -> str:
+        """A name in tool position, resolved through the host alias table.
+
+        Rules are matched against canonical tool names (`read_file`), but
+        authors write the host's names (`Read`). Resolving here keeps the two
+        implementations and the compiled output in agreement.
+        """
+
+        return _canonical_tool(self.name())
 
     def value(self) -> Any:
         self.skip()
@@ -166,10 +200,10 @@ class _Parser:
                 return PredicateSet(kind=kind, predicates=items)
         if self.take("never"):
             if self.take("flow"):
-                source = self.name()
+                source = self.tool_name()
                 source_field = self.name() if self.take("field") else None
                 self.expect("to")
-                sink = self.name()
+                sink = self.tool_name()
                 sink_field = self.name() if self.take("field") else None
                 return TaintFlow(
                     source=source,
@@ -178,12 +212,12 @@ class _Parser:
                     sink_field=sink_field,
                 )
             self.expect("call")
-            tool = self.name()
+            tool = self.tool_name()
             if not self.take("where"):
                 return PredicateSet.not_(CallShape(tool=tool))
             field = self.name()
             if self.take("tainted_by"):
-                source = self.name()
+                source = self.tool_name()
                 self.expect("(")
                 args = {} if self.take(")") else self.arguments()
                 if args:
@@ -203,10 +237,12 @@ class _Parser:
                     return Outcome(outcome="failed")
                 raise self.error("unknown outcome", "use ok or failed")
             self.expect("call")
-            tool = self.name()
+            tool = self.tool_name()
             if self.take("before"):
-                self.expect("call")
-                return Ordering(before=tool, after=self.name())
+                # Accept the shorthand printed by the README and managed block
+                # (`before <tool>`) as well as the canonical `before call <tool>`.
+                self.take("call")
+                return Ordering(before=tool, after=self.tool_name())
             args = self.arguments() if self.take("where") else {}
             return CallShape(tool=tool, args=args)
         raise self.error(

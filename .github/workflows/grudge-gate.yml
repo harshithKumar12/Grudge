@@ -1,5 +1,8 @@
 name: Grudge Gate (roadmap)
 
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
 
