@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.2.2 - 2026-11-03
+
+Fixes the two guard defects recorded in
+[`TEST-RESULTS.md`](TEST-RESULTS.md). Each has a regression test that fails
+when the fix is reverted.
+
+**F1 — a matching rule blocked every later call in the session**
+
+- A `call_shape` rule was decided over `[...sessionHistory, currentCall]`. Such
+  a rule asserts a property of one call, so any past match kept it violated for
+  every subsequent call, across tool types: a rule scoped to `shell` also
+  denied `Read`, `Write`, and MCP calls. It now decides over the current call
+  only. `ordering` and `taint_flow` describe the session and keep full history.
+- The shared engine (`check.js`, `compile.py`) is untouched, because `propose`
+  must scan history to validate a rule. `test/f1-call-shape-scope.test.js`
+  fails 3/5 without the change.
+
+**F7 — a rule written with the host's tool names never fired**
+
+- Events are recorded under canonical names (`Read` → `read_file`,
+  `Bash` → `shell`), but a rule stored the author's spelling verbatim, so
+  `never call Read …` compiled cleanly and never matched. `canonicalTool()` in
+  `normalize.js` is now applied where a tool name enters a rule: the parser
+  (every tool position, including `before`/`after` and taint source/sink),
+  `compiledRule()` so scars recorded before this release resolve too, and the
+  Python mirror so both compilers emit identical rules.
+- Qualified `mcp__server__tool` names keep their own form, since the event
+  already carries them in `tools`; unknown names keep the author's spelling
+  rather than being guessed at.
+- `test/f7-tool-names.test.js` fails 5/6 with canonicalization disabled.
+
+**Tests.** Node 184/184, Python 342 passed + 1 skipped, `ruff`, `mypy --strict`,
+and `release:verify` 30/30. Neither fix has been re-tested in a live logged-in
+Claude Code conversation; both were verified against the host's real hook
+command and payload shape.
+
 ## 0.2.1 - 2026-10-31
 
 Audit: `docs/production-readiness-audit-2026-10-30.md`. Every item below has a
