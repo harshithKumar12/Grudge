@@ -4,6 +4,7 @@
 import { mkdir, readdir, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { readJson, writeJsonAtomic } from "../core/store.js";
+import { canonicalTool } from "../core/normalize.js";
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
@@ -58,10 +59,17 @@ export function compiledRule(record, mode = "block") {
     id: record.id,
     mode,
     kind: rule.kind,
-    tool: rule.tool,
+    tool: canonicalTool(rule.tool),
     match: rule.match ?? {},
-    ordering: rule.ordering ?? { before: "", after: "" },
-    taint: rule.taint ?? { source: "", sink: "" },
+    // Ordering names two tools, and each has to resolve the same way the
+    // pending call does, or `must call Read before shell` would look for an
+    // event named `Read` that is always recorded as `read_file`.
+    ordering: rule.ordering
+      ? { before: canonicalTool(rule.ordering.before), after: canonicalTool(rule.ordering.after) }
+      : { before: "", after: "" },
+    taint: rule.taint
+      ? { ...rule.taint, source: canonicalTool(rule.taint.source), sink: canonicalTool(rule.taint.sink) }
+      : { source: "", sink: "" },
     // `polarity` decides whether a call_shape rule forbids a call or requires
     // one. Dropping it silently inverted `must call ...` into a block of the
     // required call, so it is always written and defaults to the prohibition.

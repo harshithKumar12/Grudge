@@ -85,16 +85,23 @@ async function loadState(roots, root, config, payload, warnings) {
 }
 
 /**
- * Evaluate every block/warn rule against the session history plus this call.
+ * Evaluate every block/warn rule for the call the host is about to make.
+ *
+ * Which events a rule may read depends on what it asserts. An `ordering` or
+ * `taint_flow` rule is a property of the session, so it is evaluated over the
+ * history plus this call. A `call_shape` rule describes a single call, so it is
+ * evaluated over this call alone: charging history to it would deny an
+ * unrelated call merely because some earlier call in the same session matched.
  *
  * Pure CPU over already-loaded state: it is never raced against the budget, so
  * once the rules are in memory the decision is authoritative.
  */
 function decide(rules, prior, payload) {
   if (!rules.length) return null;
-  const events = [...prior, normalize(payload)];
+  const current = normalize(payload);
   for (const rule of rules) {
     if (rule.mode !== "block" && rule.mode !== "warn") continue;
+    const events = rule.kind === "call_shape" ? [current] : [...prior, current];
     const result = check(rule, events);
     if (result.violated) return { rule, result };
   }

@@ -1,4 +1,5 @@
 // OWNER: lane-a
+import { canonicalTool } from "../core/normalize.js";
 
 /** @typedef {{kind:string, tool:string, match:object, ordering:object, taint:object, polarity?:string, source:string}} RuntimeRule */
 
@@ -82,6 +83,10 @@ export function parse(source) {
     cursor += 1;
     return token.value;
   };
+  // A bare name in tool position resolves through the host alias table, so
+  // `Read` and `read_file` (and `Bash`/`shell`) all name the same tool a
+  // recorded event is actually matched against.
+  const toolName = () => canonicalTool(name());
   const jsonValue = () => {
     const token = peek();
     if (!token) error(source, source.length, "expected a JSON value", "add a value after '='");
@@ -139,17 +144,17 @@ export function parse(source) {
   if (first === "never") {
     const kind = peek()?.raw;
     if (kind === "flow") {
-      take("flow"); const sourceTool = name();
+      take("flow"); const sourceTool = toolName();
       let sourceField = null;
       if (peek()?.raw === "field") { take("field"); sourceField = name(); }
-      take("to"); const sinkTool = name();
+      take("to"); const sinkTool = toolName();
       let sinkField = null;
       if (peek()?.raw === "field") { take("field"); sinkField = name(); }
       if (peek()) error(source, peek().pos, "unexpected text after flow rule", "remove the trailing text");
       return { kind: "taint_flow", tool: sinkTool, match: {}, ordering: { before: "", after: "" }, taint: { source: sourceTool, sink: sinkTool, sourceField, sinkField, sourceMatch: {} }, polarity: "never", source };
     }
     take("call");
-    const tool = name();
+    const tool = toolName();
     if (peek()?.raw !== "where") {
       if (peek()) error(source, peek().pos, "unexpected text after tool name", "remove the trailing text or add 'where'");
       return { kind: "call_shape", tool, match: {}, ordering: { before: "", after: "" }, taint: { source: "", sink: "" }, polarity: "never", source };
@@ -157,7 +162,7 @@ export function parse(source) {
     take("where");
     const field = name();
     if (peek()?.raw === "tainted_by") {
-      take("tainted_by"); const sourceTool = name();
+      take("tainted_by"); const sourceTool = toolName();
       let sourceMatch = {};
       if (peek()?.raw === "(") { take("("); sourceMatch = conditions(")"); take(")"); }
       if (peek()) error(source, peek().pos, "unexpected text after taint rule", "remove the trailing text");
@@ -169,14 +174,14 @@ export function parse(source) {
   }
   if (first === "must") {
     take("call");
-    const before = name();
+    const before = toolName();
     if (peek()?.raw === "before") {
       take("before");
       // The managed block and README document the shorthand
       // `must call <tool> before <tool>`; the canonical form is
       // `before call <tool>`. Accept both instead of rejecting the documented one.
       if (peek()?.raw === "call") take("call");
-      const after = name();
+      const after = toolName();
       if (peek()) error(source, peek().pos, "unexpected text after ordering rule", "remove the trailing text");
       return { kind: "ordering", tool: after, match: {}, ordering: { before, after }, taint: { source: "", sink: "" }, polarity: "must", source };
     }
