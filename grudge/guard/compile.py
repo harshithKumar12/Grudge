@@ -16,6 +16,7 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
+from grudge.predicates.dsl import _canonical_tool
 from grudge.schema.predicate import (
     CallShape,
     FilteredTaintFlow,
@@ -216,21 +217,27 @@ def _polarity(predicate: Predicate) -> str:
 
 def _flatten(predicate: Predicate) -> tuple[str, dict[str, Any]]:
     if isinstance(predicate, CallShape):
-        return "call_shape", {"tool": predicate.tool, "match": predicate.args}
+        return "call_shape", {
+            "tool": _canonical_tool(predicate.tool),
+            "match": predicate.args,
+        }
     if isinstance(predicate, Ordering):
         return "ordering", {
-            "tool": predicate.after,
-            "ordering": {"before": predicate.before, "after": predicate.after},
+            "tool": _canonical_tool(predicate.after),
+            "ordering": {
+                "before": _canonical_tool(predicate.before),
+                "after": _canonical_tool(predicate.after),
+            },
             "match": {},
         }
     if isinstance(predicate, FilteredTaintFlow):
         flow = predicate.flow
         return "taint_flow", {
-            "tool": flow.sink,
+            "tool": _canonical_tool(flow.sink),
             "match": {},
             "taint": {
-                "source": flow.source,
-                "sink": flow.sink,
+                "source": _canonical_tool(flow.source),
+                "sink": _canonical_tool(flow.sink),
                 "sourceField": flow.source_field,
                 "sinkField": flow.sink_field,
                 "sourceMatch": predicate.source_args,
@@ -238,11 +245,11 @@ def _flatten(predicate: Predicate) -> tuple[str, dict[str, Any]]:
         }
     if isinstance(predicate, TaintFlow):
         return "taint_flow", {
-            "tool": predicate.sink,
+            "tool": _canonical_tool(predicate.sink),
             "match": {},
             "taint": {
-                "source": predicate.source,
-                "sink": predicate.sink,
+                "source": _canonical_tool(predicate.source),
+                "sink": _canonical_tool(predicate.sink),
                 "sourceField": predicate.source_field,
                 "sinkField": predicate.sink_field,
                 "sourceMatch": {},
@@ -255,7 +262,7 @@ def _flatten(predicate: Predicate) -> tuple[str, dict[str, Any]]:
         and isinstance(predicate.predicates[0], CallShape)
     ):
         child = predicate.predicates[0]
-        return "call_shape", {"tool": child.tool, "match": child.args}
+        return "call_shape", {"tool": _canonical_tool(child.tool), "match": child.args}
     raise ValueError(
         f"predicate is not supported by runtime guard: {type(predicate).__name__}"
     )

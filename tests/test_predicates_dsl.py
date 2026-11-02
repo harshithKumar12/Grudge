@@ -126,10 +126,12 @@ def test_parse_errors_have_location_and_hint(
 @pytest.mark.parametrize(
     "predicate",
     [
-        CallShape(tool="read", args={"path": "keys"}),
+        CallShape(tool="read_file", args={"path": "keys"}),
         PredicateSet.not_(CallShape(tool="erase")),
         Ordering(before="verify", after="transfer"),
-        TaintFlow(source="read", sink="send", source_field="text", sink_field="body"),
+        TaintFlow(
+            source="read_file", sink="http", source_field="text", sink_field="body"
+        ),
         Outcome(outcome="ok"),
     ],
 )

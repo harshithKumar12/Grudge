@@ -36,6 +36,27 @@ export function mcpCapability(toolName) {
   return Object.hasOwn(mcpCapabilities, name) ? mcpCapabilities[name] : null;
 }
 
+/**
+ * Canonical tool name for a name written in a rule.
+ *
+ * Rule authors reach for the host's own vocabulary (`Read`, `Bash`,
+ * `WebFetch`), but events are recorded under the canonical names this module
+ * defines. Without this, `never call Read ...` compiles cleanly and never
+ * matches anything, because no recorded event is ever named `Read`.
+ *
+ * A qualified MCP tool keeps its own name: it is already addressed by the raw
+ * `mcp__server__tool` form, which the event carries in `tools`.
+ *
+ * @param {string} name
+ * @returns {string}
+ */
+export function canonicalTool(name) {
+  const text = String(name ?? "");
+  if (!text || text.startsWith("mcp__")) return text;
+  // Unknown names keep the author's spelling rather than being guessed at.
+  return toolNames[text.toLowerCase()] ?? text;
+}
+
 /** Convert a host hook payload into the canonical runtime event shape. */
 export function normalize(event = {}) {
   const rawTool = event.tool ?? event.tool_name ?? event.name ?? event.function?.name ?? event.input?.tool;
