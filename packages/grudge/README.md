@@ -46,8 +46,10 @@ alongside it.
 For a non-interactive Claude Code repository setup:
 
 ```bash
-npx grudge-cli@latest setup --yes --agents claude-code --scope repo
+npx grudge-cli@latest setup -y
 ```
+
+`--scope` defaults to `repo` and `--agents` to whatever `setup` detects, so the flags are only needed to deviate — e.g. `--scope global` for every project.
 
 Claude Code is the only agent with real hook enforcement. The others receive a
 managed instruction block in the file they already read:

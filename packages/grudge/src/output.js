@@ -63,7 +63,7 @@ function renderDoctor(result, options) {
   // scope; a user-scope install is loaded from every directory.
   const origin = (result?.checks ?? []).filter((check) => !check.ok);
   const launchOnly = origin.length === 1 && origin[0].name === "launch directory";
-  lines.push(`Next: ${launchOnly ? "grudge setup --scope global" : failed ? "grudge setup --scope repo --agents claude-code" : "grudge verify"}`);
+  lines.push(`Next: ${launchOnly ? "grudge setup --scope global" : failed ? "grudge setup --scope repo" : "grudge verify"}`);
   return `${lines.join("\n")}\n`;
 }
 
@@ -151,7 +151,7 @@ function fixFor(detail, command) {
   // The hooks are installed; the session just started elsewhere. Setup cannot
   // fix that, so point at the launch directory instead.
   if (text.includes("--settings")) return "start the session in the installed root, or pass claude --settings <root>/.claude/settings.json";
-  if (text.includes("hook")) return "grudge setup --scope repo --agents claude-code";
+  if (text.includes("hook")) return "grudge setup --scope repo";
   if (command === "doctor") return "grudge doctor --debug";
   return "rerun the command with --debug for details";
 }

@@ -214,10 +214,21 @@ grudge-node doctor       # npm Node Guard
 grudge-engine --help     # Python engine
 ```
 
-Every command also has a short form, so the common setup can be written
-`grudge setup -y -a claude-code -s repo` instead of
-`grudge setup --yes --agents claude-code --scope repo`, and
-`grudge-engine run -s scars -a examples.leaky_agent.agent_fixed -j` instead of
+In a project directory on a machine where Claude Code is installed, the whole
+install is `-y`:
+
+```bash
+grudge setup -y
+```
+
+Both `--agents` and `--scope` are already defaulted: the scope is `repo`, and
+the agents are whatever `setup` detects. The flagless form writes the same
+files as `grudge setup --yes --agents claude-code --scope repo` — you only need
+the flags to deviate from what was detected, for example
+`grudge setup -y --scope global` for an all-projects install.
+
+Every command also has a short form, so `grudge-engine run -s scars -a
+examples.leaky_agent.agent_fixed -j` works instead of
 `grudge-engine run --scars scars --agent examples.leaky_agent.agent_fixed --json`.
 Long forms always work too; `grudge --help` and `grudge-engine --help` list both.
 
@@ -238,22 +249,26 @@ Code is the only Guard-tier integration:
   ◯ OpenCode Advisory — detected
 ```
 
-Pass `--agents` and `--scope` to skip the picker. `--agents` takes a
-comma-separated list of `claude-code`, `opencode`, `codex`, `gemini-cli`,
-`copilot`, `windsurf`, and `cursor`:
+To skip the picker and accept the defaults — Claude Code, this repository —
+one flag is enough:
 
 ```bash
-# Claude Code only, this repository
-npx grudge-cli@latest setup --yes --agents claude-code --scope repo
+npx grudge-cli@latest setup -y
+```
+
+Pass `--agents` and `--scope` only to deviate from what was detected.
+`--agents` takes a comma-separated list of `claude-code`, `opencode`, `codex`,
+`gemini-cli`, `copilot`, `windsurf`, and `cursor`:
+
+```bash
+# Several agents at once; Codex and OpenCode share one AGENTS.md block
+npx grudge-cli@latest setup --yes --agents claude-code,opencode,codex --scope repo
 
 # OpenCode only (writes AGENTS.md)
 npx grudge-cli@latest setup --yes --agents opencode --scope repo
 
-# Several at once; Codex and OpenCode share one AGENTS.md block
-npx grudge-cli@latest setup --yes --agents claude-code,opencode,codex --scope repo
-
 # Claude Code for every project on this machine
-npx grudge-cli@latest setup --yes --agents claude-code --scope global
+npx grudge-cli@latest setup --yes --scope global
 ```
 
 Preview the exact file list without writing anything:
@@ -489,7 +504,7 @@ that file once and keeps a single managed block.
 ### Claude Code (Guard)
 
 ```bash
-npx grudge-cli@latest setup --yes --agents claude-code --scope repo
+npx grudge-cli@latest setup -y
 ```
 
 Setup registers five hooks and, only when no other tool owns it, a status line:
@@ -860,8 +875,8 @@ Pass the DSL through stdin:
 Use explicit scope flags:
 
 ```bash
-npx grudge-cli@latest setup --yes --agents claude-code --scope repo
-npx grudge-cli@latest setup --yes --agents claude-code --scope global
+npx grudge-cli@latest setup --yes --scope repo
+npx grudge-cli@latest setup --yes --scope global
 ```
 
 Then run `grudge doctor` and inspect the reported settings and instruction
@@ -875,7 +890,7 @@ directory from the hook payload, so they act on whichever project Claude Code
 is open in. Do not run `setup` again inside each repository:
 
 ```powershell
-npx grudge-cli@latest setup --scope global --yes --agents claude-code
+npx grudge-cli@latest setup --scope global --yes
 ```
 
 Each project only needs its own `.grudge/` state (compiled scars, session log,
