@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.2.3 - 2026-11-04
+
+Documentation and help-text release. No behavioural change to the guard; it
+carries the same F1 and F7 fixes as 0.2.2.
+
+- **Install instructions lead with the one-flag form.** `--scope` already
+  defaults to `repo` and `--agents` defaults to whatever `setup` detects, so on
+  a machine with Claude Code installed `grudge setup --yes --agents claude-code
+  --scope repo` and `grudge setup -y` are the same command — verified to write
+  an identical file tree, register the same five hooks, and produce the same
+  `CLAUDE.md` block. The README now leads with `-y` and presents the flags as
+  the way to deviate: several agents at once, or `--scope global`.
+- **Two `doctor` hints no longer print a redundant flag.**
+  `grudge setup --scope repo --agents claude-code` became
+  `grudge setup --scope repo` in both the hook-failure fix hint and the
+  hook-completeness warning. The `Next:` line is unchanged.
+- Dated records were left alone on purpose: `TEST.md` compares against verbatim
+  captures, `TEST-RESULTS.md` documents the F1 reproduction steps, and the
+  audit files are point-in-time records.
+
 ## 0.2.2 - 2026-11-03
 
 Fixes the two guard defects recorded in

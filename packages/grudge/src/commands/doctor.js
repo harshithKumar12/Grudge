@@ -147,13 +147,13 @@ export async function doctor(options = {}) {
   if ((config?.adapters ?? []).includes("claude-code")) {
     const events = new Set([...projectEvents, ...userEvents]);
     const missing = EXPECTED_HOOKS.filter((event) => !events.has(event));
-    checks.push({ name: "hook completeness", ok: missing.length === 0, detail: missing.length ? `missing ${missing.join(", ")}; run grudge setup --agents claude-code` : "all expected Claude Code events are registered" });
+    checks.push({ name: "hook completeness", ok: missing.length === 0, detail: missing.length ? `missing ${missing.join(", ")}; run grudge setup` : "all expected Claude Code events are registered" });
     if (projectEvents.size && !hasManagedBlock(await readOptional(join(projectRoot, "CLAUDE.md")))) {
-      warnings.push("project hooks are installed but the managed block is missing from CLAUDE.md; run grudge setup --scope repo --agents claude-code");
+      warnings.push("project hooks are installed but the managed block is missing from CLAUDE.md; run grudge setup --scope repo");
       checks.push({ name: "project instructions", ok: true, warning: true, detail: warnings.at(-1) });
     }
     if (userEvents.size && !hasManagedBlock(await readOptional(join(home, ".claude/CLAUDE.md")))) {
-      warnings.push("user hooks are installed but the managed block is missing from ~/.claude/CLAUDE.md; run grudge setup --scope global --agents claude-code --yes");
+      warnings.push("user hooks are installed but the managed block is missing from ~/.claude/CLAUDE.md; run grudge setup --scope global --yes");
       checks.push({ name: "user instructions", ok: true, warning: true, detail: warnings.at(-1) });
     }
     if (statusLineConflicts.length) {
