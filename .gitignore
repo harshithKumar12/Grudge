@@ -25,3 +25,6 @@ release-dist/
 .grudge/session/
 .grudge/stats.json
 .grudge/*.log
+
+# Grudge live-test artifacts
+.grudge-live-test-quarantine/
