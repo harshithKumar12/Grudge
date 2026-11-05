@@ -22,3 +22,6 @@ release-dist/
 # `.claude/settings.json` stays trackable on purpose: Claude Code defines it as
 # the file a repository ships, so the directory itself is not ignored.
 .claude/settings.local.json
+.grudge/session/
+.grudge/stats.json
+.grudge/*.log

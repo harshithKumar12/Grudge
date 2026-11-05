@@ -75,3 +75,12 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 Do not ask me which tool to use. Just pick the best one and use it.
 Prefer real tool results over hallucinated or outdated information.
+<!-- grudge:begin v1 -->
+## Grudge (mistake guard)
+- A hook may block a tool call and cite a "scar". Do not retry the same call or work around it. Change approach, or ask the user if you think it is a false positive.
+- When the user corrects a repeatable mistake, or something failed because of an action you should never repeat in this repo, record it once:
+  `node .grudge/bin/grudge.mjs propose --rule '<rule>' --why '<one sentence>'`
+- Rule forms: `never call <tool> where <field> ~ "<text>"`, `must call <tool> before <tool>`, `never call <tool> where <field> tainted_by <tool>`. Tools: read_file, write_file, shell, http. Run `... propose --help` for examples.
+- After proposing, show the exact command output. Never claim a rule is active unless that output says accepted; pending is not enforced. Add `--accept` to enforce immediately.
+- One rule per correction. Never propose rules that block reading files or running tests. Do not edit `.grudge/`.
+<!-- grudge:end -->
