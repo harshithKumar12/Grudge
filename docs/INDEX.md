@@ -10,6 +10,7 @@
 | File | Purpose | Owner phase | Status |
 |---|---|---:|---|
 | [`docs/INDEX.md`](INDEX.md) | Complete index of the documentation tree and its delivery status. | 0-12 | final |
+| [`docs/growth-strategy.md`](growth-strategy.md) | Community targets, content plan, cadence, and the signals that distinguish real adoption from vanity metrics. | 0.2.3 | draft |
 | [`docs/PROGRESS.md`](PROGRESS.md) | Pointer from the docs tree to the canonical root progress tracker. | 0 | final |
 | [`docs/architecture.md`](architecture.md) | Pipeline contracts, admission proof boundaries, gate semantics, demo orchestration, CLI integration, and the static viewer boundary. | 0-12 | final |
 | [`docs/roadmap.md`](roadmap.md) | Complete register of deferred stubs, design notes, and Phase 13 ordering. | 0-12 | final |

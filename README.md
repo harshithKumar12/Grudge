@@ -24,7 +24,35 @@ every failed agent trace is automatically turned into a regression test, so your
 
 </div>
 
-> **Release status:** Grudge CLI source version `0.2.3` is being prepared; `0.2.2` is the latest published version in both public package registries (`grudge-cli` on npm and on PyPI). The unrelated `grudge` npm package is a different project, so install `grudge-cli`.
+## The 30-second version
+
+Your agent does something it shouldn't: sends a file it read to an external
+endpoint, runs a destructive shell command, leaks a key into a log. You fix the
+prompt. Two weeks later a different model or a different tool result brings the
+exact same mistake back — because nothing in your test suite ever described it.
+
+Grudge turns that failure into a **scar**: a shrunk replay cassette plus a
+deterministic predicate that runs in CI and blocks the call locally before it
+happens.
+
+```bash
+grudge setup -y                          # install the Claude Code hook here
+grudge propose \
+  --rule 'never call shell where command ~ "rm -rf"' \
+  --why "agent deleted the venv" --accept
+grudge verify                            # Result: PASS (10/10 checks)
+```
+
+That is the whole loop — a rule a hook actually enforces, proven by feeding real
+`PreToolUse` payloads through the installed guard rather than trusting it.
+
+- **No model in the loop.** Replay is offline, deterministic, and needs no API key.
+- **Fails red then green.** A scar is only admitted with bad-agent, fixed-agent,
+  and benign-control evidence, so it cannot pass for the wrong reason.
+- **Runs before the call.** The Claude Code hook exits `2` and explains why;
+  it does not review the action afterwards.
+
+`npm install -g grudge-cli` · `pip install grudge-cli` · [Verify it works](#verify-it-works)
 
 ## Table of contents
 
@@ -949,6 +977,8 @@ npm --prefix packages/grudge run doctor:repo
 
 ## Release checklist
 
+> **Release status:** Grudge CLI `0.2.3` is published in both public package registries (`grudge-cli` on npm and on PyPI). The unrelated `grudge` package on npm is a different project, so install `grudge-cli`.
+
 Before publishing a new version:
 
 1. Update the npm and Python version metadata.
@@ -1063,6 +1093,9 @@ git diff --check
 
 Please include the behavior you changed, the checks you ran, and any platform
 limitations that remain. Do not remove tests to make a check pass.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the checks to run, what makes a good
+pull request, and the roadmap areas that most need help.
 
 ## License
 
