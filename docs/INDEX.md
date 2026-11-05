@@ -53,7 +53,7 @@
 | [`docs/FINAL-RELEASE-CONSISTENCY-REPORT.md`](FINAL-RELEASE-CONSISTENCY-REPORT.md) | Root cause, fix, evidence, and verdict for the three release-consistency defects: the stale published tarball, `grudge stats` block counts, and Claude Code nested settings discovery. | 0.2.1 release consistency | final |
 | [`docs/FINAL-RELEASE-CONSISTENCY-TEST-MATRIX.md`](FINAL-RELEASE-CONSISTENCY-TEST-MATRIX.md) | Every release-consistency check with its command, expected and observed result, and status. | 0.2.1 release consistency | final |
 | [`docs/PRODUCTION-READINESS-FINAL-REPORT.md`](PRODUCTION-READINESS-FINAL-REPORT.md) | Five-workstream production-readiness remediation: per-workstream evidence, the disposition of every audit finding, the full validation run, and the CONDITIONALLY READY verdict with its remaining conditions. | 0.2.1 production readiness | final |
-| [`../TEST.md`](../TEST.md) | Scratch-directory walkthrough for setup, hooks, stats, savings, and uninstall. | 24 | final |
+| [`../TEST.md`](../TEST.md) | Step-by-step verification procedure: build, install, record, propose, block, counters, uninstall, engine demo, and test suites. | 0.2.3 | draft |
 
 ## Status vocabulary
 

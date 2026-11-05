@@ -1,7 +1,10 @@
 # Grudge — Independent Test Results
 
-**What this is:** an independent execution of every test in [`TEST.md`](TEST.md)
-against the current checkout, by an auditor who did not write the code.
+**What this is:** an independent execution of the 22 feature tests in the
+2026-10-31 revision of [`TEST.md`](TEST.md), against commit `f12ae02`, by an
+auditor who did not write the code. The guide has since been rewritten and the
+defect described below was fixed in `f1dd813`; this file is kept as the audit
+record for that revision.
 **Date:** 2026-11-02
 **Commit tested:** `f12ae02` (`remediation/production-readiness`), version 0.2.1
 **How to read it:** each test was actually run. Nothing is marked PASS because

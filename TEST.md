@@ -1,300 +1,432 @@
-# TEST.md: try Grudge yourself (about 20 minutes)
+# Testing Grudge
 
-This guide walks you through Grudge the way a new developer would meet it. By the end you will have seen a rule get installed, watched Claude Code get stopped by it, and read the numbers it keeps.
+**Purpose:** A step-by-step procedure to verify that Grudge works in this checkout, from install through enforcement, ending in a pass/fail verdict.
+**Audience:** Anyone testing a build before release, and new contributors checking their environment.
+**Status:** draft
+**Last updated (phase):** 0.2.3
 
-**The idea in three lines**
-1. A **scar** is a rule about something the agent must never do again.
-2. A **hook** checks every action Claude Code is about to take against your scars, and stops a match before it runs.
-3. Grudge counts what it caught and stopped, so you can see whether it earns its place.
+Every command below was run against this checkout on Windows 11 with Node
+`25.2.1`, Python `3.14.0`, and Grudge `0.2.3`. Output blocks are real captures.
+Paths and scar IDs differ between machines.
 
-**You need:** Node 18 or newer and a terminal. Step 7 also needs Claude Code, and Step 10 needs Python 3.11 or newer (WSL is fine).
-
-> **Never test inside your home folder** (for example `C:\Users\you`). A repo-level install there acts like a global one and affects every project. Use the scratch folder in Step 1.
-
-Commands below are shown for **PowerShell** first, then **bash/WSL** where they differ.
-
----
-
-## Step 0: Clean up an earlier install (only if you ran setup in your home folder)
-
-You need this if Claude Code shows a **SessionStart hook error** mentioning `.grudge\bin\grudge.mjs`.
-
-1. Try the built-in remover first, from the folder where you ran setup:
-   ```powershell
-   cd $HOME
-   npx grudge-cli@latest uninstall
-   ```
-2. Check what is left. Open `%USERPROFILE%\.claude\settings.json` and delete any hook or `statusLine` entry whose command contains `.grudge`. Save the file.
-3. Open `%USERPROFILE%\.claude\CLAUDE.md` and delete the block between `<!-- grudge:begin` and `<!-- grudge:end -->` if it is there.
-4. Remove the leftover folder:
-   ```powershell
-   Remove-Item -Recurse -Force $HOME\.grudge
-   ```
-5. Start Claude Code anywhere. The hook error should be gone.
+The whole procedure takes about 20 minutes. Work through it in order — later
+steps depend on state the earlier ones create.
 
 ---
 
-## Step 1: Make a scratch project
+## What you are testing
 
-Use a temporary directory, not `$HOME` and not the Grudge checkout. On
-PowerShell, `$env:TEMP` is the Windows temporary directory; on bash/WSL use
-`${TMPDIR:-/tmp}`.
+Grudge has two packages that do different jobs:
 
-```powershell
-mkdir $env:TEMP\grudge-test
-cd $env:TEMP\grudge-test
-git init
-```
+| Package | Command | What it does |
+|---|---|---|
+| npm `grudge-cli` | `grudge` / `grudge-node` | Guard: records sessions, blocks tool calls through Claude Code hooks |
+| PyPI `grudge-cli` | `grudge-engine` | Engine: capture, shrink, admit, replay, and gate Scars |
 
-bash/WSL:
+The Guard blocks. The engine proves. Testing only one of them leaves half the
+product unverified.
+
+---
+
+## Step 0. Prerequisites
+
 ```bash
-mkdir -p "${TMPDIR:-/tmp}/grudge-test"
-cd "${TMPDIR:-/tmp}/grudge-test"
-git init
+node --version
+python --version
 ```
+
+You need Node.js 18 or newer and Python 3.11 or newer. If either is missing,
+nothing below will work and the failures will be confusing.
 
 ---
 
-## Step 2: Install Grudge (pinned, so you do not get a cached old version)
+## Step 1. Build the Guard from this checkout
 
-```powershell
-npx grudge-cli@0.2.1 setup
+Run from the repository root.
+
+```bash
+npm --prefix packages/grudge run build
 ```
 
-What you should see: a list of agents with **arrow keys to move, Space to toggle, Enter to confirm**, then a question about where to install (choose **this repository**).
+**What this proves:** the source compiles. A failure here is a broken checkout,
+not a configuration problem.
 
-Pick **Claude Code** only for this test.
+Confirm the built runtime responds:
 
-**Check the version** printed during setup. It should be `0.2.1`. If the
-version is older, clear the npx cache or install the intended version again.
-For a local unreleased checkout, build the package and install the generated
-`grudge-cli-0.2.1.tgz` into the scratch project; do not substitute the
-repository's `packages/grudge/dist` path for the published package flow.
-
----
-
-## Step 3: Run the health check
-
-```powershell
-npx grudge-cli@latest doctor
+```bash
+node packages/grudge/dist/grudge.mjs --version
 ```
 
-Everything should report as fine: Node version, hook script, settings file, hooks present, `.gitignore` entries.
-
-Now see what was created:
-
-```powershell
-dir .grudge
-dir .claude
-```
-
-You should see `.grudge\bin\grudge.mjs` and `.claude\settings.json` containing hooks.
-
----
-
-## Step 4: Prove the installed script runs on its own
-
-This is the check that catches the "Cannot find module ... commands\index.js" bug.
-
-```powershell
-node .grudge/bin/grudge.mjs statusline
-```
-
-Pass: it prints a short line, or nothing, and exits quietly.
-Fail: any message containing `Cannot find module`. That means the installed file is not self-contained. Stop and report it.
-
-To save typing for the rest of the test, define a short name for this session:
-
-```powershell
-function grudge { node .grudge/bin/grudge.mjs @args }
-```
-bash/WSL: `alias grudge='node .grudge/bin/grudge.mjs'`
-
----
-
-## Step 5: Prove the guard blocks (one command)
-
-This is the real proof, and it takes a few seconds. It uses a temporary
-project, so it does not touch this folder or your home directory:
-
-```powershell
-npx grudge-cli@latest verify
-```
-
-Pass: every line starts with `[ok]`, and the last two lines are:
+Expected:
 
 ```text
+grudge 0.2.3
+```
+
+---
+
+## Step 2. Prove enforcement with one command
+
+This is the single most important check. It needs no model, no network, and no
+Python.
+
+```bash
+node packages/grudge/dist/grudge.mjs verify
+```
+
+Expected final lines:
+
+```text
+[ok] allow: Bash "echo hello" exited 0 with no decision
+[ok] fail open: malformed payload exited 0 (allowed)
+[ok] stats: 1 blocked event in .grudge/stats.jsonl
+[ok] report: grudge report shows 1 caught, 1 blocked
 Result: PASS (10/10 checks)
 Temp project removed (use --keep to inspect it)
 ```
 
-The block line must read `block: Bash "echo GRUDGE_TEST" exited 2` with a
-reason. If anything fails, the command exits non-zero, keeps the temporary
-project, and prints its path so you can inspect what went wrong. Add `--keep`
-to keep it after a pass.
+**Pass:** `Result: PASS (10/10 checks)`.
 
-What it checks: install, installed runtime, event capture, propose, accept, the
-block, a benign call, fail-open on malformed input, the stats log, and
-`grudge report`.
+**Fail:** the failing line names which stage broke. A failure keeps the temp
+project and prints its path; `--keep` keeps it after a pass too, so you can
+inspect what was written.
 
----
-
-## Step 6: Create your own rule
-
-`verify` used a temporary project. In your scratch project you can write a rule
-the same way. We will ban one harmless command, `echo GRUDGE_TEST`, so nothing
-real is at risk.
-
-```powershell
-grudge propose --rule 'never call shell where command ~ \"GRUDGE_TEST\"' --why "harmless test rule" --preventive
-```
-
-bash/WSL (quotes are simpler there):
-```bash
-grudge propose --rule 'never call shell where command ~ "GRUDGE_TEST"' --why "harmless test rule" --preventive
-```
-
-If PowerShell complains about quotes, run this one command from Git Bash, WSL,
-or use `--rule-stdin` with a here-string in the same folder.
-
-The rule is **pending**, and the output says so: `PENDING. Not enforced until
-you run: grudge accept <id>`. A person has to approve it. That is on purpose, so
-a model can never add rules that block itself without you knowing. If you want
-the shortcut, `--accept` skips the review and enforces immediately.
-
-```powershell
-grudge scars list
-grudge accept <the id shown above>
-grudge scars list
-```
-
-Pass: the scar moves from pending to accepted.
-
-Optional: feed Grudge the same messages `verify` sends, by hand. An **allowed**
-command:
-
-```powershell
-'{"session_id":"t1","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"echo hello"}}' | node .grudge/bin/grudge.mjs hook pre-tool-use
-```
-
-Pass: no deny decision. A **blocked** command:
-
-```powershell
-'{"session_id":"t1","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"echo GRUDGE_TEST"}}' | node .grudge/bin/grudge.mjs hook pre-tool-use
-```
-
-Pass: a deny decision that names the scar, gives a short reason, and exits `2`.
+**What this proves:** the installed hook runner accepts real Claude Code
+`PreToolUse` payloads, blocks a call that matches an accepted rule with exit
+`2`, allows a benign call with exit `0`, fails open on malformed input, and
+writes both stats and a report. This is the only proof of *enforcement* in the
+product — `doctor` checks files, not decisions.
 
 ---
 
-## Step 7: Test it inside Claude Code (the real proof for your own install)
+## Step 3. Set up a disposable project
 
-`grudge verify` proves the shipped runtime. This step proves *your* install
-inside a live session.
-
-1. Start Claude Code inside `grudge-test`:
-   ```powershell
-   claude
-   ```
-2. Type `/hooks`. You should see the Grudge hooks listed.
-3. At the start you may see a short line listing your active scars. That is the SessionStart hook, and it is capped at about 1,200 characters.
-4. Ask:
-   > Run this shell command: echo GRUDGE_TEST
-
-   Pass: Claude Code does **not** run it, and shows a message naming the scar and telling Claude not to retry.
-5. Ask:
-   > Run this shell command: echo hello
-
-   Pass: it runs normally. Grudge only stops what a rule matches.
-
-If step 4 runs the command anyway, the hook is not wired up. Go back to Step 3.
-
-> **Do not trust the model's summary.** Weak or proxy models sometimes say they
-> ran a command, or that a rule is active, without running anything. Check the
-> transcript for the command output, or run `grudge verify` yourself. A rule is
-> only enforced when the output says accepted and the tool call was actually
-> blocked.
-
----
-
-## Step 8: Read the numbers
-
-Exit Claude Code, then:
-
-```powershell
-grudge stats
-grudge statusline
-```
-
-Pass: at least one **block** is counted. Token figures are always labeled **est.** because they are an estimate (blocks times an assumed cost of a retry), not a measurement.
-
----
-
-## Step 9: The end-of-turn savings line
-
-Repeat Step 7 and look right after Claude answers. You should see one short line like:
-
-```
-Grudge: 1 mistake caught, 1 blocked. ~1.5k tokens saved (est.), ~1.2k net of what Grudge injected.
-```
-
-It should stay silent on turns where nothing was caught. Then run:
-
-```powershell
-grudge report
-```
-
-to see this session and your lifetime totals.
-
----
-
-## Step 10: See how a rule is born from a real mistake (optional)
-
-This replays the demo: an agent leaks a fake secret, a rule is proposed and accepted, and the same attempt is blocked in a second session. No network, no API key.
+Do not test in your real repository. Create a scratch project:
 
 ```bash
-git clone https://github.com/harshithKumar12/Grudge
-cd Grudge
-python -m pip install -e .
+mkdir -p /d/Temp/grudge-lab && cd /d/Temp/grudge-lab && git init
+```
+
+On Windows PowerShell, use `New-Item -ItemType Directory -Force D:\Temp\grudge-lab`
+and `Set-Location D:\Temp\grudge-lab` instead.
+
+Install the guard into it:
+
+```bash
+node /c/Users/kotes/Desktop/Grudge/packages/grudge/dist/grudge.mjs setup -y
+```
+
+Adjust the path to your checkout. Expected:
+
+```text
+Grudge setup v0.2.3
+[ok] Scope: repo
+[ok] Agents: claude-code
+[ok] Files: 5 changed
+3 passed, 0 failed, 1 warnings
+Next: grudge doctor
+```
+
+The warning about the settings path is normal: Claude Code only loads a
+repo-scoped `.claude/settings.json` when the session starts in that directory.
+
+**Pass:** five files changed, including `.grudge/`, `.claude/settings.json`, and
+a managed block in `CLAUDE.md`.
+
+**What this proves:** setup detects the agent, writes the hook registration, and
+results in a self-contained runtime rather than a dependency on your checkout.
+
+Every command from here on uses the *installed* copy, `.grudge/bin/grudge.mjs`,
+not the checkout path.
+
+---
+
+## Step 4. Check the install
+
+```bash
+node .grudge/bin/grudge.mjs doctor
+```
+
+Expected tail:
+
+```text
+Enforcement: not proven by file checks. Run `grudge verify` to prove blocking works.
+20 passed, 0 failed, 2 warnings
+Next: grudge verify
+```
+
+**Pass:** `0 failed`. Warnings about an existing status line are expected if you
+already have one configured.
+
+**What this proves:** the files, hook registration, and config are coherent. It
+deliberately does *not* claim blocking works — that is Step 2's job.
+
+---
+
+## Step 5. Record a session
+
+`propose` needs an observed session before it will accept a rule. Simulate one
+by feeding the installed hook a `PostToolUse` payload:
+
+```bash
+echo '{"session_id":"lab-1","hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{"command":"rm -rf ./build"},"tool_response":"removed"}' \
+  | node .grudge/bin/grudge.mjs hook PostToolUse
+echo "exit=$?"
+```
+
+Expected: `exit=0` and no stdout (hooks stay quiet when they succeed).
+
+Confirm the session landed:
+
+```bash
+ls .grudge/session/
+```
+
+Expected: `lab-1.jsonl`.
+
+**Pass:** the file exists and contains one JSON line whose `tool` is `shell`,
+not `Bash`.
+
+**What this proves:** the hook contract accepts payloads, translates host tool
+names to canonical names, and persists events keyed by session. Without this,
+no rule can be learned. Running `propose` before this step fails with
+`no session found; record a session before proposing a rule` — that error is
+correct behavior, not a bug.
+
+---
+
+## Step 6. Propose and accept a rule
+
+```bash
+node .grudge/bin/grudge.mjs propose \
+  --rule 'never call shell where command ~ "rm -rf"' \
+  --why "agent deleted the build dir" --accept
+```
+
+Expected:
+
+```text
+Grudge propose v0.2.3
+[ok] Proposal: scar-2afdb527f5b5
+[ok] Status: accepted and enforced
+2 passed, 0 failed, 0 warnings
+```
+
+**Pass:** a scar ID is printed and the status reads *accepted and enforced*.
+
+**Fail:** `vacuous rule: it did not fire on the selected session` means the rule
+does not match what you recorded in Step 5 — check the `command` value matches.
+
+**What this proves:** the rule compiled from English-like DSL into a predicate,
+fired against a real recorded session, passed the over-broad-rule check against
+control sessions, and was written to `.grudge/compiled.json` in `block` mode.
+
+Without `--accept` the rule stays **pending**, which is not enforced. A pending
+scar must never be reported as active.
+
+---
+
+## Step 7. Prove the block
+
+Send the dangerous call as a `PreToolUse` payload:
+
+```bash
+echo '{"session_id":"lab-2","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"rm -rf ./build"}}' \
+  | node .grudge/bin/grudge.mjs hook PreToolUse
+echo "EXIT=$?"
+```
+
+Expected:
+
+```text
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny",...},"blocked":true,...}
+grudge: blocked by scar-2afdb527f5b5: Never call shell with the specified arguments. [...]
+EXIT=2
+```
+
+Now the benign call:
+
+```bash
+echo '{"session_id":"lab-2","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"echo hello"}}' \
+  | node .grudge/bin/grudge.mjs hook PreToolUse
+echo "EXIT=$?"
+```
+
+Expected: no output, `EXIT=0`.
+
+**Pass:** exit `2` with a deny decision on the first, exit `0` with silence on
+the second. Both halves matter — a guard that blocks everything is as broken as
+one that blocks nothing.
+
+**What this proves:** enforcement works on the live path, through the installed
+hook, with a real scar.
+
+### The regression this guards against
+
+An earlier version evaluated a rule against *every event in the session* instead
+of the pending call. Once a session contained one matching event, every later
+tool call in that session was denied — including harmless ones. That was fixed
+in `f1dd813`.
+
+Step 7 already covers half of it, because both calls use the same
+`session_id`. To exercise the exact failure, send a *harmless* call in the same
+session after a blocked one:
+
+```bash
+echo '{"session_id":"lab-2","hook_event_name":"PreToolUse","tool_name":"Write","tool_input":{"path":"src/app.js","content":"hi"}}' \
+  | node .grudge/bin/grudge.mjs hook PreToolUse
+echo "EXIT=$?"
+```
+
+**Pass:** `EXIT=0`. **Fail:** exit `2` — the session-scoping bug has returned,
+and the guard is now unusable for the rest of any session that trips a rule.
+
+---
+
+## Step 8. Confirm the counters
+
+```bash
+node .grudge/bin/grudge.mjs stats
+node .grudge/bin/grudge.mjs report
+```
+
+Expected:
+
+```text
+Grudge stats v0.2.3
+[ok] Blocks: 1
+[ok] Warnings: 0
+[ok] Scars: 1
+[ok] Estimated savings: ~1500 tokens
+```
+
+```text
+Grudge report v0.2.3
+[ok] lifetime: 1 caught, 1 blocked, 0 warned
+```
+
+**What this proves:** the decision was recorded, not just returned. Note that
+savings are labelled `estimated` — they value a blocked call at a fixed token
+estimate rather than measuring a real retry. Treat the number as indicative.
+
+---
+
+## Step 9. Confirm uninstall is clean
+
+```bash
+node .grudge/bin/grudge.mjs uninstall
+```
+
+Expected:
+
+```text
+Grudge uninstall v0.2.3
+[ok] Restored: 4 files
+[ok] Removed: 9 paths
+3 passed, 0 failed, 0 warnings
+```
+
+**Pass:** Grudge-managed content is gone, and any content Grudge did not write
+is left alone. Verify by checking that `.grudge/` is removed and that your
+`.claude/` settings no longer contain Grudge hooks.
+
+**What this proves:** the install is reversible. This matters more than it
+sounds — a tool that cannot be cleanly removed is one people are reluctant to
+try.
+
+---
+
+## Step 10. Run the Python engine demo
+
+From the repository root, not the scratch project:
+
+```bash
+python -m grudge demo --no-browser --fast --json
+```
+
+Expected JSON includes:
+
+```json
+"mode": "offline/deterministic",
+"vulnerable": { "passed": false, "successes": 0 },
+"fixed": { "passed": true, "successes": 1 }
+```
+
+**Pass:** `vulnerable.passed` is `false` and `fixed.passed` is `true`.
+
+**What this proves:** the core claim — a Scar is red on the bad agent and green
+on the fixed one. It runs fully offline against checked-in fake tools and
+scripted policies, so it does not depend on any model provider.
+
+For the two-session hook proof:
+
+```bash
 python -m grudge demo --guard --json
 ```
 
-Pass: the output shows session 1 leaked and a rule was proposed, and session 2 was blocked.
+This needs a Node Guard runtime. It resolves `--node-runtime`, then
+`GRUDGE_NODE_RUNTIME`, then a checkout, then `packages/grudge/node_modules`.
 
-For the visual version with the shrink animation:
+---
+
+## Step 11. Run the test suites
+
+From the repository root:
+
 ```bash
-python -m grudge demo
+python -m pytest
 ```
+
+Expected: `342 passed, 1 skipped`.
+
+```bash
+npm test --prefix packages/grudge
+```
+
+Expected: `pass 184`, `fail 0`.
+
+```bash
+python -m scripts.docs_check
+```
+
+Expected: `docs-check: 44 indexed, non-empty, linked documentation files` with
+exit `0`.
 
 ---
 
-## Step 11: Remove everything
+## Interpreting results
 
-From `grudge-test`:
-```powershell
-npx grudge-cli@0.2.1 uninstall
-```
-Then check `.claude\settings.json` has no `.grudge` entries and that the managed block is gone from `CLAUDE.md`. Uninstall removes only Grudge-managed content; do not manually delete a file containing user content.
-
----
-
-## If something looks wrong
-
-| What you see | What it means |
+| Symptom | Likely cause |
 |---|---|
-| `Cannot find module ... commands\index.js` | The installed script is the old unbundled one. Update to `0.1.9` or later and run setup again. |
-| Setup prints a wall of JSON | You are on an old version. `0.1.9` prints a structured summary by default; use `--json` for scripts. |
-| You chose scope "local" but the result says "repo" | Old scope bug. Update and retry. |
-| `doctor` is green but Claude runs the blocked command | Expected. `doctor` only reads files. Run `grudge verify`, then check `/hooks` and restart Claude Code. |
-| `grudge verify` reports FAIL | Real problem in the shipped runtime or this machine. The kept temp project and the failing line show where. |
-| Quote errors in `propose` on PowerShell | Use Git Bash or WSL for that one command, or `--rule-stdin`. |
-| Hook error on every session in every project | The install went into your home folder. Do Step 0. |
-| A hook error naming some other plugin | Another tool's hook, not Grudge's. Grudge never edits hook entries it did not create. |
+| `verify` fails at `install` | stale build — rerun Step 1 |
+| `propose` says `no session found` | you skipped Step 5, or ran it in another directory |
+| `propose` says `vacuous rule` | the rule does not match the command you recorded |
+| Block does not fire | the scar is `pending`, not `accepted` |
+| `doctor` warns about the status line | you already had one; Grudge will not overwrite it |
+| `no installed runtime found` | you ran `packages/grudge/dist/grudge.mjs` with `--cwd` instead of the installed copy |
 
-## You are done when
+## What a full pass means
 
-- [ ] `grudge verify` prints `Result: PASS (10/10 checks)`.
-- [ ] `doctor` is clean and Step 4 runs without errors.
-- [ ] The blocked command is stopped in Claude Code and the harmless one runs.
-- [ ] `stats` shows at least one block, with figures labeled **est.**
-- [ ] Uninstall leaves no `.grudge` entries behind.
+Every step passing establishes that:
+
+1. the Guard installs into a repository and can be removed cleanly;
+2. it records sessions and translates host tool names;
+3. a rule learned from a session is enforced on the live path;
+4. benign calls are not affected;
+5. the engine's offline proof is red on the bad agent and green on the fixed one;
+6. both test suites are green.
+
+It does **not** establish that other agents are protected. Codex, Gemini CLI,
+GitHub Copilot, OpenCode, and Windsurf receive an advisory instruction file —
+nothing blocks their tool calls. Guard enforcement is verified for Claude Code
+only, because it is the only integration that exposes blocking command hooks.
+
+---
+
+## Cleanup
+
+```bash
+rm -rf /d/Temp/grudge-lab
+```
+
+On PowerShell: `Remove-Item -Recurse -Force D:\Temp\grudge-lab`.
