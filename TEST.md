@@ -138,10 +138,35 @@ as broken as one that blocks nothing.
 
 ```bash
 grudge uninstall
+```
+
+Expected:
+
+```text
+[ok] Restored: 4 files
+[ok] Removed: 9 paths
+```
+
+Check the folder afterwards:
+
+```bash
+ls -a
+```
+
+Expected: `.git`, `.gitignore`, and an **empty** `.claude/`. Every Grudge hook,
+scar, and managed block is gone; the directory remains because uninstall will
+not delete a folder it did not create and cannot know is unused. Delete it
+yourself if it is empty.
+
+**Pass:** no `.grudge/`, no Grudge hooks in `.claude/settings.json`, and your
+own content untouched.
+
+Then remove the lab:
+
+```bash
 rm -rf /d/Temp/grudge-lab
 ```
 
-If Grudge-managed content is gone and your folder is back to just `.git`, you're done.
-
 **Verdict:** Steps 1, 2, 3, and 4 all passing means the npm package installs,
-blocks real calls, leaves benign calls alone, and uninstalls cleanly.
+blocks real calls, leaves benign calls alone, and uninstalls without collateral
+damage.
